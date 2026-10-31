@@ -8,7 +8,6 @@ import {
   Share2,
   RotateCcw,
   Check,
-  Plus,
   Gamepad2,
 } from 'lucide-react';
 
@@ -131,15 +130,6 @@ export function GameCard({ game, isActive }: GameCardProps) {
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
           </button>
-
-          {/* Create New */}
-          <Link
-            href="/create"
-            aria-label="Create game"
-            className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-zinc-200 backdrop-blur-md active:scale-90 transition-all"
-          >
-            <Plus className="w-4 h-4" />
-          </Link>
         </div>
       </div>
 
