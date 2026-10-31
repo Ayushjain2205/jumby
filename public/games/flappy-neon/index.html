@@ -10,11 +10,11 @@
     html, body { width: 100%; height: 100%; overflow: hidden; background: #070714; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     canvas { display: block; width: 100%; height: 100%; }
     #ui {
-      position: absolute; top: 24px; left: 0; right: 0;
+      position: absolute; top: 52px; left: 0; right: 0;
       text-align: center; pointer-events: none; z-index: 10;
     }
     .score {
-      font-size: 56px; font-weight: 900; color: #fff;
+      font-size: 52px; font-weight: 900; color: #fff;
       text-shadow: 0 0 20px #00f0ff, 0 0 40px #00f0ff;
     }
     #tap-hint {
@@ -22,6 +22,29 @@
       text-align: center; color: #ff0077; font-size: 18px; font-weight: 700;
       text-shadow: 0 0 10px #ff0077; animation: pulse 1.2s infinite alternate;
       pointer-events: none;
+    }
+    #gameover-actions {
+      display: none; position: absolute; bottom: 18%; left: 50%;
+      transform: translateX(-50%); width: 85%; max-width: 320px;
+      flex-direction: column; gap: 8px; z-index: 30;
+    }
+    .action-btn {
+      width: 100%; padding: 12px; border-radius: 16px; border: none;
+      font-weight: 800; font-size: 13px; cursor: pointer; transition: transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .action-btn:active { transform: scale(0.96); }
+    .btn-revive {
+      background: linear-gradient(135deg, #10b981, #06b6d4); color: #000;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    }
+    .btn-shield {
+      background: linear-gradient(135deg, #f59e0b, #eab308); color: #000;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    }
+    .btn-restart {
+      background: rgba(255, 255, 255, 0.15); color: #fff; backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
     @keyframes pulse { from { opacity: 0.4; transform: scale(0.96); } to { opacity: 1; transform: scale(1.04); } }
   </style>
@@ -31,6 +54,19 @@
     <div id="score" class="score">0</div>
   </div>
   <div id="tap-hint">TAP TO FLAP</div>
+
+  <div id="gameover-actions">
+    <button id="btn-revive" class="action-btn btn-revive">
+      <span>📺</span> Watch Ad to Revive
+    </button>
+    <button id="btn-shield" class="action-btn btn-shield">
+      <span>🪙</span> Buy Cyber Shield (20 Coins)
+    </button>
+    <button id="btn-restart" class="action-btn btn-restart">
+      <span>🔄</span> Tap to Restart
+    </button>
+  </div>
+
   <canvas id="canvas"></canvas>
 
   <script>
@@ -38,6 +74,10 @@
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
     const hintEl = document.getElementById('tap-hint');
+    const actionsEl = document.getElementById('gameover-actions');
+    const btnRevive = document.getElementById('btn-revive');
+    const btnShield = document.getElementById('btn-shield');
+    const btnRestart = document.getElementById('btn-restart');
 
     let width, height;
     function resize() {
@@ -47,12 +87,10 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // Game State
     let state = 'waiting'; // waiting, playing, dead
     let score = 0;
     let frames = 0;
 
-    // Player
     const player = {
       x: 80,
       y: 0,
@@ -61,14 +99,17 @@
       gravity: 0.38,
       jumpForce: -7.5,
       trail: [],
+      hasShield: false,
+      invulnerableFrames: 0,
       reset() {
         this.y = height * 0.45;
         this.vy = 0;
         this.trail = [];
+        this.hasShield = false;
+        this.invulnerableFrames = 0;
       }
     };
 
-    // Obstacles
     let pipes = [];
     const pipeWidth = 60;
     const pipeGap = 160;
@@ -90,22 +131,58 @@
       if (state === 'waiting') {
         state = 'playing';
         hintEl.style.display = 'none';
+        actionsEl.style.display = 'none';
         player.vy = player.jumpForce;
         if (window.Jumby) window.Jumby.sound.jump();
       } else if (state === 'playing') {
         player.vy = player.jumpForce;
         if (window.Jumby) window.Jumby.sound.jump();
-      } else if (state === 'dead') {
-        resetGame();
       }
     }
 
-    window.addEventListener('pointerdown', jump);
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#gameover-actions')) return;
+      if (state === 'dead') return;
+      jump();
+    });
+
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault();
-        jump();
+        if (state === 'dead') resetGame();
+        else jump();
       }
+    });
+
+    // Rewarded Ad Revive Integration
+    btnRevive.addEventListener('click', async () => {
+      if (!window.Jumby) return;
+      const ad = await window.Jumby.ads.showRewarded();
+      if (ad && ad.completed) {
+        // Revive player!
+        state = 'playing';
+        actionsEl.style.display = 'none';
+        player.y = height * 0.45;
+        player.vy = -4;
+        player.invulnerableFrames = 180; // 3 seconds invulnerability
+        player.hasShield = true;
+        if (window.Jumby.sound) window.Jumby.sound.powerup();
+      }
+    });
+
+    // In-Game Purchase (Jumby Coins) Integration
+    btnShield.addEventListener('click', async () => {
+      if (!window.Jumby) return;
+      const res = await window.Jumby.payments.buyItem({ item: 'Cyber Shield', priceCoins: 20 });
+      if (res) {
+        player.hasShield = true;
+        btnShield.style.display = 'none';
+        if (window.Jumby.sound) window.Jumby.sound.powerup();
+      }
+    });
+
+    btnRestart.addEventListener('click', () => {
+      resetGame();
     });
 
     function resetGame() {
@@ -114,6 +191,8 @@
       scoreEl.textContent = '0';
       hintEl.style.display = 'block';
       hintEl.textContent = 'TAP TO FLAP';
+      actionsEl.style.display = 'none';
+      btnShield.style.display = 'flex';
       pipes = [];
       player.reset();
       state = 'waiting';
@@ -122,12 +201,28 @@
 
     player.reset();
 
-    // Game Loop
+    function die() {
+      // Check if shield absorbs hit
+      if (player.hasShield) {
+        player.hasShield = false;
+        player.invulnerableFrames = 60; // 1 second mercy
+        if (window.Jumby) window.Jumby.sound.score();
+        return;
+      }
+
+      state = 'dead';
+      actionsEl.style.display = 'flex';
+      hintEl.style.display = 'none';
+      if (window.Jumby) {
+        window.Jumby.sound.hit();
+        window.Jumby.gameOver(score);
+      }
+    }
+
     function loop() {
       requestAnimationFrame(loop);
       frames++;
 
-      // Background clear with slight trail
       ctx.fillStyle = '#070714';
       ctx.fillRect(0, 0, width, height);
 
@@ -144,23 +239,20 @@
       }
 
       if (state === 'playing') {
-        // Player physics
         player.vy += player.gravity;
         player.y += player.vy;
 
-        // Player trail
+        if (player.invulnerableFrames > 0) player.invulnerableFrames--;
+
         player.trail.push({ x: player.x, y: player.y });
         if (player.trail.length > 12) player.trail.shift();
 
-        // Spawn pipes
         if (frames % 100 === 0) spawnPipe();
 
-        // Move pipes
         for (let i = pipes.length - 1; i >= 0; i--) {
           const p = pipes[i];
           p.x -= pipeSpeed;
 
-          // Score detection
           if (!p.passed && p.x + pipeWidth < player.x) {
             p.passed = true;
             score++;
@@ -171,8 +263,8 @@
             }
           }
 
-          // Collision detection
           if (
+            player.invulnerableFrames === 0 &&
             player.x + player.radius > p.x &&
             player.x - player.radius < p.x + pipeWidth
           ) {
@@ -181,28 +273,21 @@
             }
           }
 
-          // Remove offscreen pipes
           if (p.x + pipeWidth < -10) pipes.splice(i, 1);
         }
 
-        // Floor / Ceiling collision
         if (player.y + player.radius > height || player.y - player.radius < 0) {
           die();
         }
       }
 
-      // Draw Pipes (Neon glowing columns)
+      // Draw Pipes
       for (const p of pipes) {
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#ff0077';
         ctx.fillStyle = '#ff0077';
-
-        // Top Pipe
         ctx.fillRect(p.x, 0, pipeWidth, p.top);
-        // Bottom Pipe
         ctx.fillRect(p.x, height - p.bottom, pipeWidth, p.bottom);
-
-        // Pipe accent lines
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(p.x + 4, 0, 3, p.top);
         ctx.fillRect(p.x + 4, height - p.bottom, 3, p.bottom);
@@ -221,30 +306,31 @@
         ctx.fill();
       }
 
+      // Draw Cyber Shield Halo
+      if (player.hasShield) {
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#facc15';
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       // Draw Player
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = '#00f0ff';
-      ctx.fillStyle = '#00f0ff';
+      ctx.shadowBlur = player.invulnerableFrames > 0 ? 30 : 20;
+      ctx.shadowColor = player.invulnerableFrames > 0 ? '#ffffff' : '#00f0ff';
+      ctx.fillStyle = player.invulnerableFrames > 0 ? '#ffffff' : '#00f0ff';
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
       ctx.fill();
 
       // Eye
       ctx.shadowBlur = 0;
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#070714';
       ctx.beginPath();
       ctx.arc(player.x + 6, player.y - 3, 5, 0, Math.PI * 2);
       ctx.fill();
-    }
-
-    function die() {
-      state = 'dead';
-      hintEl.style.display = 'block';
-      hintEl.textContent = 'TAP TO RESTART';
-      if (window.Jumby) {
-        window.Jumby.sound.hit();
-        window.Jumby.gameOver(score);
-      }
     }
 
     loop();

@@ -28,6 +28,10 @@ export interface Game {
   tags: string[];
   controlsHint: string;
   createdAt: string;
+  isSponsored?: boolean;
+  sponsorName?: string;
+  sponsorCta?: string;
+  sponsorUrl?: string;
 }
 
 // Sandbox postMessage Protocol

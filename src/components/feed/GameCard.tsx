@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Game } from '@/types/game';
+import { useWallet } from '@/context/WalletContext';
 import {
   Heart,
   Share2,
   RotateCcw,
   Check,
   Gamepad2,
+  ExternalLink,
 } from 'lucide-react';
 
 interface GameCardProps {
@@ -18,13 +20,14 @@ interface GameCardProps {
 
 export function GameCard({ game, isActive }: GameCardProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const { coins, openShop, requestPayment, requestRewardedAd } = useWallet();
 
   const [likes, setLikes] = useState(game.stats.likes);
   const [isLiked, setIsLiked] = useState(false);
   const [copied, setCopied] = useState(false);
   const [gameOverScore, setGameOverScore] = useState<number | null>(null);
 
-  // Listen to sandbox postMessages for game over
+  // Listen to sandbox postMessages for game over, IAP, and rewarded ads
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       const data = event.data;
@@ -32,12 +35,68 @@ export function GameCard({ game, isActive }: GameCardProps) {
 
       if (data.type === 'JUMBY_GAME_OVER') {
         setGameOverScore(data.score ?? 0);
+      } else if (data.type === 'JUMBY_BUY_ITEM') {
+        // Native In-Game Purchase request from game
+        requestPayment({
+          requestId: data.requestId,
+          item: data.item || 'Mystery Item',
+          priceCoins: Number(data.priceCoins) || 10,
+          gameTitle: game.title,
+          onSuccess: () => {
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: 'JUMBY_BUY_RESPONSE',
+                requestId: data.requestId,
+                success: true,
+                item: data.item,
+              },
+              '*'
+            );
+          },
+          onCancel: () => {
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: 'JUMBY_BUY_RESPONSE',
+                requestId: data.requestId,
+                success: false,
+              },
+              '*'
+            );
+          },
+        });
+      } else if (data.type === 'JUMBY_SHOW_REWARDED_AD') {
+        // Native Rewarded Ad request from game
+        requestRewardedAd({
+          requestId: data.requestId,
+          sponsorName: 'Jumby Ads',
+          rewardType: 'Revive & Bonus',
+          onReward: () => {
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: 'JUMBY_AD_RESPONSE',
+                requestId: data.requestId,
+                rewardGranted: true,
+              },
+              '*'
+            );
+          },
+          onClose: () => {
+            iframeRef.current?.contentWindow?.postMessage(
+              {
+                type: 'JUMBY_AD_RESPONSE',
+                requestId: data.requestId,
+                rewardGranted: false,
+              },
+              '*'
+            );
+          },
+        });
       }
     }
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [game.title, requestPayment, requestRewardedAd]);
 
   // When card becomes active/inactive, notify iframe
   useEffect(() => {
@@ -85,7 +144,7 @@ export function GameCard({ game, isActive }: GameCardProps) {
 
   return (
     <div className="relative w-full h-full flex flex-col bg-black overflow-hidden select-none">
-      {/* Sleek, Minimal Top Bar (No Remix Clutter) */}
+      {/* Sleek, Minimal Top Bar */}
       <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-3 py-2 bg-gradient-to-b from-black/85 via-black/50 to-transparent">
         {/* Left: Brand + Title + Creator */}
         <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -98,17 +157,34 @@ export function GameCard({ game, isActive }: GameCardProps) {
           </Link>
 
           <div className="flex flex-col min-w-0 leading-tight">
-            <span className="font-extrabold text-xs text-white truncate drop-shadow">
-              {game.title}
-            </span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-extrabold text-xs text-white truncate drop-shadow">
+                {game.title}
+              </span>
+              {game.isSponsored && (
+                <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  Ad
+                </span>
+              )}
+            </div>
             <span className="text-[10px] text-zinc-400 font-medium truncate">
-              @{game.creator.username}
+              {game.isSponsored ? `Promoted by ${game.sponsorName}` : `@${game.creator.username}`}
             </span>
           </div>
         </div>
 
-        {/* Right: Actions (Like, Share, Create) */}
+        {/* Right: Actions (Coins Wallet, Like, Share) */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Jumby Coins Pill */}
+          <button
+            onClick={openShop}
+            title="Open Jumby Coin Shop"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-[11px] font-black text-amber-300 backdrop-blur-md active:scale-95 transition-all shadow-sm"
+          >
+            <span>🪙</span>
+            <span>{coins}</span>
+          </button>
+
           {/* Like */}
           <button
             onClick={handleLike}
@@ -142,7 +218,22 @@ export function GameCard({ game, isActive }: GameCardProps) {
         className="w-full h-full border-0 z-0 bg-[#070714]"
       />
 
-      {/* Clean Game Over Modal (Only shown after player dies) */}
+      {/* In-Feed Sponsored Ad CTA Overlay (Only on sponsored cards) */}
+      {game.isSponsored && game.sponsorCta && (
+        <div className="absolute bottom-5 left-4 right-4 z-20">
+          <a
+            href={game.sponsorUrl || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-400 text-black font-black text-xs shadow-xl shadow-amber-500/30 hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <span>{game.sponsorCta}</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+
+      {/* Clean Game Over Modal */}
       {gameOverScore !== null && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-fade-in">
           <div className="w-full max-w-xs rounded-3xl bg-zinc-900 border border-white/10 p-6 text-center shadow-2xl">
