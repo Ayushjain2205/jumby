@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { GameFeed } from '@/components/feed/GameFeed';
 import { AppHeader } from '@/components/layout/AppHeader';
+import { MobileShell } from '@/components/layout/MobileShell';
 import { SEED_GAMES } from '@/data/seed-games';
 
 interface GamePageProps {
@@ -64,9 +65,9 @@ export default async function GamePermalinkPage({ params }: GamePageProps) {
   ];
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden bg-black">
+    <MobileShell>
       <AppHeader />
       <GameFeed games={orderedGames} initialSlug={slug} />
-    </main>
+    </MobileShell>
   );
 }

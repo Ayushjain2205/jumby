@@ -84,7 +84,7 @@ export function GameFeed({ games, initialSlug }: GameFeedProps) {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-black">
+    <div className="relative w-full h-full overflow-hidden bg-black">
       {/* Snap-scroll container */}
       <div
         ref={containerRef}
