@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Flappy Neon</title>
+  <script src="/jumby-sdk.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #070714; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #ui {
+      position: absolute; top: 24px; left: 0; right: 0;
+      text-align: center; pointer-events: none; z-index: 10;
+    }
+    .score {
+      font-size: 56px; font-weight: 900; color: #fff;
+      text-shadow: 0 0 20px #00f0ff, 0 0 40px #00f0ff;
+    }
+    #tap-hint {
+      position: absolute; bottom: 35%; left: 0; right: 0;
+      text-align: center; color: #ff0077; font-size: 18px; font-weight: 700;
+      text-shadow: 0 0 10px #ff0077; animation: pulse 1.2s infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes pulse { from { opacity: 0.4; transform: scale(0.96); } to { opacity: 1; transform: scale(1.04); } }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="score" class="score">0</div>
+  </div>
+  <div id="tap-hint">TAP TO FLAP</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const hintEl = document.getElementById('tap-hint');
+
+    let width, height;
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Game State
+    let state = 'waiting'; // waiting, playing, dead
+    let score = 0;
+    let frames = 0;
+
+    // Player
+    const player = {
+      x: 80,
+      y: 0,
+      radius: 16,
+      vy: 0,
+      gravity: 0.38,
+      jumpForce: -7.5,
+      trail: [],
+      reset() {
+        this.y = height * 0.45;
+        this.vy = 0;
+        this.trail = [];
+      }
+    };
+
+    // Obstacles
+    let pipes = [];
+    const pipeWidth = 60;
+    const pipeGap = 160;
+    const pipeSpeed = 3.2;
+
+    function spawnPipe() {
+      const minHeight = 60;
+      const maxHeight = height - pipeGap - minHeight;
+      const topHeight = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+      pipes.push({
+        x: width,
+        top: topHeight,
+        bottom: height - topHeight - pipeGap,
+        passed: false
+      });
+    }
+
+    function jump() {
+      if (state === 'waiting') {
+        state = 'playing';
+        hintEl.style.display = 'none';
+        player.vy = player.jumpForce;
+        if (window.Jumby) window.Jumby.sound.jump();
+      } else if (state === 'playing') {
+        player.vy = player.jumpForce;
+        if (window.Jumby) window.Jumby.sound.jump();
+      } else if (state === 'dead') {
+        resetGame();
+      }
+    }
+
+    window.addEventListener('pointerdown', jump);
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        jump();
+      }
+    });
+
+    function resetGame() {
+      score = 0;
+      frames = 0;
+      scoreEl.textContent = '0';
+      hintEl.style.display = 'block';
+      hintEl.textContent = 'TAP TO FLAP';
+      pipes = [];
+      player.reset();
+      state = 'waiting';
+      if (window.Jumby) window.Jumby.setScore(0);
+    }
+
+    player.reset();
+
+    // Game Loop
+    function loop() {
+      requestAnimationFrame(loop);
+      frames++;
+
+      // Background clear with slight trail
+      ctx.fillStyle = '#070714';
+      ctx.fillRect(0, 0, width, height);
+
+      // Grid background effect
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.05)';
+      ctx.lineWidth = 1;
+      const gridSize = 40;
+      const offsetX = (frames * 1.5) % gridSize;
+      for (let x = -offsetX; x < width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+
+      if (state === 'playing') {
+        // Player physics
+        player.vy += player.gravity;
+        player.y += player.vy;
+
+        // Player trail
+        player.trail.push({ x: player.x, y: player.y });
+        if (player.trail.length > 12) player.trail.shift();
+
+        // Spawn pipes
+        if (frames % 100 === 0) spawnPipe();
+
+        // Move pipes
+        for (let i = pipes.length - 1; i >= 0; i--) {
+          const p = pipes[i];
+          p.x -= pipeSpeed;
+
+          // Score detection
+          if (!p.passed && p.x + pipeWidth < player.x) {
+            p.passed = true;
+            score++;
+            scoreEl.textContent = score;
+            if (window.Jumby) {
+              window.Jumby.setScore(score);
+              window.Jumby.sound.score();
+            }
+          }
+
+          // Collision detection
+          if (
+            player.x + player.radius > p.x &&
+            player.x - player.radius < p.x + pipeWidth
+          ) {
+            if (player.y - player.radius < p.top || player.y + player.radius > height - p.bottom) {
+              die();
+            }
+          }
+
+          // Remove offscreen pipes
+          if (p.x + pipeWidth < -10) pipes.splice(i, 1);
+        }
+
+        // Floor / Ceiling collision
+        if (player.y + player.radius > height || player.y - player.radius < 0) {
+          die();
+        }
+      }
+
+      // Draw Pipes (Neon glowing columns)
+      for (const p of pipes) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff0077';
+        ctx.fillStyle = '#ff0077';
+
+        // Top Pipe
+        ctx.fillRect(p.x, 0, pipeWidth, p.top);
+        // Bottom Pipe
+        ctx.fillRect(p.x, height - p.bottom, pipeWidth, p.bottom);
+
+        // Pipe accent lines
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(p.x + 4, 0, 3, p.top);
+        ctx.fillRect(p.x + 4, height - p.bottom, 3, p.bottom);
+      }
+
+      // Draw Player Trail
+      for (let i = 0; i < player.trail.length; i++) {
+        const t = player.trail[i];
+        const alpha = (i + 1) / player.trail.length * 0.4;
+        const rad = player.radius * ((i + 1) / player.trail.length);
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#00f0ff';
+        ctx.fillStyle = `rgba(0, 240, 255, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, rad, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw Player
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#00f0ff';
+      ctx.fillStyle = '#00f0ff';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eye
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(player.x + 6, player.y - 3, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function die() {
+      state = 'dead';
+      hintEl.style.display = 'block';
+      hintEl.textContent = 'TAP TO RESTART';
+      if (window.Jumby) {
+        window.Jumby.sound.hit();
+        window.Jumby.gameOver(score);
+      }
+    }
+
+    loop();
+  </script>
+</body>
+</html>

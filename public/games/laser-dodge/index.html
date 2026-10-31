@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Orbital Laser Dodge</title>
+  <script src="/jumby-sdk.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #05050f; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #ui {
+      position: absolute; top: 24px; left: 0; right: 0;
+      text-align: center; pointer-events: none; z-index: 10;
+    }
+    .score {
+      font-size: 56px; font-weight: 900; color: #fff;
+      text-shadow: 0 0 20px #ffe600, 0 0 40px #ffe600;
+    }
+    #tap-hint {
+      position: absolute; bottom: 25%; left: 0; right: 0;
+      text-align: center; color: #ffe600; font-size: 18px; font-weight: 700;
+      text-shadow: 0 0 10px #ffe600; animation: pulse 1.2s infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes pulse { from { opacity: 0.4; transform: scale(0.96); } to { opacity: 1; transform: scale(1.04); } }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="score" class="score">0</div>
+  </div>
+  <div id="tap-hint">TAP TO REVERSE ORBIT</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const hintEl = document.getElementById('tap-hint');
+
+    let width, height, cx, cy, orbitRadius;
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      cx = width / 2;
+      cy = height / 2;
+      orbitRadius = Math.min(width, height) * 0.32;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let state = 'waiting'; // waiting, playing, dead
+    let score = 0;
+    let frames = 0;
+
+    // Player (orbits around center)
+    const player = {
+      angle: 0,
+      speed: 0.045,
+      direction: 1, // 1: CW, -1: CCW
+      radius: 14,
+      particles: []
+    };
+
+    // Obstacles & Collectibles
+    let hazards = [];
+    let crystals = [];
+
+    function spawnHazard() {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.6 + Math.min(score * 0.05, 3.5);
+      hazards.push({
+        x: cx + Math.cos(angle) * (orbitRadius * 1.9),
+        y: cy + Math.sin(angle) * (orbitRadius * 1.9),
+        vx: -Math.cos(angle) * speed,
+        vy: -Math.sin(angle) * speed,
+        radius: 12,
+        color: '#ff0055'
+      });
+    }
+
+    function spawnCrystal() {
+      const angle = Math.random() * Math.PI * 2;
+      crystals.push({
+        angle: angle,
+        x: cx + Math.cos(angle) * orbitRadius,
+        y: cy + Math.sin(angle) * orbitRadius,
+        radius: 10,
+        pulse: 0
+      });
+    }
+
+    function handleAction() {
+      if (state === 'waiting') {
+        state = 'playing';
+        hintEl.style.display = 'none';
+        player.direction *= -1;
+        if (window.Jumby) window.Jumby.sound.jump();
+      } else if (state === 'playing') {
+        player.direction *= -1;
+        if (window.Jumby) window.Jumby.sound.jump();
+      } else if (state === 'dead') {
+        resetGame();
+      }
+    }
+
+    window.addEventListener('pointerdown', handleAction);
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        handleAction();
+      }
+    });
+
+    function resetGame() {
+      state = 'waiting';
+      score = 0;
+      frames = 0;
+      scoreEl.textContent = '0';
+      hintEl.style.display = 'block';
+      hintEl.textContent = 'TAP TO REVERSE ORBIT';
+      hazards = [];
+      crystals = [];
+      player.angle = 0;
+      player.direction = 1;
+      player.particles = [];
+      if (window.Jumby) window.Jumby.setScore(0);
+    }
+
+    function die() {
+      state = 'dead';
+      hintEl.style.display = 'block';
+      hintEl.textContent = 'TAP TO RESTART';
+      if (window.Jumby) {
+        window.Jumby.sound.hit();
+        window.Jumby.gameOver(score);
+      }
+    }
+
+    function loop() {
+      requestAnimationFrame(loop);
+      frames++;
+
+      // Background
+      ctx.fillStyle = '#05050f';
+      ctx.fillRect(0, 0, width, height);
+
+      // Core glow in center
+      const corePulse = Math.sin(frames * 0.05) * 4;
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = '#00f0ff';
+      ctx.fillStyle = '#00f0ff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 26 + corePulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Orbit Track Ring
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, orbitRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (state === 'playing') {
+        // Player movement
+        player.angle += player.speed * player.direction;
+        const px = cx + Math.cos(player.angle) * orbitRadius;
+        const py = cy + Math.sin(player.angle) * orbitRadius;
+
+        // Player trail
+        player.particles.push({ x: px, y: py, alpha: 0.8 });
+        if (player.particles.length > 14) player.particles.shift();
+
+        // Spawns
+        if (frames % Math.max(35, 75 - score * 2) === 0) spawnHazard();
+        if (crystals.length < 2 && Math.random() < 0.02) spawnCrystal();
+
+        // Update Crystals
+        for (let i = crystals.length - 1; i >= 0; i--) {
+          const c = crystals[i];
+          const dist = Math.hypot(px - c.x, py - c.y);
+          if (dist < player.radius + c.radius + 8) {
+            crystals.splice(i, 1);
+            score += 3;
+            scoreEl.textContent = score;
+            if (window.Jumby) {
+              window.Jumby.setScore(score);
+              window.Jumby.sound.powerup();
+            }
+          }
+        }
+
+        // Update Hazards
+        for (let i = hazards.length - 1; i >= 0; i--) {
+          const h = hazards[i];
+          h.x += h.vx;
+          h.y += h.vy;
+
+          // Check hit with player
+          const dist = Math.hypot(px - h.x, py - h.y);
+          if (dist < player.radius + h.radius) {
+            die();
+          }
+
+          // Check hit with core
+          const distCore = Math.hypot(cx - h.x, cy - h.y);
+          if (distCore < 30) {
+            hazards.splice(i, 1);
+            score++;
+            scoreEl.textContent = score;
+            if (window.Jumby) window.Jumby.setScore(score);
+          }
+        }
+      }
+
+      // Draw Hazards (Incoming red fireballs)
+      for (const h of hazards) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = h.color;
+        ctx.fillStyle = h.color;
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw Crystals (Golden spinning gems)
+      for (const c of crystals) {
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#ffe600';
+        ctx.fillStyle = '#ffe600';
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw Player Trail
+      for (let i = 0; i < player.particles.length; i++) {
+        const p = player.particles[i];
+        p.alpha -= 0.04;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ffe600';
+        ctx.fillStyle = `rgba(255, 230, 0, ${Math.max(0, p.alpha)})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, player.radius * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw Player
+      const px = cx + Math.cos(player.angle) * orbitRadius;
+      const py = cy + Math.sin(player.angle) * orbitRadius;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#ffe600';
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(px, py, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    loop();
+  </script>
+</body>
+</html>

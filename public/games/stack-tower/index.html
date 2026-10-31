@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Stack Slice</title>
+  <script src="/jumby-sdk.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0c0818; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #ui {
+      position: absolute; top: 24px; left: 0; right: 0;
+      text-align: center; pointer-events: none; z-index: 10;
+    }
+    .score {
+      font-size: 56px; font-weight: 900; color: #fff;
+      text-shadow: 0 0 20px #a855f7, 0 0 40px #a855f7;
+    }
+    #tap-hint {
+      position: absolute; bottom: 20%; left: 0; right: 0;
+      text-align: center; color: #c084fc; font-size: 18px; font-weight: 700;
+      text-shadow: 0 0 10px #c084fc; animation: pulse 1.2s infinite alternate;
+      pointer-events: none;
+    }
+    @keyframes pulse { from { opacity: 0.4; transform: scale(0.96); } to { opacity: 1; transform: scale(1.04); } }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="score" class="score">0</div>
+  </div>
+  <div id="tap-hint">TAP TO PLACE BLOCK</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const hintEl = document.getElementById('tap-hint');
+
+    let width, height;
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let state = 'waiting'; // waiting, playing, dead
+    let score = 0;
+    let cameraY = 0;
+    const blockHeight = 24;
+
+    const colors = [
+      '#f43f5e', '#fb923c', '#facc15', '#4ade80', '#2dd4bf',
+      '#38bdf8', '#818cf8', '#c084fc', '#f472b6'
+    ];
+
+    let stack = [];
+    let currentBlock = null;
+    let fallingBlocks = [];
+
+    function initGame() {
+      state = 'waiting';
+      score = 0;
+      cameraY = 0;
+      scoreEl.textContent = '0';
+      hintEl.style.display = 'block';
+      hintEl.textContent = 'TAP TO PLACE BLOCK';
+      fallingBlocks = [];
+
+      const baseWidth = Math.min(width * 0.6, 240);
+      stack = [
+        {
+          x: (width - baseWidth) / 2,
+          y: height - 120,
+          w: baseWidth,
+          color: colors[0]
+        }
+      ];
+
+      spawnNextBlock();
+      if (window.Jumby) window.Jumby.setScore(0);
+    }
+
+    function spawnNextBlock() {
+      const prev = stack[stack.length - 1];
+      const color = colors[stack.length % colors.length];
+      const speed = 3.5 + Math.min(stack.length * 0.15, 6.0);
+
+      currentBlock = {
+        x: 0,
+        y: prev.y - blockHeight,
+        w: prev.w,
+        vx: speed,
+        color: color
+      };
+    }
+
+    function handleAction() {
+      if (state === 'waiting') {
+        state = 'playing';
+        hintEl.style.display = 'none';
+        dropBlock();
+      } else if (state === 'playing') {
+        dropBlock();
+      } else if (state === 'dead') {
+        initGame();
+      }
+    }
+
+    function dropBlock() {
+      if (!currentBlock) return;
+      const prev = stack[stack.length - 1];
+      const diff = currentBlock.x - prev.x;
+
+      // Perfect match tolerance
+      if (Math.abs(diff) < 4) {
+        currentBlock.x = prev.x;
+        stack.push({ ...currentBlock });
+        score += 2;
+        scoreEl.textContent = score;
+        if (window.Jumby) {
+          window.Jumby.setScore(score);
+          window.Jumby.sound.score();
+        }
+      } else if (Math.abs(diff) >= currentBlock.w) {
+        // Complete miss -> Game over
+        fallingBlocks.push({
+          x: currentBlock.x,
+          y: currentBlock.y,
+          w: currentBlock.w,
+          vy: 2,
+          color: currentBlock.color
+        });
+        currentBlock = null;
+        die();
+        return;
+      } else {
+        // Slice the block
+        let newX, newW, slicedX, slicedW;
+        if (diff > 0) {
+          newX = currentBlock.x;
+          newW = currentBlock.w - diff;
+          slicedX = newX + newW;
+          slicedW = diff;
+        } else {
+          newX = prev.x;
+          newW = currentBlock.w + diff;
+          slicedX = currentBlock.x;
+          slicedW = -diff;
+        }
+
+        stack.push({
+          x: newX,
+          y: currentBlock.y,
+          w: newW,
+          color: currentBlock.color
+        });
+
+        fallingBlocks.push({
+          x: slicedX,
+          y: currentBlock.y,
+          w: slicedW,
+          vy: 2,
+          color: currentBlock.color
+        });
+
+        score++;
+        scoreEl.textContent = score;
+        if (window.Jumby) {
+          window.Jumby.setScore(score);
+          window.Jumby.sound.jump();
+        }
+      }
+
+      // Smooth camera scroll up as tower rises
+      const targetCamY = Math.max(0, (stack.length - 8) * blockHeight);
+      cameraY = targetCamY;
+
+      spawnNextBlock();
+    }
+
+    function die() {
+      state = 'dead';
+      hintEl.style.display = 'block';
+      hintEl.textContent = 'TAP TO RESTART';
+      if (window.Jumby) {
+        window.Jumby.sound.hit();
+        window.Jumby.gameOver(score);
+      }
+    }
+
+    window.addEventListener('pointerdown', handleAction);
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        handleAction();
+      }
+    });
+
+    initGame();
+
+    function loop() {
+      requestAnimationFrame(loop);
+
+      ctx.fillStyle = '#0c0818';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.translate(0, cameraY);
+
+      // Move current moving block
+      if (state === 'playing' && currentBlock) {
+        currentBlock.x += currentBlock.vx;
+        if (currentBlock.x + currentBlock.w > width || currentBlock.x < 0) {
+          currentBlock.vx *= -1;
+        }
+      }
+
+      // Draw Stack
+      for (const b of stack) {
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = b.color;
+        ctx.fillStyle = b.color;
+        ctx.fillRect(b.x, b.y, b.w, blockHeight - 2);
+
+        // Highlight stripe
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(b.x, b.y, b.w, 4);
+      }
+
+      // Draw Current Moving Block
+      if (currentBlock) {
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = currentBlock.color;
+        ctx.fillStyle = currentBlock.color;
+        ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, blockHeight - 2);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, 4);
+      }
+
+      // Draw Falling sliced pieces
+      for (let i = fallingBlocks.length - 1; i >= 0; i--) {
+        const fb = fallingBlocks[i];
+        fb.vy += 0.5;
+        fb.y += fb.vy;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = fb.color;
+        ctx.fillStyle = fb.color;
+        ctx.fillRect(fb.x, fb.y, fb.w, blockHeight - 2);
+
+        if (fb.y > height + 200) fallingBlocks.splice(i, 1);
+      }
+
+      ctx.restore();
+    }
+
+    loop();
+  </script>
+</body>
+</html>
