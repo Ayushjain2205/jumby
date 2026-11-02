@@ -762,12 +762,9 @@ function CreateStudioContent() {
                         <JumbyMascot className="w-12 h-12 animate-bounce" />
                       </div>
 
-                      <h3 className="relative font-heading font-black text-xl text-white mb-2 tracking-tight">
+                      <h3 className="relative font-heading font-black text-2xl tracking-tight animate-text-shimmer drop-shadow-md">
                         Waiting on your genius.
                       </h3>
-                      <p className="relative text-xs text-zinc-400 font-sans max-w-[240px] leading-relaxed">
-                        Tell the AI on the left what to build before I get bored.
-                      </p>
                     </div>
                   )
                 ) : (

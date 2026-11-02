@@ -45,3 +45,21 @@ h1, h2, h3, h4, .font-heading {
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(233, 231, 255, 0.12);
 }
+
+@keyframes text-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-text-shimmer {
+  background: linear-gradient(90deg, #FFFFFF 0%, #D8FF43 35%, #7160FF 65%, #FFFFFF 100%);
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: text-shimmer 4s ease-in-out infinite;
+}
