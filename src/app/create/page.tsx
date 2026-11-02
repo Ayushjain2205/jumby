@@ -755,38 +755,19 @@ function CreateStudioContent() {
                       className="w-full h-full border-none bg-black flex-1"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-zinc-950 via-jumby-ink to-zinc-950 relative overflow-hidden select-none">
-                      <div className="absolute inset-0 bg-[radial-gradient(#7160FF_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
+                    <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-zinc-950 via-jumby-ink to-zinc-950 relative overflow-hidden select-none">
+                      <div className="absolute inset-0 bg-[radial-gradient(#7160FF_1px,transparent_1px)] [background-size:20px_20px] opacity-25" />
 
-                      <div className="relative w-16 h-16 rounded-3xl bg-jumby-purple/15 border border-jumby-purple/30 flex items-center justify-center mb-4 text-jumby-purple shadow-xl shadow-jumby-purple/10">
-                        <JumbyMascot className="w-10 h-10 animate-bounce" />
+                      <div className="relative w-20 h-20 rounded-3xl bg-jumby-purple/15 border border-jumby-purple/30 flex items-center justify-center mb-5 text-jumby-purple shadow-2xl shadow-jumby-purple/20">
+                        <JumbyMascot className="w-12 h-12 animate-bounce" />
                       </div>
 
-                      <h3 className="relative font-heading font-black text-lg text-white mb-1.5">
-                        Your Blank Canvas
+                      <h3 className="relative font-heading font-black text-xl text-white mb-2 tracking-tight">
+                        Canvas is empty. Brain is loaded.
                       </h3>
-                      <p className="relative text-xs text-zinc-400 font-sans max-w-[260px] leading-relaxed mb-6">
-                        Describe an idea in the AI Assistant on the left, or tap a quick starter template below:
+                      <p className="relative text-xs text-zinc-400 font-sans max-w-[240px] leading-relaxed">
+                        Type your wildest game idea in the AI chat on the left. Let’s make something chaotic.
                       </p>
-
-                      {/* Quick Starter Inspiration Chips */}
-                      <div className="relative w-full max-w-[280px] flex flex-col gap-2 z-10">
-                        {[
-                          { title: '⚡ Cyber Runner 3-Lane Dodge', arch: 'runner' as const },
-                          { title: '🪐 Orbital Laser Pulse', arch: 'orbit' as const },
-                          { title: '🧱 Rhythm Block Tower', arch: 'stack' as const },
-                          { title: '🐦 Neon Flappy Jumper', arch: 'flappy' as const },
-                        ].map((idea) => (
-                          <button
-                            key={idea.title}
-                            onClick={() => handleSelectArchetype(idea.arch)}
-                            className="w-full text-left px-3.5 py-2.5 rounded-xl bg-zinc-900/90 border border-white/10 hover:border-jumby-lime text-xs text-zinc-200 hover:text-white font-sans transition-all active:scale-95 flex items-center justify-between group"
-                          >
-                            <span>{idea.title}</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-jumby-lime group-hover:translate-x-0.5 transition-all" />
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   )
                 ) : (
