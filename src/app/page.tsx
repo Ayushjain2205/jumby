@@ -1,11 +1,13 @@
 import { GameFeed } from '@/components/feed/GameFeed';
 import { MobileShell } from '@/components/layout/MobileShell';
-import { SEED_GAMES } from '@/data/seed-games';
+import { getAllGames } from '@/lib/games/game-registry';
+
 
 export default function HomePage() {
+  const games = getAllGames();
   return (
     <MobileShell>
-      <GameFeed games={SEED_GAMES} />
+      <GameFeed games={games} />
     </MobileShell>
   );
 }

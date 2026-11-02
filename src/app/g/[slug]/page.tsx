@@ -2,7 +2,8 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { GameFeed } from '@/components/feed/GameFeed';
 import { MobileShell } from '@/components/layout/MobileShell';
-import { SEED_GAMES } from '@/data/seed-games';
+import { getAllGames, getGameBySlug } from '@/lib/games/game-registry';
+
 
 interface GamePageProps {
   params: Promise<{
@@ -11,14 +12,15 @@ interface GamePageProps {
 }
 
 export async function generateStaticParams() {
-  return SEED_GAMES.map((game) => ({
+  const games = getAllGames();
+  return games.map((game) => ({
     slug: game.slug,
   }));
 }
 
 export async function generateMetadata({ params }: GamePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const game = SEED_GAMES.find((g) => g.slug === slug);
+  const game = getGameBySlug(slug);
 
   if (!game) {
     return {
@@ -51,16 +53,17 @@ export async function generateMetadata({ params }: GamePageProps): Promise<Metad
 
 export default async function GamePermalinkPage({ params }: GamePageProps) {
   const { slug } = await params;
-  const game = SEED_GAMES.find((g) => g.slug === slug);
+  const game = getGameBySlug(slug);
 
   if (!game) {
     notFound();
   }
 
+  const allGames = getAllGames();
   // Reorder so the requested game is first, followed by the rest of the recommendation feed
   const orderedGames = [
     game,
-    ...SEED_GAMES.filter((g) => g.slug !== slug),
+    ...allGames.filter((g) => g.slug !== slug),
   ];
 
   return (

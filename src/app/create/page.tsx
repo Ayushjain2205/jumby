@@ -21,6 +21,11 @@ import {
   Play,
   Flame,
   ArrowRight,
+  Settings2,
+  Key,
+  Loader2,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 import { SEED_GAMES } from '@/data/seed-games';
 import {
@@ -76,6 +81,31 @@ function CreateStudioContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string | null>(null);
 
+  // API Key Settings Modal
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+
+  // Publishing State
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+
+  // Load saved API key from localStorage if present
+  useEffect(() => {
+    try {
+      const savedKey = localStorage.getItem('jumby_api_key');
+      if (savedKey) setApiKey(savedKey);
+    } catch (e) {}
+  }, []);
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    try {
+      if (key) localStorage.setItem('jumby_api_key', key);
+      else localStorage.removeItem('jumby_api_key');
+    } catch (e) {}
+    setShowSettingsModal(false);
+  };
+
   // Conversation History
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -91,7 +121,6 @@ function CreateStudioContent() {
   // Game Code & Undo History
   const [gameHtml, setGameHtml] = useState<string>('');
   const [history, setHistory] = useState<string[]>([]);
-  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -116,8 +145,9 @@ function CreateStudioContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleApplyPrompt = (promptText: string) => {
-    if (!promptText.trim()) return;
+  // Live Streaming AI Generation Handler
+  const handleApplyPrompt = async (promptText: string) => {
+    if (!promptText.trim() || isGenerating) return;
 
     const userMsg: ChatMessage = {
       id: `msg_${Date.now()}`,
@@ -129,67 +159,92 @@ function CreateStudioContent() {
     setMessages((prev) => [...prev, userMsg]);
     setInputPrompt('');
     setIsGenerating(true);
+    setGenerationStep('🧠 Analyzing prompt & mechanics...');
 
-    // Multi-step agentic generation simulation
-    setGenerationStep('🧠 Analyzing game mechanics...');
-    setTimeout(() => {
-      setGenerationStep('🎨 Synthesizing shaders & assets...');
-    }, 400);
-
-    setTimeout(() => {
-      setGenerationStep('🔊 Synthesizing 8-bit sound effects...');
-    }, 800);
-
-    setTimeout(() => {
-      // Parse prompt modifiers
-      let newSpeed = speedMultiplier;
-      let newGravity = gravity;
-      let newTheme = selectedThemeIndex;
-      let newArch = archetype;
-
-      const lower = promptText.toLowerCase();
-      if (lower.includes('faster') || lower.includes('speed')) newSpeed = Math.min(2.5, newSpeed * 1.3);
-      if (lower.includes('slower')) newSpeed = Math.max(0.5, newSpeed * 0.7);
-      if (lower.includes('floaty') || lower.includes('low gravity')) newGravity = Math.max(0.18, newGravity * 0.7);
-      if (lower.includes('heavy') || lower.includes('high gravity')) newGravity = Math.min(0.65, newGravity * 1.4);
-      if (lower.includes('coral') || lower.includes('pink') || lower.includes('warm')) newTheme = 1;
-      if (lower.includes('lime') || lower.includes('green')) newTheme = 2;
-      if (lower.includes('sky') || lower.includes('blue') || lower.includes('chill')) newTheme = 3;
-
-      if (lower.includes('orbit')) newArch = 'orbit';
-      else if (lower.includes('stack') || lower.includes('tower')) newArch = 'stack';
-      else if (lower.includes('runner') || lower.includes('dodge') || lower.includes('lane')) newArch = 'runner';
-
-      setSpeedMultiplier(newSpeed);
-      setGravity(newGravity);
-      setSelectedThemeIndex(newTheme);
-      setArchetype(newArch);
-
-      const nextCode = generateGameHtml({
-        title,
-        themeColor: THEMES[newTheme].themeColor,
-        accentColor: THEMES[newTheme].accentColor,
-        bgGradient: THEMES[newTheme].bg,
-        gameType: newArch,
-        speedMultiplier: newSpeed,
-        gravity: newGravity,
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptText,
+          archetype,
+          baseCode: gameHtml,
+          apiKey: apiKey || undefined,
+        }),
       });
 
-      setHistory((prev) => [...prev, gameHtml]);
-      setGameHtml(nextCode);
-      setIsGenerating(false);
-      setGenerationStep(null);
+      if (!res.ok) {
+        throw new Error(`Generation failed (${res.status})`);
+      }
 
+      if (!res.body) {
+        throw new Error('No response stream received');
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedCode = '';
+      let receivedCompleteHtml = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const textChunk = decoder.decode(value, { stream: true });
+        const lines = textChunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.substring(6));
+
+              if (data.step) {
+                setGenerationStep(data.step);
+              }
+
+              if (data.chunk) {
+                accumulatedCode += data.chunk;
+              }
+
+              if (data.done && data.fullHtml) {
+                receivedCompleteHtml = data.fullHtml;
+              }
+            } catch (e) {
+              // Ignore partial JSON chunks
+            }
+          }
+        }
+      }
+
+      const finalHtml = receivedCompleteHtml || accumulatedCode || gameHtml;
+      setHistory((prev) => [...prev, gameHtml]);
+      setGameHtml(finalHtml);
+
+      // Add Assistant completion response
       setMessages((prev) => [
         ...prev,
         {
           id: `msg_ai_${Date.now()}`,
           sender: 'assistant',
-          text: `Applied! Updated ${newArch} mechanics with ${newSpeed.toFixed(1)}x speed and refreshed visual effects. Try playing on the right!`,
+          text: `Game synthesized! Injected high-score tracking, 8-bit audio, and screen juice. Try playing in the live preview on the right!`,
           timestamp: 'Just now',
         },
       ]);
-    }, 1200);
+    } catch (err: any) {
+      console.error('[Create Studio] Generation error:', err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_ai_err_${Date.now()}`,
+          sender: 'assistant',
+          text: `Failed to generate game: ${err.message || 'Network error'}. Reverting to previous build.`,
+          timestamp: 'Just now',
+        },
+      ]);
+    } finally {
+      setIsGenerating(false);
+      setGenerationStep(null);
+    }
   };
 
   const handleSelectArchetype = (arch: GameArchetype) => {
@@ -215,14 +270,43 @@ function CreateStudioContent() {
     }
   };
 
-  const handlePublish = () => {
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    setPublishedSlug(slug);
+  // Live Publishing Handler
+  const handlePublish = async () => {
+    if (isPublishing) return;
+    setIsPublishing(true);
+
+    try {
+      const res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          html: gameHtml,
+          archetype,
+          prompt: messages[messages.length - 1]?.text || title,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.slug) {
+        setPublishedSlug(data.slug);
+      } else {
+        alert(data.error || 'Failed to publish game');
+      }
+    } catch (e: any) {
+      console.error('[Publish] Error:', e);
+      alert('Error publishing game. Please check your connection.');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const testAudioTone = (freq: number) => {
     if (typeof window === 'undefined') return;
-    const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
+    const AudioContext =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof window.AudioContext })
+        .webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
     const osc = ctx.createOscillator();
@@ -265,13 +349,26 @@ function CreateStudioContent() {
               )}
             </div>
             <div className="text-[10px] text-zinc-400 font-sans">
-              Jumby Studio • Instant In-Memory Live Preview
+              Jumby Studio • Rimsha Micro-Engine Runtime
             </div>
           </div>
         </div>
 
         {/* Top Right Controls */}
         <div className="flex items-center gap-2">
+          {/* AI Engine Status Pill / Settings Trigger */}
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            title="Configure AI Generation Engine"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-xs font-heading font-bold text-zinc-300 transition-all active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-jumby-lime" />
+            <span className="hidden sm:inline">
+              {apiKey ? 'Custom LLM' : 'Smart Engine'}
+            </span>
+            <Settings2 className="w-3 h-3 text-zinc-400 ml-0.5" />
+          </button>
+
           {history.length > 1 && (
             <button
               onClick={handleUndo}
@@ -311,10 +408,15 @@ function CreateStudioContent() {
           {/* Primary Publish Button: Jumby Lime (#D8FF43) */}
           <button
             onClick={handlePublish}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-jumby-lime hover:brightness-105 active:scale-95 text-jumby-ink font-heading font-black text-xs shadow-md shadow-jumby-lime/25 transition-all"
+            disabled={isPublishing}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-jumby-lime hover:brightness-105 active:scale-95 disabled:opacity-50 text-jumby-ink font-heading font-black text-xs shadow-md shadow-jumby-lime/25 transition-all"
           >
-            <Upload className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Publish</span>
+            {isPublishing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Upload className="w-3.5 h-3.5 stroke-[2.5]" />
+            )}
+            <span>{isPublishing ? 'Publishing...' : 'Publish'}</span>
           </button>
         </div>
       </header>
@@ -323,7 +425,7 @@ function CreateStudioContent() {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Left Side: Creation Controls (Chat, Templates, Theme) */}
         <div className="w-full md:w-[460px] bg-zinc-950 border-r border-white/10 flex flex-col shrink-0 overflow-hidden">
-          {/* Sub Navigation Tabs (From Swatch Spec) */}
+          {/* Sub Navigation Tabs */}
           <div className="flex border-b border-white/10 px-3 bg-zinc-900/60 shrink-0">
             <button
               onClick={() => setPanelTab('chat')}
@@ -341,7 +443,7 @@ function CreateStudioContent() {
               onClick={() => setPanelTab('templates')}
               className={`flex items-center gap-1.5 px-4 py-3 text-xs font-heading font-bold border-b-2 transition-all ${
                 panelTab === 'templates'
-                  ? 'border-jumby-lime text-jumby-lime'
+                  ? 'border-jumby-purple text-jumby-purple'
                   : 'border-transparent text-zinc-400 hover:text-white'
               }`}
             >
@@ -353,290 +455,296 @@ function CreateStudioContent() {
               onClick={() => setPanelTab('theme')}
               className={`flex items-center gap-1.5 px-4 py-3 text-xs font-heading font-bold border-b-2 transition-all ${
                 panelTab === 'theme'
-                  ? 'border-jumby-lime text-jumby-lime'
+                  ? 'border-jumby-coral text-jumby-coral'
                   : 'border-transparent text-zinc-400 hover:text-white'
               }`}
             >
               <Palette className="w-3.5 h-3.5" />
-              <span>Theme & Physics</span>
+              <span>Physics & Audio</span>
             </button>
           </div>
 
-          {/* TAB 1: AI Prompt Chat Assistant */}
-          {panelTab === 'chat' && (
-            <div className="flex-1 flex flex-col overflow-hidden p-4">
-              {/* Mascot Welcome Header */}
-              <div className="flex items-center gap-3 p-3 rounded-2xl bg-jumby-purple/10 border border-jumby-purple/20 mb-3 shrink-0">
-                <JumbyMascot size={46} />
-                <div>
-                  <div className="font-heading font-black text-xs text-white">
-                    Turn your ideas into games.
-                  </div>
-                  <div className="text-[11px] text-zinc-400">
-                    Type changes in natural language to update your game live.
-                  </div>
-                </div>
-              </div>
-
-              {/* Chat Message Scroll Area */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 no-scrollbar mb-3">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`flex flex-col ${
-                      m.sender === 'user' ? 'items-end' : 'items-start'
-                    }`}
-                  >
+          {/* Panel Content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* 1. CHAT TAB */}
+            {panelTab === 'chat' && (
+              <div className="flex flex-col h-full">
+                {/* Chat Messages */}
+                <div className="flex-1 p-4 space-y-3.5 overflow-y-auto">
+                  {messages.map((m) => (
                     <div
-                      className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
-                        m.sender === 'user'
-                          ? 'bg-jumby-purple text-white shadow-md'
-                          : 'bg-zinc-900 border border-white/10 text-zinc-200'
+                      key={m.id}
+                      className={`flex gap-3 text-xs leading-relaxed ${
+                        m.sender === 'user' ? 'justify-end' : 'justify-start'
                       }`}
                     >
-                      {m.text}
-                    </div>
-                    <span className="text-[9px] text-zinc-500 mt-1 px-1">
-                      {m.sender === 'user' ? 'You' : 'Jumby AI'}
-                    </span>
-                  </div>
-                ))}
-
-                {isGenerating && generationStep && (
-                  <div className="p-3 rounded-2xl bg-zinc-900/90 border border-jumby-lime/30 text-xs text-jumby-lime flex items-center gap-2 animate-pulse">
-                    <Sparkles className="w-4 h-4 animate-spin-slow shrink-0" />
-                    <span>{generationStep}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Quick Modifier Pills */}
-              <div className="mb-2 shrink-0">
-                <div className="text-[10px] font-heading font-black text-zinc-500 uppercase tracking-wider mb-1.5">
-                  Quick Modifiers
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'Make it 2x faster',
-                    'Lower gravity floaty',
-                    'Neon laser obstacles',
-                    'Switch to orbital dodge',
-                    'Switch to block stacker',
-                  ].map((chip) => (
-                    <button
-                      key={chip}
-                      onClick={() => handleApplyPrompt(chip)}
-                      className="px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-zinc-300 font-sans transition-all active:scale-95"
-                    >
-                      + {chip}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Chat Input Box */}
-              <div className="relative shrink-0">
-                <input
-                  type="text"
-                  value={inputPrompt}
-                  onChange={(e) => setInputPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleApplyPrompt(inputPrompt);
-                  }}
-                  placeholder="Describe mechanics, speed, or game idea..."
-                  className="w-full rounded-full bg-zinc-900 border border-white/15 px-4 py-3 pr-12 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-jumby-lime transition-all"
-                />
-                <button
-                  onClick={() => handleApplyPrompt(inputPrompt)}
-                  disabled={!inputPrompt.trim() || isGenerating}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-jumby-lime hover:brightness-105 active:scale-95 disabled:opacity-40 flex items-center justify-center text-jumby-ink transition-all shadow-md shadow-jumby-lime/20"
-                >
-                  <Send className="w-3.5 h-3.5 stroke-[2.5]" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Templates & Archetypes */}
-          {panelTab === 'templates' && (
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-              <div className="text-xs text-zinc-400 mb-1">
-                Pick a core game archetype to load its foundation:
-              </div>
-
-              <div className="grid grid-cols-1 gap-2.5">
-                {ARCHETYPES.map((arch) => (
-                  <button
-                    key={arch.id}
-                    onClick={() => handleSelectArchetype(arch.id)}
-                    className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all ${
-                      archetype === arch.id
-                        ? 'border-jumby-lime bg-jumby-lime/10 shadow-md shadow-jumby-lime/10'
-                        : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
-                    }`}
-                  >
-                    <span className="text-2xl p-1 bg-black/40 rounded-xl shrink-0">
-                      {arch.icon}
-                    </span>
-                    <div>
-                      <div className="text-xs font-heading font-black text-white flex items-center gap-1.5">
-                        <span>{arch.name}</span>
-                        {archetype === arch.id && (
-                          <span className="text-[9px] px-2 py-0.2 rounded-full bg-jumby-lime text-jumby-ink font-heading font-black uppercase">
-                            Active
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-zinc-400 mt-0.5">
-                        {arch.desc}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Theme, Sound & Physics Tuning */}
-          {panelTab === 'theme' && (
-            <div className="flex-1 overflow-y-auto p-4 space-y-5 no-scrollbar">
-              {/* Palette Selection */}
-              <div>
-                <label className="text-xs font-heading font-black text-zinc-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Flame className="w-3.5 h-3.5 text-jumby-coral" />
-                  <span>Color Swatch Palette</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {THEMES.map((theme, i) => (
-                    <button
-                      key={theme.name}
-                      onClick={() => {
-                        setSelectedThemeIndex(i);
-                        setGameHtml(buildHtml({ themeColor: theme.themeColor, accentColor: theme.accentColor, bgGradient: theme.bg }));
-                      }}
-                      className={`flex items-center gap-2 p-2.5 rounded-xl border text-left transition-all ${
-                        selectedThemeIndex === i
-                          ? 'border-jumby-lime bg-jumby-lime/10'
-                          : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
-                      }`}
-                    >
+                      {m.sender === 'assistant' && (
+                        <div className="w-7 h-7 rounded-full bg-jumby-purple/30 border border-jumby-purple/50 flex items-center justify-center shrink-0">
+                          <JumbyMascot className="w-5 h-5" />
+                        </div>
+                      )}
                       <div
-                        className="w-4 h-4 rounded-full shrink-0 shadow-sm"
-                        style={{ backgroundColor: theme.themeColor }}
-                      />
-                      <span className="text-xs font-heading font-bold text-zinc-200 truncate">
-                        {theme.name}
-                      </span>
-                    </button>
+                        className={`max-w-[85%] p-3.5 rounded-2xl ${
+                          m.sender === 'user'
+                            ? 'bg-jumby-purple text-white font-medium rounded-tr-none'
+                            : 'bg-zinc-900 border border-white/10 text-zinc-200 rounded-tl-none font-sans'
+                        }`}
+                      >
+                        {m.text}
+                      </div>
+                    </div>
                   ))}
-                </div>
-              </div>
 
-              {/* Physics Tuning Sliders */}
-              <div className="space-y-3 p-3.5 rounded-2xl bg-zinc-900/40 border border-white/5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-heading font-bold text-zinc-400 flex items-center gap-1">
-                    <Sliders className="w-3 h-3" /> Game Speed
-                  </span>
-                  <span className="font-mono text-jumby-lime font-bold">
-                    {speedMultiplier.toFixed(1)}x
-                  </span>
+                  {/* Generation Status Indicator */}
+                  {isGenerating && (
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-zinc-900/80 border border-jumby-lime/30 text-xs text-jumby-lime animate-pulse font-heading font-bold">
+                      <Sparkles className="w-4 h-4 animate-spin text-jumby-lime" />
+                      <span>{generationStep || 'Generating game...'}</span>
+                    </div>
+                  )}
                 </div>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2.5"
-                  step="0.1"
-                  value={speedMultiplier}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setSpeedMultiplier(val);
-                    setGameHtml(buildHtml({ speedMultiplier: val }));
-                  }}
-                  className="w-full accent-jumby-lime cursor-pointer"
-                />
 
-                <div className="flex items-center justify-between text-xs pt-1">
-                  <span className="font-heading font-bold text-zinc-400 flex items-center gap-1">
-                    <Sliders className="w-3 h-3" /> Gravity Force
-                  </span>
-                  <span className="font-mono text-jumby-purple font-bold">
-                    {gravity.toFixed(2)}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0.15"
-                  max="0.8"
-                  step="0.05"
-                  value={gravity}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setGravity(val);
-                    setGameHtml(buildHtml({ gravity: val }));
-                  }}
-                  className="w-full accent-jumby-purple cursor-pointer"
-                />
-              </div>
-
-              {/* 8-Bit Web Audio Sound Tester */}
-              <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-white/5">
-                <div className="text-xs font-heading font-bold text-zinc-300 flex items-center gap-1.5 mb-2.5">
-                  <Volume2 className="w-3.5 h-3.5 text-jumby-sky" />
-                  <span>Synthesizer Audio Tester</span>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
+                {/* Prompt Quick Suggestion Pills */}
+                <div className="px-3 py-2 flex gap-1.5 overflow-x-auto no-scrollbar border-t border-white/5 bg-zinc-950/40">
                   {[
-                    { label: 'Jump', freq: 320 },
-                    { label: 'Score', freq: 587 },
-                    { label: 'Hit', freq: 150 },
-                    { label: 'Power', freq: 880 },
-                  ].map((sfx) => (
+                    'Make it 2x faster with neon lime trail',
+                    'Switch to Cyber Runner 3-lane dodge',
+                    'Low gravity floaty bounce mode',
+                    'Change to Orbital Pulse with lasers',
+                  ].map((s) => (
                     <button
-                      key={sfx.label}
-                      onClick={() => testAudioTone(sfx.freq)}
-                      className="py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-heading font-bold text-zinc-200 active:scale-95 transition-all text-center"
+                      key={s}
+                      disabled={isGenerating}
+                      onClick={() => handleApplyPrompt(s)}
+                      className="whitespace-nowrap px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-zinc-300 font-sans transition-all active:scale-95 disabled:opacity-40"
                     >
-                      {sfx.label}
+                      + {s}
                     </button>
                   ))}
                 </div>
+
+                {/* Prompt Input Form */}
+                <div className="p-3 border-t border-white/10 bg-zinc-900/40">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleApplyPrompt(inputPrompt);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      type="text"
+                      placeholder={
+                        isGenerating
+                          ? 'Synthesizing micro-game...'
+                          : 'Describe gameplay, speed, or theme...'
+                      }
+                      value={inputPrompt}
+                      disabled={isGenerating}
+                      onChange={(e) => setInputPrompt(e.target.value)}
+                      className="flex-1 bg-zinc-900 border border-white/10 rounded-full px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-jumby-purple transition-colors disabled:opacity-50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isGenerating || !inputPrompt.trim()}
+                      className="w-9 h-9 rounded-full bg-jumby-purple hover:brightness-110 active:scale-95 disabled:opacity-40 flex items-center justify-center text-white transition-all shadow-md shadow-jumby-purple/30"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* 2. TEMPLATES TAB */}
+            {panelTab === 'templates' && (
+              <div className="p-4 space-y-4">
+                <div className="text-xs text-zinc-400 font-sans">
+                  Choose a battle-tested micro-game template pre-wired with 60fps canvas, input, and Web Audio:
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  {ARCHETYPES.map((arch) => (
+                    <div
+                      key={arch.id}
+                      onClick={() => handleSelectArchetype(arch.id)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                        archetype === arch.id
+                          ? 'bg-jumby-purple/15 border-jumby-purple text-white shadow-lg shadow-jumby-purple/10'
+                          : 'bg-zinc-900/50 border-white/10 hover:border-white/20 text-zinc-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl p-2 rounded-xl bg-white/5">{arch.icon}</div>
+                        <div>
+                          <div className="font-heading font-black text-xs text-white">
+                            {arch.name}
+                          </div>
+                          <div className="text-[11px] text-zinc-400 font-sans">{arch.desc}</div>
+                        </div>
+                      </div>
+                      {archetype === arch.id && (
+                        <div className="w-6 h-6 rounded-full bg-jumby-purple text-white flex items-center justify-center">
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 3. THEME & AUDIO TAB */}
+            {panelTab === 'theme' && (
+              <div className="p-4 space-y-5">
+                {/* Brand Color Palettes */}
+                <div>
+                  <div className="font-heading font-bold text-xs text-white mb-2.5 flex items-center gap-1.5">
+                    <Palette className="w-3.5 h-3.5 text-jumby-coral" />
+                    <span>Jumby Brand Palettes</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {THEMES.map((th, idx) => (
+                      <button
+                        key={th.name}
+                        onClick={() => {
+                          setSelectedThemeIndex(idx);
+                          const code = generateGameHtml({
+                            title,
+                            themeColor: th.themeColor,
+                            accentColor: th.accentColor,
+                            bgGradient: th.bg,
+                            gameType: archetype,
+                            speedMultiplier,
+                            gravity,
+                          });
+                          setHistory((prev) => [...prev, gameHtml]);
+                          setGameHtml(code);
+                        }}
+                        className={`p-3 rounded-2xl border text-left transition-all ${
+                          selectedThemeIndex === idx
+                            ? 'border-jumby-lime bg-jumby-lime/10'
+                            : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <div
+                            className="w-4 h-4 rounded-full border border-white/20"
+                            style={{ backgroundColor: th.themeColor }}
+                          />
+                          <div
+                            className="w-4 h-4 rounded-full border border-white/20"
+                            style={{ backgroundColor: th.accentColor }}
+                          />
+                        </div>
+                        <div className="text-[11px] font-heading font-bold text-white truncate">
+                          {th.name}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Physics Sliders */}
+                <div className="space-y-4 pt-2 border-t border-white/10">
+                  <div className="font-heading font-bold text-xs text-white flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-jumby-lime" />
+                    <span>Gameplay Physics Tuning</span>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-zinc-300 mb-1">
+                      <span>Speed Multiplier</span>
+                      <span className="font-mono text-jumby-lime">{speedMultiplier.toFixed(1)}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2.5"
+                      step="0.1"
+                      value={speedMultiplier}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setSpeedMultiplier(val);
+                        setGameHtml(buildHtml({ speedMultiplier: val }));
+                      }}
+                      className="w-full accent-jumby-lime"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-zinc-300 mb-1">
+                      <span>Gravity / Acceleration</span>
+                      <span className="font-mono text-jumby-purple">{gravity.toFixed(2)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.15"
+                      max="0.75"
+                      step="0.02"
+                      value={gravity}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setGravity(val);
+                        setGameHtml(buildHtml({ gravity: val }));
+                      }}
+                      className="w-full accent-jumby-purple"
+                    />
+                  </div>
+                </div>
+
+                {/* Web Audio Synthesizer Tester */}
+                <div className="pt-2 border-t border-white/10">
+                  <div className="font-heading font-bold text-xs text-white mb-2 flex items-center gap-1.5">
+                    <Volume2 className="w-3.5 h-3.5 text-jumby-sky" />
+                    <span>Procedural 8-Bit Web Audio Tones</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { name: 'Jump', freq: 320 },
+                      { name: 'Score', freq: 587 },
+                      { name: 'Powerup', freq: 880 },
+                      { name: 'Hit', freq: 140 },
+                      { name: 'Laser', freq: 440 },
+                      { name: 'Coin', freq: 987 },
+                    ].map((s) => (
+                      <button
+                        key={s.name}
+                        onClick={() => testAudioTone(s.freq)}
+                        className="px-3 py-2 rounded-xl bg-zinc-900 border border-white/10 hover:border-jumby-sky text-[11px] font-heading font-bold text-zinc-300 hover:text-white transition-all active:scale-95"
+                      >
+                        🔊 {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right Side: Live Game Workspace (Preview / Code) */}
-        <div className="flex-1 relative flex items-center justify-center bg-jumby-ink overflow-hidden p-3 md:p-6">
+        {/* Right Side: Live In-Memory Sandbox / Code Editor */}
+        <div className="flex-1 bg-black flex flex-col items-center justify-center p-2 sm:p-4 relative overflow-hidden">
           {workspaceTab === 'preview' ? (
-            <div className="relative w-full max-w-[390px] h-full max-h-[720px] rounded-[38px] overflow-hidden shadow-2xl border-[4px] border-zinc-800 bg-[#070714]">
-              {/* In-Memory Instant Preview Iframe */}
-              <iframe
-                ref={iframeRef}
-                title="Live Game Preview"
-                srcDoc={gameHtml}
-                sandbox="allow-scripts allow-pointer-lock"
-                className="w-full h-full border-0"
-              />
-
-              {/* Live Status Pill */}
-              <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-[10px] font-mono font-bold text-jumby-lime flex items-center gap-1.5 pointer-events-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-jumby-lime animate-pulse" />
-                <span>IN-MEMORY • 60 FPS</span>
+            <div className="w-full h-full flex flex-col items-center justify-center">
+              {/* Phone Frame Mockup for Realistic Portrait Feel */}
+              <div className="relative w-full max-w-[390px] h-full max-h-[800px] rounded-[36px] overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col">
+                <iframe
+                  ref={iframeRef}
+                  srcDoc={gameHtml}
+                  title="Live Preview"
+                  sandbox="allow-scripts allow-pointer-lock allow-same-origin"
+                  className="w-full h-full border-none bg-black flex-1"
+                />
               </div>
             </div>
           ) : (
-            /* Live Code Inspector / Editor */
-            <div className="w-full h-full max-w-3xl rounded-2xl bg-zinc-950 border border-white/10 p-4 font-mono text-xs overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between pb-3 mb-2 border-b border-white/10">
-                <span className="font-heading font-bold text-xs text-zinc-300">
-                  Game Source (Standalone HTML5 + Jumby SDK)
+            <div className="w-full h-full flex flex-col bg-zinc-950 rounded-2xl border border-white/10 p-4">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
+                <span className="font-mono text-xs text-zinc-400">
+                  index.html • HTML5 Canvas + Jumby SDK
                 </span>
                 <button
-                  onClick={() => {
-                    if (iframeRef.current) iframeRef.current.srcdoc = gameHtml;
-                    setWorkspaceTab('preview');
-                  }}
+                  onClick={() => setWorkspaceTab('preview')}
                   className="px-3 py-1 rounded-full bg-jumby-lime text-jumby-ink font-heading font-black text-xs hover:brightness-105 active:scale-95 transition-all flex items-center gap-1"
                 >
                   <Play className="w-3 h-3 fill-current" />
@@ -653,6 +761,79 @@ function CreateStudioContent() {
           )}
         </div>
       </div>
+
+      {/* API Key / Engine Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-jumby-ink/85 backdrop-blur-md p-4 animate-fade-in font-sans">
+          <div className="w-full max-w-md rounded-[32px] bg-zinc-900 border border-jumby-lavender/15 p-6 shadow-2xl relative">
+            <button
+              onClick={() => setShowSettingsModal(false)}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-jumby-purple/20 text-jumby-purple flex items-center justify-center mb-3">
+              <Sparkles className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-xl font-heading font-black text-white mb-1">
+              AI Generation Engine
+            </h3>
+            <p className="text-xs text-zinc-400 mb-4 font-sans leading-relaxed">
+              Jumby comes with an instant smart procedural micro-game synthesizer (0ms latency, zero API key needed). You can also plug in your own Google Gemini or OpenAI API key for frontier LLM generations.
+            </p>
+
+            <div className="space-y-4 mb-6">
+              <div className="p-3.5 rounded-2xl bg-jumby-ink border border-white/10">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-heading font-bold text-xs text-white">Smart Engine (Built-In)</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-jumby-lime/20 text-jumby-lime font-mono font-bold">
+                    Active (Default)
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400">
+                  Pre-wired with Rimsha micro-engine, Web Audio synthesizer, and canvas juice.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-heading font-bold text-zinc-300 mb-1.5 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-jumby-lime" />
+                  <span>Custom Gemini / OpenAI API Key (Optional)</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="AIzaSy... or sk-proj-..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="w-full bg-zinc-950 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-jumby-purple font-mono"
+                />
+                <span className="text-[10px] text-zinc-500 mt-1 block">
+                  Keys are stored locally in your browser and used only for your creation requests.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSaveApiKey(apiKey)}
+                className="flex-1 py-3 rounded-full bg-jumby-lime text-jumby-ink font-heading font-black text-xs hover:brightness-105 active:scale-95 transition-all shadow-md shadow-jumby-lime/20"
+              >
+                Save Settings
+              </button>
+              {apiKey && (
+                <button
+                  onClick={() => handleSaveApiKey('')}
+                  className="px-4 py-3 rounded-full bg-white/10 hover:bg-white/20 text-xs font-bold text-zinc-300 transition-all"
+                >
+                  Clear Key
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Publish Success Modal */}
       {publishedSlug && (
