@@ -61,9 +61,9 @@ function CreateStudioContent() {
   const remixId = searchParams.get('remix');
   const parentGame = remixId ? SEED_GAMES.find((g) => g.id === remixId) : null;
 
-  // Active Game State
+  // Active Game State - Blank scratch by default
   const [title, setTitle] = useState(
-    parentGame ? `${parentGame.title} (Remix)` : 'Neon Dash 2099'
+    parentGame ? `${parentGame.title} (Remix)` : 'Untitled Game'
   );
   const [archetype, setArchetype] = useState<GameArchetype>('flappy');
   const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
@@ -107,7 +107,7 @@ function CreateStudioContent() {
       sender: 'assistant',
       text: parentGame
         ? `Remixing **${parentGame.title}**. What would you like to modify? (e.g. "make it 2x faster", "change color to coral", "lower gravity")`
-        : "Hey creator! What kind of game do you want to build today? Type a prompt or pick a starter template below.",
+        : "Hey creator! What kind of game do you want to build from scratch today? Type an idea below or pick a starter template on the right.",
       timestamp: 'Just now',
     },
   ]);
@@ -115,7 +115,7 @@ function CreateStudioContent() {
   const buildHtml = (customConfig?: Partial<GameTemplateConfig>) => {
     const theme = THEMES[selectedThemeIndex] || THEMES[0];
     return generateGameHtml({
-      title,
+      title: title === 'Untitled Game' ? 'Neon Dash' : title,
       themeColor: theme.themeColor,
       accentColor: theme.accentColor,
       bgGradient: theme.bg,
@@ -126,17 +126,20 @@ function CreateStudioContent() {
     });
   };
 
-  // Game Code & Undo History (initialized with default build)
+  // Game Code starts EMPTY unless remixing!
   const [gameHtml, setGameHtml] = useState<string>(() => {
-    return generateGameHtml({
-      title: parentGame ? `${parentGame.title} (Remix)` : 'Neon Dash 2099',
-      themeColor: THEMES[0].themeColor,
-      accentColor: THEMES[0].accentColor,
-      bgGradient: THEMES[0].bg,
-      gameType: 'flappy',
-      speedMultiplier: 1.2,
-      gravity: 0.38,
-    });
+    if (parentGame) {
+      return generateGameHtml({
+        title: `${parentGame.title} (Remix)`,
+        themeColor: THEMES[0].themeColor,
+        accentColor: THEMES[0].accentColor,
+        bgGradient: THEMES[0].bg,
+        gameType: 'flappy',
+        speedMultiplier: 1.2,
+        gravity: 0.38,
+      });
+    }
+    return ''; // Start from clean scratch!
   });
   const [history, setHistory] = useState<string[]>([]);
 
@@ -148,7 +151,9 @@ function CreateStudioContent() {
       const savedKey = localStorage.getItem('jumby_api_key');
       if (savedKey) setApiKey(savedKey);
     } catch (e) {}
-    setHistory((prev) => (prev.length === 0 ? [gameHtml] : prev));
+    if (gameHtml) {
+      setHistory([gameHtml]);
+    }
   }, []);
 
   // Live Streaming AI Generation Handler
@@ -255,8 +260,13 @@ function CreateStudioContent() {
 
   const handleSelectArchetype = (arch: GameArchetype) => {
     setArchetype(arch);
+    const archName = ARCHETYPES.find((a) => a.id === arch)?.name || arch;
+    const effectiveTitle = title === 'Untitled Game' ? archName : title;
+    if (title === 'Untitled Game') {
+      setTitle(archName);
+    }
     const code = generateGameHtml({
-      title,
+      title: effectiveTitle,
       themeColor: THEMES[selectedThemeIndex].themeColor,
       accentColor: THEMES[selectedThemeIndex].accentColor,
       bgGradient: THEMES[selectedThemeIndex].bg,
@@ -264,7 +274,7 @@ function CreateStudioContent() {
       speedMultiplier,
       gravity,
     });
-    setHistory((prev) => [...prev, gameHtml]);
+    setHistory((prev) => (gameHtml ? [...prev, gameHtml] : []));
     setGameHtml(code);
   };
 
@@ -414,8 +424,9 @@ function CreateStudioContent() {
           {/* Primary Publish Button: Jumby Lime (#D8FF43) */}
           <button
             onClick={handlePublish}
-            disabled={isPublishing}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-jumby-lime hover:brightness-105 active:scale-95 disabled:opacity-50 text-jumby-ink font-heading font-black text-xs shadow-md shadow-jumby-lime/25 transition-all"
+            disabled={isPublishing || !gameHtml}
+            title={!gameHtml ? 'Create or generate a game first' : 'Publish game to feed'}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-jumby-lime hover:brightness-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-jumby-ink font-heading font-black text-xs shadow-md shadow-jumby-lime/25 transition-all"
           >
             {isPublishing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -735,16 +746,52 @@ function CreateStudioContent() {
               {/* Phone Frame Mockup for Realistic Portrait Feel */}
               <div className="relative w-full max-w-[390px] h-full max-h-[800px] rounded-[36px] overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col">
                 {mounted ? (
-                  <iframe
-                    ref={iframeRef}
-                    srcDoc={gameHtml}
-                    title="Live Preview"
-                    sandbox="allow-scripts allow-pointer-lock"
-                    className="w-full h-full border-none bg-black flex-1"
-                  />
+                  gameHtml ? (
+                    <iframe
+                      ref={iframeRef}
+                      srcDoc={gameHtml}
+                      title="Live Preview"
+                      sandbox="allow-scripts allow-pointer-lock"
+                      className="w-full h-full border-none bg-black flex-1"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-zinc-950 via-jumby-ink to-zinc-950 relative overflow-hidden select-none">
+                      <div className="absolute inset-0 bg-[radial-gradient(#7160FF_1px,transparent_1px)] [background-size:16px_16px] opacity-20" />
+
+                      <div className="relative w-16 h-16 rounded-3xl bg-jumby-purple/15 border border-jumby-purple/30 flex items-center justify-center mb-4 text-jumby-purple shadow-xl shadow-jumby-purple/10">
+                        <JumbyMascot className="w-10 h-10 animate-bounce" />
+                      </div>
+
+                      <h3 className="relative font-heading font-black text-lg text-white mb-1.5">
+                        Your Blank Canvas
+                      </h3>
+                      <p className="relative text-xs text-zinc-400 font-sans max-w-[260px] leading-relaxed mb-6">
+                        Describe an idea in the AI Assistant on the left, or tap a quick starter template below:
+                      </p>
+
+                      {/* Quick Starter Inspiration Chips */}
+                      <div className="relative w-full max-w-[280px] flex flex-col gap-2 z-10">
+                        {[
+                          { title: '⚡ Cyber Runner 3-Lane Dodge', arch: 'runner' as const },
+                          { title: '🪐 Orbital Laser Pulse', arch: 'orbit' as const },
+                          { title: '🧱 Rhythm Block Tower', arch: 'stack' as const },
+                          { title: '🐦 Neon Flappy Jumper', arch: 'flappy' as const },
+                        ].map((idea) => (
+                          <button
+                            key={idea.title}
+                            onClick={() => handleSelectArchetype(idea.arch)}
+                            className="w-full text-left px-3.5 py-2.5 rounded-xl bg-zinc-900/90 border border-white/10 hover:border-jumby-lime text-xs text-zinc-200 hover:text-white font-sans transition-all active:scale-95 flex items-center justify-between group"
+                          >
+                            <span>{idea.title}</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-zinc-500 group-hover:text-jumby-lime group-hover:translate-x-0.5 transition-all" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-xs">
-                    Loading preview...
+                    Loading studio...
                   </div>
                 )}
               </div>
@@ -765,8 +812,9 @@ function CreateStudioContent() {
               </div>
               <textarea
                 value={gameHtml}
+                placeholder={`<!-- No game generated yet. -->\n<!-- Type an idea in the AI Assistant on the left or select a template archetype to generate game code! -->`}
                 onChange={(e) => setGameHtml(e.target.value)}
-                className="flex-1 w-full bg-transparent text-cyan-300 font-mono text-xs resize-none focus:outline-none overflow-auto leading-relaxed"
+                className="flex-1 w-full bg-transparent text-cyan-300 placeholder-zinc-600 font-mono text-xs resize-none focus:outline-none overflow-auto leading-relaxed"
                 spellCheck={false}
               />
             </div>
