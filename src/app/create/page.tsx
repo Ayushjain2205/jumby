@@ -195,7 +195,29 @@ function CreateStudioContent() {
     setMessages((prev) => [...prev, userMsg]);
     setInputPrompt('');
     setIsGenerating(true);
-    setGenerationStep('🧠 Analyzing prompt & mechanics...');
+    // Detect archetype and update title if untitled
+    const lower = promptText.toLowerCase();
+    let targetArchetype = archetype;
+    if (lower.includes('stack') || lower.includes('tower') || lower.includes('block') || lower.includes('slice') || lower.includes('rhythm')) {
+      targetArchetype = 'stack';
+      setArchetype('stack');
+      if (title === 'Untitled Game') setTitle('Rhythm Stack Tower');
+    } else if (lower.includes('orbit') || lower.includes('circle') || lower.includes('planet') || lower.includes('pulse')) {
+      targetArchetype = 'orbit';
+      setArchetype('orbit');
+      if (title === 'Untitled Game') setTitle('Orbital Pulse');
+    } else if (lower.includes('runner') || lower.includes('lane') || lower.includes('dodge') || lower.includes('car') || lower.includes('dash')) {
+      targetArchetype = 'runner';
+      setArchetype('runner');
+      if (title === 'Untitled Game') setTitle('Cyber Runner');
+    } else if (lower.includes('flap') || lower.includes('bird') || lower.includes('jump')) {
+      targetArchetype = 'flappy';
+      setArchetype('flappy');
+      if (title === 'Untitled Game') setTitle('Neon Jumper');
+    } else if (title === 'Untitled Game') {
+      const words = promptText.trim().replace(/[^\w\s]/g, '').split(/\s+/).slice(0, 3).join(' ');
+      if (words) setTitle(words.replace(/\b\w/g, (c) => c.toUpperCase()));
+    }
 
     try {
       const res = await fetch('/api/generate', {
@@ -203,7 +225,7 @@ function CreateStudioContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptText,
-          archetype,
+          archetype: targetArchetype,
           baseCode: gameHtml,
           apiKey: apiKey || undefined,
         }),

@@ -24,13 +24,23 @@ export function synthesizeProceduralGame(params: GeneratorParams): string {
   else if (p.includes('chill') || p.includes('relax') || p.includes('cloud')) title = 'Zen Orbit';
   else if (p.includes('cyber') || p.includes('neon')) title = 'Neon Surge';
 
-  // 2. Determine Archetype
-  let chosenArchetype = archetype;
-  if (chosenArchetype === 'custom') {
-    if (p.includes('orbit') || p.includes('circle') || p.includes('planet')) chosenArchetype = 'orbit';
-    else if (p.includes('stack') || p.includes('block') || p.includes('tower')) chosenArchetype = 'stack';
-    else if (p.includes('run') || p.includes('lane') || p.includes('dodge') || p.includes('car')) chosenArchetype = 'runner';
-    else chosenArchetype = 'flappy';
+  // 2. Determine Archetype (Prompt keywords always take priority!)
+  let chosenArchetype: 'flappy' | 'orbit' | 'stack' | 'runner' = 'flappy';
+
+  if (p.includes('stack') || p.includes('block') || p.includes('tower') || p.includes('slice') || p.includes('rhythm')) {
+    chosenArchetype = 'stack';
+    if (title === 'Neon Pulse') title = 'Stack Slice Tower';
+  } else if (p.includes('orbit') || p.includes('circle') || p.includes('planet') || p.includes('pulse')) {
+    chosenArchetype = 'orbit';
+    if (title === 'Neon Pulse') title = 'Orbital Pulse';
+  } else if (p.includes('run') || p.includes('lane') || p.includes('dodge') || p.includes('car') || p.includes('race') || p.includes('dash')) {
+    chosenArchetype = 'runner';
+    if (title === 'Neon Pulse') title = 'Cyber Runner';
+  } else if (p.includes('flap') || p.includes('bird') || p.includes('jump') || p.includes('fly')) {
+    chosenArchetype = 'flappy';
+    if (title === 'Neon Pulse') title = 'Neon Jumper';
+  } else if (archetype && archetype !== 'custom') {
+    chosenArchetype = archetype;
   }
 
   // 3. Theme Colors
