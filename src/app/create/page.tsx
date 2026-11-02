@@ -89,13 +89,7 @@ function CreateStudioContent() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
-  // Load saved API key from localStorage if present
-  useEffect(() => {
-    try {
-      const savedKey = localStorage.getItem('jumby_api_key');
-      if (savedKey) setApiKey(savedKey);
-    } catch (e) {}
-  }, []);
+  const [mounted, setMounted] = useState(false);
 
   const handleSaveApiKey = (key: string) => {
     setApiKey(key);
@@ -118,14 +112,8 @@ function CreateStudioContent() {
     },
   ]);
 
-  // Game Code & Undo History
-  const [gameHtml, setGameHtml] = useState<string>('');
-  const [history, setHistory] = useState<string[]>([]);
-
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
   const buildHtml = (customConfig?: Partial<GameTemplateConfig>) => {
-    const theme = THEMES[selectedThemeIndex];
+    const theme = THEMES[selectedThemeIndex] || THEMES[0];
     return generateGameHtml({
       title,
       themeColor: theme.themeColor,
@@ -138,11 +126,29 @@ function CreateStudioContent() {
     });
   };
 
+  // Game Code & Undo History (initialized with default build)
+  const [gameHtml, setGameHtml] = useState<string>(() => {
+    return generateGameHtml({
+      title: parentGame ? `${parentGame.title} (Remix)` : 'Neon Dash 2099',
+      themeColor: THEMES[0].themeColor,
+      accentColor: THEMES[0].accentColor,
+      bgGradient: THEMES[0].bg,
+      gameType: 'flappy',
+      speedMultiplier: 1.2,
+      gravity: 0.38,
+    });
+  });
+  const [history, setHistory] = useState<string[]>([]);
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
   useEffect(() => {
-    const code = buildHtml();
-    setGameHtml(code);
-    setHistory([code]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setMounted(true);
+    try {
+      const savedKey = localStorage.getItem('jumby_api_key');
+      if (savedKey) setApiKey(savedKey);
+    } catch (e) {}
+    setHistory((prev) => (prev.length === 0 ? [gameHtml] : prev));
   }, []);
 
   // Live Streaming AI Generation Handler
@@ -728,13 +734,19 @@ function CreateStudioContent() {
             <div className="w-full h-full flex flex-col items-center justify-center">
               {/* Phone Frame Mockup for Realistic Portrait Feel */}
               <div className="relative w-full max-w-[390px] h-full max-h-[800px] rounded-[36px] overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col">
-                <iframe
-                  ref={iframeRef}
-                  srcDoc={gameHtml}
-                  title="Live Preview"
-                  sandbox="allow-scripts allow-pointer-lock allow-same-origin"
-                  className="w-full h-full border-none bg-black flex-1"
-                />
+                {mounted ? (
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={gameHtml}
+                    title="Live Preview"
+                    sandbox="allow-scripts allow-pointer-lock"
+                    className="w-full h-full border-none bg-black flex-1"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-xs">
+                    Loading preview...
+                  </div>
+                )}
               </div>
             </div>
           ) : (

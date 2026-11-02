@@ -41,8 +41,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`h-full ${poppins.variable} ${inter.variable}`}>
-      <body className="h-full w-full overflow-hidden bg-jumby-ink text-white antialiased font-sans">
+    <html lang="en" suppressHydrationWarning className={`h-full ${poppins.variable} ${inter.variable}`}>
+      <body suppressHydrationWarning className="h-full w-full overflow-hidden bg-jumby-ink text-white antialiased font-sans">
         {children}
       </body>
     </html>
