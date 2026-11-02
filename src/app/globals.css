@@ -1,17 +1,32 @@
 @import "tailwindcss";
 
+@theme {
+  --color-jumby-purple: #7160FF;
+  --color-jumby-lime: #D8FF43;
+  --color-jumby-coral: #FF7657;
+  --color-jumby-sky: #4DB8FF;
+  --color-jumby-lavender: #E9E7FF;
+  --color-jumby-ink: #0F0F0F;
+  --font-poppins: var(--font-poppins), sans-serif;
+  --font-inter: var(--font-inter), sans-serif;
+}
+
 :root {
-  --background: #06070d;
-  --foreground: #f3f4f6;
+  --background: #0F0F0F;
+  --foreground: #FFFFFF;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+}
+
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-poppins), sans-serif;
 }
 
 /* Hide scrollbars for slick TikTok feed */
@@ -25,8 +40,8 @@ body {
 
 /* Glassmorphism helpers */
 .glass-panel {
-  background: rgba(18, 20, 32, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 15, 15, 0.75);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(233, 231, 255, 0.12);
 }

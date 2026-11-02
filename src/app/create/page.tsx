@@ -19,10 +19,10 @@ import { SEED_GAMES } from '@/data/seed-games';
 import { generateGameHtml, GameTemplateConfig } from '@/lib/templates/game-generator';
 
 const THEMES = [
-  { name: 'Neon Cyber', themeColor: '#00f0ff', accentColor: '#ff0077', bg: ['#070714', '#170b28'] as [string, string] },
-  { name: 'Solar Flare', themeColor: '#facc15', accentColor: '#ef4444', bg: ['#120804', '#2a0808'] as [string, string] },
-  { name: 'Toxic Emerald', themeColor: '#10b981', accentColor: '#8b5cf6', bg: ['#04140b', '#0a1f18'] as [string, string] },
-  { name: 'Hyper Violet', themeColor: '#c084fc', accentColor: '#38bdf8', bg: ['#0c061a', '#1e0a38'] as [string, string] },
+  { name: 'Jumby Purple & Lime', themeColor: '#7160FF', accentColor: '#D8FF43', bg: ['#0F0F0F', '#1D173F'] as [string, string] },
+  { name: 'Jumby Coral & Sky', themeColor: '#FF7657', accentColor: '#4DB8FF', bg: ['#0F0F0F', '#261218'] as [string, string] },
+  { name: 'Jumby Lime Glow', themeColor: '#D8FF43', accentColor: '#7160FF', bg: ['#0F0F0F', '#1A2408'] as [string, string] },
+  { name: 'Jumby Sky Chill', themeColor: '#4DB8FF', accentColor: '#FF7657', bg: ['#0F0F0F', '#0C1E2B'] as [string, string] },
 ];
 
 function CreateStudioContent() {
@@ -137,7 +137,7 @@ function CreateStudioContent() {
             <button
               onClick={() => setActiveTab('preview')}
               className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                activeTab === 'preview' ? 'bg-cyan-500 text-black shadow' : 'text-zinc-400 hover:text-white'
+                activeTab === 'preview' ? 'bg-jumby-purple text-white shadow' : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Eye className="w-3 h-3" />
@@ -146,7 +146,7 @@ function CreateStudioContent() {
             <button
               onClick={() => setActiveTab('code')}
               className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                activeTab === 'code' ? 'bg-cyan-500 text-black shadow' : 'text-zinc-400 hover:text-white'
+                activeTab === 'code' ? 'bg-jumby-purple text-white shadow' : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Code className="w-3 h-3" />
@@ -156,9 +156,9 @@ function CreateStudioContent() {
 
           <button
             onClick={handlePublish}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 hover:brightness-110 text-white text-xs font-extrabold shadow-lg shadow-cyan-500/20 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-jumby-lime hover:brightness-105 text-jumby-ink font-heading font-black text-xs shadow-md shadow-jumby-lime/25 active:scale-95 transition-all"
           >
-            <Upload className="w-3.5 h-3.5" />
+            <Upload className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Publish</span>
           </button>
         </div>
@@ -275,9 +275,9 @@ function CreateStudioContent() {
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-fuchsia-600 hover:brightness-110 active:scale-98 transition-all font-black text-sm text-white shadow-xl shadow-fuchsia-500/20 disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-full bg-jumby-purple hover:brightness-110 active:scale-98 transition-all font-heading font-black text-xs text-white shadow-xl shadow-jumby-purple/30 disabled:opacity-50"
           >
-            <Sparkles className="w-4 h-4 animate-spin-slow" />
+            <Sparkles className="w-4 h-4 text-jumby-lime" />
             <span>{isGenerating ? 'Compiling in-memory...' : 'Update Live Preview'}</span>
           </button>
         </div>
