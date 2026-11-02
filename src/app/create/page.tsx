@@ -13,7 +13,6 @@ import {
   Check,
   Sliders,
   Volume2,
-  FolderKanban,
   MessageSquare,
   Palette,
   Send,
@@ -96,8 +95,8 @@ function CreateStudioContent() {
   const [speedMultiplier, setSpeedMultiplier] = useState(1.2);
   const [gravity, setGravity] = useState(0.38);
 
-  // Left Studio Panel Tabs: 'chat' | 'templates' | 'theme'
-  const [panelTab, setPanelTab] = useState<'chat' | 'templates' | 'theme'>('chat');
+  // Left Studio Panel Tabs: 'chat' | 'tune'
+  const [panelTab, setPanelTab] = useState<'chat' | 'tune'>('chat');
 
   // Preview Workspace Tabs: 'preview' | 'code'
   const [workspaceTab, setWorkspaceTab] = useState<'preview' | 'code'>('preview');
@@ -483,27 +482,15 @@ function CreateStudioContent() {
             </button>
 
             <button
-              onClick={() => setPanelTab('templates')}
+              onClick={() => setPanelTab('tune')}
               className={`flex items-center gap-1.5 px-4 py-3 text-xs font-heading font-bold border-b-2 transition-all ${
-                panelTab === 'templates'
+                panelTab === 'tune'
                   ? 'border-jumby-purple text-jumby-purple'
                   : 'border-transparent text-zinc-400 hover:text-white'
               }`}
             >
-              <FolderKanban className="w-3.5 h-3.5" />
-              <span>Templates</span>
-            </button>
-
-            <button
-              onClick={() => setPanelTab('theme')}
-              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-heading font-bold border-b-2 transition-all ${
-                panelTab === 'theme'
-                  ? 'border-jumby-coral text-jumby-coral'
-                  : 'border-transparent text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Palette className="w-3.5 h-3.5" />
-              <span>Physics & Audio</span>
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Fine-Tune & Audio</span>
             </button>
           </div>
 
@@ -550,10 +537,12 @@ function CreateStudioContent() {
                 {/* Prompt Quick Suggestion Pills */}
                 <div className="px-3 py-2 flex gap-1.5 overflow-x-auto no-scrollbar border-t border-white/5 bg-zinc-950/40">
                   {[
-                    'Make it 2x faster with neon lime trail',
-                    'Switch to Cyber Runner 3-lane dodge',
-                    'Low gravity floaty bounce mode',
-                    'Change to Orbital Pulse with lasers',
+                    '⚡ Cyber Runner 3-lane dodge',
+                    '🪐 Orbital laser pulse survival',
+                    '🧱 Rhythm block stack tower',
+                    '🐦 Neon flappy jumper',
+                    '🔥 2x insane speed trail',
+                    '🌊 Low gravity floaty bounce',
                   ].map((s) => (
                     <button
                       key={s}
@@ -599,45 +588,8 @@ function CreateStudioContent() {
               </div>
             )}
 
-            {/* 2. TEMPLATES TAB */}
-            {panelTab === 'templates' && (
-              <div className="p-4 space-y-4">
-                <div className="text-xs text-zinc-400 font-sans">
-                  Choose a battle-tested micro-game template pre-wired with 60fps canvas, input, and Web Audio:
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                  {ARCHETYPES.map((arch) => (
-                    <div
-                      key={arch.id}
-                      onClick={() => handleSelectArchetype(arch.id)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                        archetype === arch.id
-                          ? 'bg-jumby-purple/15 border-jumby-purple text-white shadow-lg shadow-jumby-purple/10'
-                          : 'bg-zinc-900/50 border-white/10 hover:border-white/20 text-zinc-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl p-2 rounded-xl bg-white/5">{arch.icon}</div>
-                        <div>
-                          <div className="font-heading font-black text-xs text-white">
-                            {arch.name}
-                          </div>
-                          <div className="text-[11px] text-zinc-400 font-sans">{arch.desc}</div>
-                        </div>
-                      </div>
-                      {archetype === arch.id && (
-                        <div className="w-6 h-6 rounded-full bg-jumby-purple text-white flex items-center justify-center">
-                          <Check className="w-3.5 h-3.5" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 3. THEME & AUDIO TAB */}
-            {panelTab === 'theme' && (
+            {/* 2. FINE-TUNE & AUDIO TAB */}
+            {panelTab === 'tune' && (
               <div className="p-4 space-y-5">
                 {/* Brand Color Palettes */}
                 <div>
