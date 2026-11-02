@@ -56,6 +56,32 @@ interface ChatMessage {
   timestamp: string;
 }
 
+function AnimatedGeniusTitle() {
+  const text = 'Waiting on your genius.';
+  return (
+    <h3 className="relative flex items-center justify-center flex-wrap select-none">
+      {text.split('').map((char, i) => {
+        const isGenius = i >= 16;
+        return (
+          <span
+            key={i}
+            className={`inline-block font-heading font-black text-2xl tracking-tight animate-bounce ${
+              isGenius ? 'text-jumby-lime drop-shadow-[0_0_15px_rgba(216,255,67,0.45)]' : 'text-white'
+            }`}
+            style={{
+              animationDelay: `${i * 65}ms`,
+              animationDuration: '1.3s',
+              marginRight: char === ' ' ? '6px' : '0px',
+            }}
+          >
+            {char === ' ' ? '\u00A0' : char}
+          </span>
+        );
+      })}
+    </h3>
+  );
+}
+
 function CreateStudioContent() {
   const searchParams = useSearchParams();
   const remixId = searchParams.get('remix');
@@ -762,9 +788,7 @@ function CreateStudioContent() {
                         <JumbyMascot className="w-12 h-12 animate-bounce" />
                       </div>
 
-                      <h3 className="relative font-heading font-black text-2xl tracking-tight animate-text-shimmer drop-shadow-md">
-                        Waiting on your genius.
-                      </h3>
+                      <AnimatedGeniusTitle />
                     </div>
                   )
                 ) : (
