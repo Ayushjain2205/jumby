@@ -763,10 +763,10 @@ function CreateStudioContent() {
                       </div>
 
                       <h3 className="relative font-heading font-black text-xl text-white mb-2 tracking-tight">
-                        Canvas is empty. Brain is loaded.
+                        Waiting on your genius.
                       </h3>
                       <p className="relative text-xs text-zinc-400 font-sans max-w-[240px] leading-relaxed">
-                        Type your wildest game idea in the AI chat on the left. Let’s make something chaotic.
+                        Tell the AI on the left what to build before I get bored.
                       </p>
                     </div>
                   )
