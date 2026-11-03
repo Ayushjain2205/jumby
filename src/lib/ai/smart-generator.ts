@@ -185,6 +185,16 @@ export function synthesizeProceduralGame(params: GeneratorParams): string {
   if (p.includes('faster') || p.includes('insane') || p.includes('hard') || p.includes('2x')) speedMultiplier = 1.5;
   if (p.includes('slower') || p.includes('easy') || p.includes('chill')) speedMultiplier = 0.75;
 
+  // 7. BGM Rhythm / Vibe Selection
+  let bgmVibe: 'arcade' | 'cyber' | 'chill' | 'action' = 'arcade';
+  if (p.includes('space') || p.includes('cyber') || p.includes('neon') || p.includes('laser') || p.includes('sci-fi') || p.includes('synth')) {
+    bgmVibe = 'cyber';
+  } else if (p.includes('race') || p.includes('action') || p.includes('battle') || p.includes('ninja') || p.includes('war') || p.includes('fire') || p.includes('speed')) {
+    bgmVibe = 'action';
+  } else if (p.includes('chill') || p.includes('zen') || p.includes('relax') || p.includes('orbit') || p.includes('cloud')) {
+    bgmVibe = 'chill';
+  }
+
   const genOpts: GameGenOptions = {
     title,
     themeColor,
@@ -196,7 +206,8 @@ export function synthesizeProceduralGame(params: GeneratorParams): string {
     fontFamily,
     playerEmoji,
     targetEmoji,
-    hazardEmoji
+    hazardEmoji,
+    bgmVibe,
   };
 
   // Synthesize according to chosen archetype
@@ -229,6 +240,7 @@ export interface GameGenOptions {
   playerEmoji: string;
   targetEmoji: string;
   hazardEmoji: string;
+  bgmVibe: 'arcade' | 'cyber' | 'chill' | 'action';
 }
 
 // --------------------------------------------------------------------------
@@ -316,11 +328,13 @@ function generateFlappyGame(opts: GameGenOptions) {
       hintEl.style.display = 'none';
       Jumby.setScore(0);
       Jumby.sound.jump();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     }
 
     function die() {
       state = 'gameover';
       Jumby.sound.hit();
+      Jumby.sound.bgm.stop();
       Jumby.fx.shake(16);
       Jumby.fx.particles(player.x, player.y, 25, '${opts.themeColor}');
       hintEl.style.display = 'block';
@@ -335,6 +349,7 @@ function generateFlappyGame(opts: GameGenOptions) {
       items = items.filter(it => it.x > player.x + 120);
       hintEl.style.display = 'none';
       Jumby.sound.powerup();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
       Jumby.fx.particles(player.x, player.y, 30, '${opts.accentColor}');
     });
 
@@ -521,11 +536,13 @@ function generateOrbitGame(opts: GameGenOptions) {
       hintEl.style.display = 'none';
       Jumby.setScore(0);
       Jumby.sound.jump();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     }
 
     function die() {
       state = 'gameover';
       Jumby.sound.hit();
+      Jumby.sound.bgm.stop();
       Jumby.fx.shake(18);
       const px = width / 2 + Math.cos(angle) * orbitRadius;
       const py = height / 2 + Math.sin(angle) * orbitRadius;
@@ -540,6 +557,7 @@ function generateOrbitGame(opts: GameGenOptions) {
       lasers = [];
       hintEl.style.display = 'none';
       Jumby.sound.powerup();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     });
 
     function loop() {
@@ -716,16 +734,27 @@ function generateStackGame(opts: GameGenOptions) {
       hintEl.style.display = 'none';
       Jumby.setScore(0);
       Jumby.sound.jump();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     }
 
     function die() {
       state = 'gameover';
       Jumby.sound.hit();
+      Jumby.sound.bgm.stop();
       Jumby.fx.shake(16);
       hintEl.style.display = 'block';
       hintEl.innerText = 'MISSED! TAP TO RETRY';
       Jumby.gameOver(score, { coins: Math.floor(score / 5) });
     }
+
+    Jumby.on('REVIVE_GRANTED', () => {
+      state = 'playing';
+      activeBlock.x = 0;
+      activeBlock.w = stack[stack.length - 1].w;
+      hintEl.style.display = 'none';
+      Jumby.sound.powerup();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
+    });
 
     function loop() {
       requestAnimationFrame(loop);
@@ -904,17 +933,27 @@ function generateRunnerGame(opts: GameGenOptions) {
       hintEl.style.display = 'none';
       Jumby.setScore(0);
       Jumby.sound.jump();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     }
 
     function die() {
       state = 'gameover';
       Jumby.sound.hit();
+      Jumby.sound.bgm.stop();
       Jumby.fx.shake(18);
       Jumby.fx.particles(getLaneX(lane), height - 120, 30, '${opts.themeColor}');
       hintEl.style.display = 'block';
       hintEl.innerText = 'WRECKED! TAP TO RETRY';
       Jumby.gameOver(score, { coins: Math.floor(score / 5) });
     }
+
+    Jumby.on('REVIVE_GRANTED', () => {
+      state = 'playing';
+      obstacles = [];
+      hintEl.style.display = 'none';
+      Jumby.sound.powerup();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
+    });
 
     function loop() {
       requestAnimationFrame(loop);
@@ -1094,11 +1133,13 @@ function generateCatcherGame(opts: GameGenOptions) {
       hintEl.style.display = 'none';
       Jumby.setScore(0);
       Jumby.sound.jump();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     }
 
     function die() {
       state = 'gameover';
       Jumby.sound.hit();
+      Jumby.sound.bgm.stop();
       Jumby.fx.shake(16);
       Jumby.fx.particles(basket.x, basket.y, 25, '#EF4444');
       hintEl.style.display = 'block';
@@ -1111,6 +1152,7 @@ function generateCatcherGame(opts: GameGenOptions) {
       items = items.filter(it => it.y > height * 0.4);
       hintEl.style.display = 'none';
       Jumby.sound.powerup();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     });
 
     function loop() {
@@ -1300,11 +1342,13 @@ function generateShooterGame(opts: GameGenOptions) {
       hintEl.style.display = 'none';
       Jumby.setScore(0);
       Jumby.sound.powerup();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     }
 
     function die() {
       state = 'gameover';
       Jumby.sound.hit();
+      Jumby.sound.bgm.stop();
       Jumby.fx.shake(16);
       Jumby.fx.particles(ship.x, ship.y, 25, '#EF4444');
       hintEl.style.display = 'block';
@@ -1317,6 +1361,7 @@ function generateShooterGame(opts: GameGenOptions) {
       enemies = enemies.filter(e => e.y < height * 0.3);
       hintEl.style.display = 'none';
       Jumby.sound.powerup();
+      Jumby.sound.bgm.start('${opts.bgmVibe}');
     });
 
     function loop() {

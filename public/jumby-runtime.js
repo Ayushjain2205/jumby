@@ -119,6 +119,224 @@
     },
   };
 
+  // 2.5 Procedural 8-Bit BGM Synthesizer (Zero asset download, responsive Web Audio loop)
+  const BGM_TRACKS = {
+    arcade: {
+      bpm: 132,
+      bass: [130.81, 130.81, 164.81, 164.81, 174.61, 174.61, 196.0, 196.0],
+      lead: [
+        523.25, 0, 392.0, 0, 329.63, 392.0, 440.0, 523.25,
+        440.0, 0, 392.0, 0, 329.63, 0, 293.66, 261.63,
+      ],
+      leadType: 'square',
+      bassType: 'triangle',
+    },
+    cyber: {
+      bpm: 120,
+      bass: [110.0, 110.0, 110.0, 110.0, 87.31, 87.31, 87.31, 87.31, 98.0, 98.0, 98.0, 98.0, 82.41, 82.41, 82.41, 82.41],
+      lead: [
+        440.0, 0, 440.0, 523.25, 0, 440.0, 392.0, 0,
+        349.23, 0, 392.0, 440.0, 0, 329.63, 0, 0,
+      ],
+      leadType: 'sawtooth',
+      bassType: 'sawtooth',
+    },
+    chill: {
+      bpm: 88,
+      bass: [130.81, 0, 130.81, 0, 110.0, 0, 110.0, 0, 87.31, 0, 87.31, 0, 98.0, 0, 98.0, 0],
+      lead: [
+        523.25, 0, 493.88, 0, 392.0, 0, 329.63, 0,
+        440.0, 0, 392.0, 0, 329.63, 0, 293.66, 0,
+      ],
+      leadType: 'sine',
+      bassType: 'sine',
+    },
+    action: {
+      bpm: 144,
+      bass: [73.42, 73.42, 87.31, 73.42, 98.0, 73.42, 103.83, 110.0],
+      lead: [
+        293.66, 349.23, 440.0, 587.33, 523.25, 440.0, 392.0, 349.23,
+        293.66, 0, 349.23, 0, 440.0, 523.25, 587.33, 0,
+      ],
+      leadType: 'sawtooth',
+      bassType: 'triangle',
+    },
+  };
+
+  const Bgm = {
+    isPlaying: false,
+    currentVibe: 'arcade',
+    volume: 0.12,
+    muted: false,
+    step: 0,
+    timer: null,
+    nextNoteTime: 0,
+    autoStartPending: false,
+
+    start: function (vibe = 'arcade') {
+      this.currentVibe = BGM_TRACKS[vibe] ? vibe : 'arcade';
+      this.isPlaying = true;
+      const ctx = getAudioCtx();
+
+      if (!ctx || ctx.state === 'suspended') {
+        this.autoStartPending = true;
+        this._createMuteButton();
+        return;
+      }
+      this.autoStartPending = false;
+      this.nextNoteTime = ctx.currentTime + 0.05;
+      this.step = 0;
+
+      if (!this.timer) {
+        this.timer = setInterval(() => this._schedule(), 35);
+      }
+      this._createMuteButton();
+    },
+
+    stop: function () {
+      this.isPlaying = false;
+      this.autoStartPending = false;
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = null;
+      }
+    },
+
+    toggle: function () {
+      this.muted = !this.muted;
+      this._updateMuteButtonUi();
+      return !this.muted;
+    },
+
+    setVolume: function (vol) {
+      this.volume = Math.max(0, Math.min(1, vol));
+    },
+
+    _schedule: function () {
+      const ctx = getAudioCtx();
+      if (!ctx || !this.isPlaying) return;
+
+      const track = BGM_TRACKS[this.currentVibe] || BGM_TRACKS.arcade;
+      const secondsPerBeat = 60.0 / track.bpm;
+      const stepDuration = secondsPerBeat / 4; // 16th note
+
+      while (this.nextNoteTime < ctx.currentTime + 0.15) {
+        if (!this.muted) {
+          this._playStep(this.step, this.nextNoteTime, stepDuration, track);
+        }
+        this.nextNoteTime += stepDuration;
+        this.step = (this.step + 1) % 16;
+      }
+    },
+
+    _playStep: function (step, time, duration, track) {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+
+      // 1. Drum Beat (Kick on 0, 4, 8, 12; Crisp Hi-hat click on 2, 6, 10, 14)
+      if (step % 4 === 0) {
+        // Kick
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.setValueAtTime(120, time);
+        osc.frequency.exponentialRampToValueAtTime(35, time + 0.08);
+        gain.gain.setValueAtTime(this.volume * 0.9, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(time);
+        osc.stop(time + 0.08);
+      } else if (step % 2 === 0) {
+        // Crisp hi-hat click
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1800, time);
+        gain.gain.setValueAtTime(this.volume * 0.25, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(time);
+        osc.stop(time + 0.03);
+      }
+
+      // 2. Bass (every 8th note)
+      if (step % 2 === 0) {
+        const bassIdx = Math.floor(step / 2) % track.bass.length;
+        const bassFreq = track.bass[bassIdx];
+        if (bassFreq > 0) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = track.bassType || 'triangle';
+          osc.frequency.setValueAtTime(bassFreq, time);
+          gain.gain.setValueAtTime(this.volume * 0.65, time);
+          gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 1.8);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + duration * 1.8);
+        }
+      }
+
+      // 3. Lead / Arp (16th notes)
+      const leadFreq = track.lead[step % track.lead.length];
+      if (leadFreq > 0) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = track.leadType || 'square';
+        osc.frequency.setValueAtTime(leadFreq, time);
+        gain.gain.setValueAtTime(this.volume * 0.45, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.85);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(time);
+        osc.stop(time + duration * 0.85);
+      }
+    },
+
+    _createMuteButton: function () {
+      if (document.getElementById('jumby-bgm-mute-btn')) return;
+      const btn = document.createElement('button');
+      btn.id = 'jumby-bgm-mute-btn';
+      btn.title = 'Toggle Music';
+      btn.innerHTML = '🎵';
+      btn.style.cssText =
+        'position:fixed;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(20,20,30,0.65);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:99999;transition:all 0.2s ease;user-select:none;-webkit-tap-highlight-color:transparent;';
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        this.toggle();
+      };
+      document.body.appendChild(btn);
+    },
+
+    _updateMuteButtonUi: function () {
+      const btn = document.getElementById('jumby-bgm-mute-btn');
+      if (btn) {
+        btn.innerHTML = this.muted ? '🔇' : '🎵';
+        btn.style.opacity = this.muted ? '0.45' : '0.9';
+      }
+    },
+  };
+
+  Sound.bgm = Bgm;
+
+  // Auto-unlock AudioContext on user interaction
+  function unlockAudio() {
+    const ctx = getAudioCtx();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        if (Bgm.autoStartPending) {
+          Bgm.start(Bgm.currentVibe);
+        }
+      });
+    } else if (Bgm.autoStartPending) {
+      Bgm.start(Bgm.currentVibe);
+    }
+  }
+  global.addEventListener('pointerdown', unlockAudio, { passive: true });
+  global.addEventListener('touchstart', unlockAudio, { passive: true });
+  global.addEventListener('click', unlockAudio, { passive: true });
+
   // 3. Screen Shake & Visual Juice
   let shakeIntensity = 0;
   let shakeDecay = 0.9;

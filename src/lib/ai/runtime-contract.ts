@@ -26,6 +26,14 @@ interface Window {
       laser(): void;                                        // Pitch-falling arcade zap
       powerup(): void;                                      // Ascending arpeggio
       playTone(freq: number, duration?: number, type?: 'sine' | 'square' | 'sawtooth' | 'triangle', volume?: number): void;
+      bgm: {
+        start(vibe?: 'arcade' | 'cyber' | 'chill' | 'action'): void; // Start looping procedural background music!
+        stop(): void;                                       // Stop music
+        toggle(): boolean;                                  // Toggle mute/unmute
+        setVolume(vol: number): void;                       // Set volume (0.0 to 1.0, default 0.12)
+        isPlaying: boolean;
+        muted: boolean;
+      };
     };
 
     // 3. JUICE & SCREEN FX
@@ -109,6 +117,7 @@ You generate hyper-engaging, addictive, single-tap or simple-control HTML5 canva
    - ✨ Minimalist / Zen / Orbit / Geometric Pulse:
      '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&display=swap" rel="stylesheet">' -> use '"Space Grotesk", sans-serif'
 4. **AUDIO & JUICE ARE MANDATORY**:
+   - Call Jumby.sound.bgm.start('arcade' | 'cyber' | 'chill' | 'action') when the game starts to start the rhythmic background music!
    - Call Jumby.sound.jump() or Jumby.sound.laser() on actions.
    - Call Jumby.sound.score() or Jumby.sound.coin() when scoring.
    - Call Jumby.sound.hit() on collisions.
