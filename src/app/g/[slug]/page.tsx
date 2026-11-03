@@ -1,9 +1,9 @@
+import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { GameFeed } from '@/components/feed/GameFeed';
 import { MobileShell } from '@/components/layout/MobileShell';
 import { getAllGames, getGameBySlug } from '@/lib/games/game-registry';
-
 
 interface GamePageProps {
   params: Promise<{
@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: GamePageProps): Promise<Metad
   };
 }
 
-export default async function GamePermalinkPage({ params }: GamePageProps) {
+async function GamePageContent({ params }: GamePageProps) {
   const { slug } = await params;
   const game = getGameBySlug(slug);
 
@@ -66,9 +66,21 @@ export default async function GamePermalinkPage({ params }: GamePageProps) {
     ...allGames.filter((g) => g.slug !== slug),
   ];
 
+  return <GameFeed games={orderedGames} initialSlug={slug} />;
+}
+
+export default function GamePermalinkPage({ params }: GamePageProps) {
   return (
     <MobileShell>
-      <GameFeed games={orderedGames} initialSlug={slug} />
+      <Suspense
+        fallback={
+          <div className="w-full h-full bg-[#070714] flex items-center justify-center text-zinc-500 font-mono text-xs">
+            Loading game...
+          </div>
+        }
+      >
+        <GamePageContent params={params} />
+      </Suspense>
     </MobileShell>
   );
 }
