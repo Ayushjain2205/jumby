@@ -69,16 +69,19 @@
     playTone: function (freq = 440, duration = 0.1, type = 'sine', volume = 0.2) {
       const ctx = getAudioCtx();
       if (!ctx) return;
+      // If duration is passed in milliseconds (e.g. 40, 100, 250), convert to seconds
+      let dur = duration > 5 ? duration / 1000 : duration;
+      dur = Math.min(Math.max(dur, 0.02), 1.5);
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = type;
       osc.frequency.setValueAtTime(freq, ctx.currentTime);
       gain.gain.setValueAtTime(volume, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();
-      osc.stop(ctx.currentTime + duration);
+      osc.stop(ctx.currentTime + dur);
     },
     jump: function () {
       this.playTone(320, 0.12, 'sine', 0.25);
@@ -141,12 +144,17 @@
         });
       }
     },
-    updateAndRender: function (ctx, width, height) {
-      // Screen shake transform
+    getShakeOffset: function () {
       if (shakeIntensity > 0.5) {
-        const dx = (Math.random() - 0.5) * shakeIntensity * 2;
-        const dy = (Math.random() - 0.5) * shakeIntensity * 2;
-        ctx.translate(dx, dy);
+        return {
+          x: (Math.random() - 0.5) * shakeIntensity * 2,
+          y: (Math.random() - 0.5) * shakeIntensity * 2,
+        };
+      }
+      return { x: 0, y: 0 };
+    },
+    updateAndRender: function (ctx, width, height) {
+      if (shakeIntensity > 0.5) {
         shakeIntensity *= shakeDecay;
       }
 

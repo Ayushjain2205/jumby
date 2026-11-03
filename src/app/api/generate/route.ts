@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
     const geminiKey = clientApiKey || process.env.GEMINI_API_KEY;
     const openaiKey = clientApiKey || process.env.OPENAI_API_KEY;
 
+    // Ensure there is always a proven baseline code for the LLM to enhance and remix
+    const effectiveBaseCode = baseCode || synthesizeProceduralGame({ prompt, archetype });
+
     // 1. Try Local CLI Proxy API if requested or in auto mode
     const tryProxy = provider === 'proxy' || provider === 'cliproxy' || provider === 'auto';
     if (tryProxy && cliProxyUrl) {
@@ -34,7 +37,7 @@ export async function POST(req: NextRequest) {
           cliProxyModel,
           prompt,
           archetype,
-          baseCode
+          effectiveBaseCode
         );
         if (proxyStream) {
           return proxyStream;
@@ -49,9 +52,9 @@ export async function POST(req: NextRequest) {
     const useOpenAI = provider === 'openai' || (provider === 'auto' && openaiKey && !geminiKey);
 
     if (useGemini && geminiKey) {
-      return streamFromGemini(geminiKey, prompt, archetype, baseCode);
+      return streamFromGemini(geminiKey, prompt, archetype, effectiveBaseCode);
     } else if (useOpenAI && openaiKey) {
-      return streamFromOpenAI(openaiKey, prompt, archetype, baseCode);
+      return streamFromOpenAI(openaiKey, prompt, archetype, effectiveBaseCode);
     }
 
     // 3. Fallback: High-fidelity procedural dynamic generation with SSE streaming
