@@ -103,47 +103,155 @@ export function synthesizeProceduralGame(params: GeneratorParams): string {
     bgBottom = '#1A153A';
   }
 
-  // 4. Speed & Dynamics
+  // 4. Game Typography / Font Vibe
+  let fontUrl = 'https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700;900&display=swap';
+  let fontFamily = "'Fredoka', cursive, sans-serif";
+
+  if (p.includes('retro') || p.includes('pixel') || p.includes('8bit') || p.includes('arcade') || p.includes('classic')) {
+    fontUrl = 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap';
+    fontFamily = "'Press Start 2P', monospace";
+  } else if (p.includes('space') || p.includes('cyber') || p.includes('neon') || p.includes('laser') || p.includes('sci-fi') || p.includes('matrix')) {
+    fontUrl = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap';
+    fontFamily = "'Orbitron', sans-serif";
+  } else if (p.includes('race') || p.includes('action') || p.includes('battle') || p.includes('hard') || p.includes('fire') || p.includes('speed') || p.includes('turbo')) {
+    fontUrl = 'https://fonts.googleapis.com/css2?family=Russo+One&display=swap';
+    fontFamily = "'Russo One', sans-serif";
+  } else if (p.includes('orbit') || p.includes('zen') || p.includes('minimal') || p.includes('chill') || p.includes('clean')) {
+    fontUrl = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&display=swap';
+    fontFamily = "'Space Grotesk', sans-serif";
+  }
+
+  // 5. Dynamic Emoji Visual Characters & Items
+  let playerEmoji = '⭐';
+  let targetEmoji = '💎';
+  let hazardEmoji = '💣';
+
+  if (p.includes('taco') || p.includes('sombrero') || p.includes('mexic')) {
+    playerEmoji = '👒';
+    targetEmoji = '🌮';
+    hazardEmoji = '🌶️';
+  } else if (p.includes('fruit') || p.includes('apple') || p.includes('berry') || p.includes('banana')) {
+    playerEmoji = '🧺';
+    targetEmoji = '🍎';
+    hazardEmoji = '🐛';
+  } else if (p.includes('burger') || p.includes('pizza') || p.includes('food')) {
+    playerEmoji = '😋';
+    targetEmoji = '🍕';
+    hazardEmoji = '🥦';
+  } else if (p.includes('space') || p.includes('galaxy') || p.includes('star') || p.includes('invader')) {
+    playerEmoji = '🚀';
+    targetEmoji = '⭐';
+    hazardEmoji = '👾';
+  } else if (p.includes('alien') || p.includes('ufo')) {
+    playerEmoji = '🛸';
+    targetEmoji = '🪐';
+    hazardEmoji = '☄️';
+  } else if (p.includes('car') || p.includes('race') || p.includes('turbo') || p.includes('drift')) {
+    playerEmoji = '🏎️';
+    targetEmoji = '⚡';
+    hazardEmoji = '🚧';
+  } else if (p.includes('coin') || p.includes('gold') || p.includes('rich') || p.includes('treasure')) {
+    playerEmoji = '💰';
+    targetEmoji = '🪙';
+    hazardEmoji = '💸';
+  } else if (p.includes('cat') || p.includes('kitten')) {
+    playerEmoji = '🐱';
+    targetEmoji = '🐟';
+    hazardEmoji = '🧶';
+  } else if (p.includes('dog') || p.includes('puppy')) {
+    playerEmoji = '🐶';
+    targetEmoji = '🦴';
+    hazardEmoji = '🪨';
+  } else if (p.includes('ocean') || p.includes('fish') || p.includes('sea') || p.includes('water')) {
+    playerEmoji = '🐠';
+    targetEmoji = '🐚';
+    hazardEmoji = '🦈';
+  } else if (p.includes('bird') || p.includes('fly') || p.includes('flap')) {
+    playerEmoji = '🐤';
+    targetEmoji = '🪱';
+    hazardEmoji = '🦅';
+  } else if (p.includes('ninja') || p.includes('blade') || p.includes('slash')) {
+    playerEmoji = '🥷';
+    targetEmoji = '🗡️';
+    hazardEmoji = '💣';
+  } else if (p.includes('bjp') || p.includes('saffron') || p.includes('india')) {
+    playerEmoji = '🪷';
+    targetEmoji = '☀️';
+    hazardEmoji = '⚡';
+  }
+
+  // 6. Speed & Dynamics
   let speedMultiplier = 1.0;
   if (p.includes('faster') || p.includes('insane') || p.includes('hard') || p.includes('2x')) speedMultiplier = 1.5;
   if (p.includes('slower') || p.includes('easy') || p.includes('chill')) speedMultiplier = 0.75;
 
+  const genOpts: GameGenOptions = {
+    title,
+    themeColor,
+    accentColor,
+    bgTop,
+    bgBottom,
+    speedMultiplier,
+    fontUrl,
+    fontFamily,
+    playerEmoji,
+    targetEmoji,
+    hazardEmoji
+  };
+
   // Synthesize according to chosen archetype
   switch (chosenArchetype) {
     case 'catcher':
-      return generateCatcherGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
+      return generateCatcherGame(genOpts);
     case 'shooter':
-      return generateShooterGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
+      return generateShooterGame(genOpts);
     case 'orbit':
-      return generateOrbitGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
+      return generateOrbitGame(genOpts);
     case 'stack':
-      return generateStackGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
+      return generateStackGame(genOpts);
     case 'runner':
-      return generateRunnerGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
+      return generateRunnerGame(genOpts);
     case 'flappy':
     default:
-      return generateFlappyGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
+      return generateFlappyGame(genOpts);
   }
+}
+
+export interface GameGenOptions {
+  title: string;
+  themeColor: string;
+  accentColor: string;
+  bgTop: string;
+  bgBottom: string;
+  speedMultiplier: number;
+  fontUrl: string;
+  fontFamily: string;
+  playerEmoji: string;
+  targetEmoji: string;
+  hazardEmoji: string;
 }
 
 // --------------------------------------------------------------------------
 // 1. FLAPPY / TAP JUMPER
 // --------------------------------------------------------------------------
-function generateFlappyGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+function generateFlappyGame(opts: GameGenOptions) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${opts.title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${opts.fontUrl}" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}; }
     canvas { display: block; width: 100%; height: 100%; }
     #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
-    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; font-family: ${opts.fontFamily}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; font-family: ${opts.fontFamily}; }
   </style>
 </head>
 <body>
@@ -296,6 +404,7 @@ function generateFlappyGame(opts: { title: string; themeColor: string; accentCol
               Jumby.setScore(score);
               Jumby.sound.score();
               Jumby.fx.particles(item.x, item.y, 16, '${opts.accentColor}');
+              Jumby.fx.addFloatingText('+1', item.x, item.y, '${opts.accentColor}', 22);
               items.splice(i, 1);
               continue;
             }
@@ -318,36 +427,22 @@ function generateFlappyGame(opts: { title: string; themeColor: string; accentCol
       }
       ctx.stroke();
 
-      // Render Items
+      // Render Items with Emojis
       items.forEach((item) => {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
         if (item.type === 'hazard') {
-          ctx.fillStyle = '${opts.themeColor}';
-          ctx.shadowColor = '${opts.themeColor}';
-          ctx.shadowBlur = 15;
+          Jumby.drawEmoji(ctx, '${opts.hazardEmoji}', item.x, item.y, 32);
         } else {
-          ctx.fillStyle = '${opts.accentColor}';
-          ctx.shadowColor = '${opts.accentColor}';
-          ctx.shadowBlur = 18;
+          Jumby.drawEmoji(ctx, '${opts.targetEmoji}', item.x, item.y, 30);
         }
-        ctx.fill();
-        ctx.restore();
       });
 
-      // Render Player
-      ctx.save();
-      ctx.shadowColor = '${opts.accentColor}';
-      ctx.shadowBlur = 18;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '${opts.accentColor}';
-      ctx.stroke();
-      ctx.restore();
+      // Render Player with Expressive Tilt
+      const tilt = Math.max(-0.5, Math.min(0.5, player.vy * 0.05));
+      Jumby.drawEmoji(ctx, '${opts.playerEmoji}', player.x, player.y, 38, {
+        rotation: tilt,
+        shadowColor: '${opts.accentColor}',
+        shadowBlur: 16
+      });
 
       // Render Screen Shake & Juice
       Jumby.fx.updateAndRender(ctx, width, height);
@@ -365,21 +460,24 @@ function generateFlappyGame(opts: { title: string; themeColor: string; accentCol
 // --------------------------------------------------------------------------
 // 2. ORBITAL PULSE
 // --------------------------------------------------------------------------
-function generateOrbitGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+function generateOrbitGame(opts: GameGenOptions) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${opts.title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${opts.fontUrl}" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}; }
     canvas { display: block; width: 100%; height: 100%; }
     #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
-    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; font-family: ${opts.fontFamily}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; font-family: ${opts.fontFamily}; }
   </style>
 </head>
 <body>
@@ -507,6 +605,7 @@ function generateOrbitGame(opts: { title: string; themeColor: string; accentColo
             Jumby.setScore(score);
             Jumby.sound.score();
             Jumby.fx.particles(cx, cy, 12, '${opts.accentColor}');
+            Jumby.fx.addFloatingText('+1', cx, cy - 35, '${opts.accentColor}', 20);
             lasers.splice(i, 1);
           }
         }
@@ -519,40 +618,24 @@ function generateOrbitGame(opts: { title: string; themeColor: string; accentColo
       ctx.arc(cx, cy, orbitRadius, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Draw Center Core
-      ctx.fillStyle = '${opts.themeColor}';
-      ctx.shadowColor = '${opts.themeColor}';
-      ctx.shadowBlur = 25;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 26, 0, Math.PI * 2);
-      ctx.fill();
+      // Draw Center Core / Target
+      Jumby.drawEmoji(ctx, '${opts.targetEmoji}', cx, cy, 38, { shadowColor: '${opts.themeColor}', shadowBlur: 20 });
 
-      // Draw Lasers
+      // Draw Lasers / Incoming Hazards
       lasers.forEach(l => {
         const lx = cx + Math.cos(l.angle) * l.dist;
         const ly = cy + Math.sin(l.angle) * l.dist;
-        ctx.fillStyle = '${opts.themeColor}';
-        ctx.shadowColor = '${opts.themeColor}';
-        ctx.shadowBlur = 15;
-        ctx.beginPath();
-        ctx.arc(lx, ly, l.radius, 0, Math.PI * 2);
-        ctx.fill();
+        Jumby.drawEmoji(ctx, '${opts.hazardEmoji}', lx, ly, 26);
       });
 
-      // Draw Player Orb
+      // Draw Player
       const px = cx + Math.cos(angle) * orbitRadius;
       const py = cy + Math.sin(angle) * orbitRadius;
-      ctx.save();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.shadowColor = '${opts.accentColor}';
-      ctx.shadowBlur = 20;
-      ctx.beginPath();
-      ctx.arc(px, py, 14, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '${opts.accentColor}';
-      ctx.stroke();
-      ctx.restore();
+      Jumby.drawEmoji(ctx, '${opts.playerEmoji}', px, py, 34, {
+        rotation: angle + Math.PI / 2,
+        shadowColor: '${opts.accentColor}',
+        shadowBlur: 18
+      });
 
       Jumby.fx.updateAndRender(ctx, width, height);
       ctx.restore();
@@ -569,21 +652,24 @@ function generateOrbitGame(opts: { title: string; themeColor: string; accentColo
 // --------------------------------------------------------------------------
 // 3. STACK SLICE TOWER
 // --------------------------------------------------------------------------
-function generateStackGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+function generateStackGame(opts: GameGenOptions) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${opts.title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${opts.fontUrl}" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}; }
     canvas { display: block; width: 100%; height: 100%; }
     #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
-    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; font-family: ${opts.fontFamily}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; font-family: ${opts.fontFamily}; }
   </style>
 </head>
 <body>
@@ -666,15 +752,17 @@ function generateStackGame(opts: { title: string; themeColor: string; accentColo
             let newW = activeBlock.w - Math.abs(diff);
             let newX = diff > 0 ? activeBlock.x : top.x;
 
-            if (Math.abs(diff) < 4) {
+            if (Math.abs(diff) < 5) {
               // Perfect placement
               newW = activeBlock.w;
               newX = top.x;
               Jumby.sound.coin();
-              Jumby.fx.particles(newX + newW / 2, activeBlock.y, 20, '${opts.accentColor}');
+              Jumby.fx.particles(newX + newW / 2, activeBlock.y, 22, '${opts.accentColor}');
+              Jumby.fx.addFloatingText('PERFECT! +50', newX + newW / 2, activeBlock.y - 15, '${opts.accentColor}', 24);
             } else {
               Jumby.sound.score();
               Jumby.fx.particles(diff > 0 ? newX + newW : newX, activeBlock.y, 10, '${opts.themeColor}');
+              Jumby.fx.addFloatingText('+10', newX + newW / 2, activeBlock.y - 15, '#FFFFFF', 18);
             }
 
             stack.push({
@@ -715,13 +803,18 @@ function generateStackGame(opts: { title: string; themeColor: string; accentColo
       }
 
       // Draw Stack
-      stack.forEach(b => {
+      stack.forEach((b, idx) => {
         ctx.save();
         ctx.fillStyle = b.color;
         ctx.shadowColor = b.color;
         ctx.shadowBlur = 10;
         ctx.fillRect(b.x, b.y, b.w, blockHeight - 2);
         ctx.restore();
+
+        // Draw mascot on top block
+        if (idx === stack.length - 1) {
+          Jumby.drawEmoji(ctx, '${opts.playerEmoji}', b.x + b.w / 2, b.y - 16, 26);
+        }
       });
 
       // Draw Active Block
@@ -749,21 +842,24 @@ function generateStackGame(opts: { title: string; themeColor: string; accentColo
 // --------------------------------------------------------------------------
 // 4. CYBER RUNNER
 // --------------------------------------------------------------------------
-function generateRunnerGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+function generateRunnerGame(opts: GameGenOptions) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${opts.title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${opts.fontUrl}" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}; }
     canvas { display: block; width: 100%; height: 100%; }
     #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
-    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; font-family: ${opts.fontFamily}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; font-family: ${opts.fontFamily}; }
   </style>
 </head>
 <body>
@@ -886,6 +982,7 @@ function generateRunnerGame(opts: { title: string; themeColor: string; accentCol
             scoreEl.innerText = score;
             Jumby.setScore(score);
             Jumby.sound.score();
+            Jumby.fx.addFloatingText('+1', playerX, playerY - 40, '${opts.accentColor}', 20);
             obstacles.splice(i, 1);
           }
         }
@@ -894,30 +991,16 @@ function generateRunnerGame(opts: { title: string; themeColor: string; accentCol
       // Draw Obstacles
       obstacles.forEach(ob => {
         const ox = getLaneX(ob.lane);
-        ctx.save();
-        ctx.fillStyle = '${opts.themeColor}';
-        ctx.shadowColor = '${opts.themeColor}';
-        ctx.shadowBlur = 16;
-        ctx.beginPath();
-        ctx.arc(ox, ob.y, ob.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        Jumby.drawEmoji(ctx, '${opts.hazardEmoji}', ox, ob.y, 36);
       });
 
       // Draw Player
       const px = getLaneX(lane);
       const py = height - 120;
-      ctx.save();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.shadowColor = '${opts.accentColor}';
-      ctx.shadowBlur = 20;
-      ctx.beginPath();
-      ctx.arc(px, py, 20, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '${opts.accentColor}';
-      ctx.stroke();
-      ctx.restore();
+      Jumby.drawEmoji(ctx, '${opts.playerEmoji}', px, py, 42, {
+        shadowColor: '${opts.accentColor}',
+        shadowBlur: 20
+      });
 
       Jumby.fx.updateAndRender(ctx, width, height);
       ctx.restore();
@@ -934,21 +1017,24 @@ function generateRunnerGame(opts: { title: string; themeColor: string; accentCol
 // --------------------------------------------------------------------------
 // 5. CATCHER / FALLING COLLECTOR ARCHETYPE
 // --------------------------------------------------------------------------
-function generateCatcherGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+function generateCatcherGame(opts: GameGenOptions) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${opts.title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${opts.fontUrl}" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}; }
     canvas { display: block; width: 100%; height: 100%; }
     #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
-    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; font-family: ${opts.fontFamily}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; font-family: ${opts.fontFamily}; }
   </style>
 </head>
 <body>
@@ -990,10 +1076,10 @@ function generateCatcherGame(opts: { title: string; themeColor: string; accentCo
       items.push({
         x: Math.random() * (width - 60) + 30,
         y: -20,
-        radius: isHazard ? 14 : 16,
+        radius: 18,
         vy: (3.2 + Math.random() * 2) * ${opts.speedMultiplier},
         isHazard: isHazard,
-        color: isHazard ? '#EF4444' : '${opts.accentColor}'
+        emoji: isHazard ? '${opts.hazardEmoji}' : '${opts.targetEmoji}'
       });
     }
 
@@ -1085,6 +1171,7 @@ function generateCatcherGame(opts: { title: string; themeColor: string; accentCo
               Jumby.setScore(score);
               Jumby.sound.score();
               Jumby.fx.particles(it.x, it.y, 14, '${opts.accentColor}');
+              Jumby.fx.addFloatingText('+1', it.x, it.y, '${opts.accentColor}', 22);
               items.splice(i, 1);
               continue;
             }
@@ -1101,30 +1188,16 @@ function generateCatcherGame(opts: { title: string; themeColor: string; accentCo
         }
       }
 
-      // Draw Items
+      // Draw Items with Emojis
       items.forEach(it => {
-        ctx.save();
-        ctx.fillStyle = it.color;
-        ctx.shadowColor = it.color;
-        ctx.shadowBlur = 12;
-        ctx.beginPath();
-        ctx.arc(it.x, it.y, it.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        Jumby.drawEmoji(ctx, it.emoji, it.x, it.y, 34);
       });
 
-      // Draw Basket
-      ctx.save();
-      ctx.fillStyle = '${opts.themeColor}';
-      ctx.shadowColor = '${opts.themeColor}';
-      ctx.shadowBlur = 16;
-      ctx.beginPath();
-      ctx.roundRect(basket.x - basket.w / 2, basket.y - basket.h / 2, basket.w, basket.h, 10);
-      ctx.fill();
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.restore();
+      // Draw Basket / Collector Character
+      Jumby.drawEmoji(ctx, '${opts.playerEmoji}', basket.x, basket.y, 44, {
+        shadowColor: '${opts.themeColor}',
+        shadowBlur: 14
+      });
 
       Jumby.fx.updateAndRender(ctx, width, height);
       ctx.restore();
@@ -1141,21 +1214,24 @@ function generateCatcherGame(opts: { title: string; themeColor: string; accentCo
 // --------------------------------------------------------------------------
 // 6. SHOOTER / WAVE BLASTER ARCHETYPE
 // --------------------------------------------------------------------------
-function generateShooterGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+function generateShooterGame(opts: GameGenOptions) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${opts.title}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="${opts.fontUrl}" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}; }
     canvas { display: block; width: 100%; height: 100%; }
     #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
-    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; font-family: ${opts.fontFamily}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; font-family: ${opts.fontFamily}; }
   </style>
 </head>
 <body>
@@ -1198,7 +1274,7 @@ function generateShooterGame(opts: { title: string; themeColor: string; accentCo
         y: -25,
         radius: 18,
         vy: (2.2 + Math.random() * 1.5) * ${opts.speedMultiplier},
-        color: '${opts.themeColor}'
+        emoji: '${opts.hazardEmoji}'
       });
     }
 
@@ -1309,6 +1385,7 @@ function generateShooterGame(opts: { title: string; themeColor: string; accentCo
               Jumby.setScore(score);
               Jumby.sound.score();
               Jumby.fx.particles(en.x, en.y, 16, '${opts.accentColor}');
+              Jumby.fx.addFloatingText('+10', en.x, en.y, '${opts.accentColor}', 22);
               enemies.splice(j, 1);
               bullets.splice(i, 1);
               break;
@@ -1340,33 +1417,16 @@ function generateShooterGame(opts: { title: string; themeColor: string; accentCo
         ctx.restore();
       });
 
-      // Draw Enemies
+      // Draw Enemies with Emojis
       enemies.forEach(en => {
-        ctx.save();
-        ctx.fillStyle = en.color;
-        ctx.shadowColor = en.color;
-        ctx.shadowBlur = 14;
-        ctx.beginPath();
-        ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        Jumby.drawEmoji(ctx, en.emoji, en.x, en.y, 36);
       });
 
-      // Draw Ship
-      ctx.save();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.shadowColor = '${opts.accentColor}';
-      ctx.shadowBlur = 20;
-      ctx.beginPath();
-      ctx.moveTo(ship.x, ship.y - ship.radius - 4);
-      ctx.lineTo(ship.x - ship.radius, ship.y + ship.radius);
-      ctx.lineTo(ship.x + ship.radius, ship.y + ship.radius);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = '${opts.accentColor}';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.restore();
+      // Draw Ship Character
+      Jumby.drawEmoji(ctx, '${opts.playerEmoji}', ship.x, ship.y, 44, {
+        shadowColor: '${opts.accentColor}',
+        shadowBlur: 20
+      });
 
       Jumby.fx.updateAndRender(ctx, width, height);
       ctx.restore();

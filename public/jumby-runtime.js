@@ -188,6 +188,136 @@
         ctx.fill();
         ctx.restore();
       }
+
+      // Update & render floating texts
+      Graphics.updateFloatingTexts(ctx);
+    },
+  };
+
+  // 4. Graphics & Sprite Sheet Engine (Sprite sheets, animations, emojis, floating text juice)
+  const imageCache = new Map();
+  const floatingTexts = [];
+
+  const Graphics = {
+    getImage: function (src) {
+      if (!src) return null;
+      if (imageCache.has(src)) return imageCache.get(src);
+      const img = new Image();
+      img.src = src;
+      img.crossOrigin = 'anonymous';
+      imageCache.set(src, img);
+      return img;
+    },
+
+    /**
+     * Draw an animated sprite frame from a sprite sheet with flipping and rotation.
+     * options: {
+     *   image: HTMLImageElement | string (URL),
+     *   x: number, y: number,
+     *   width?: number, height?: number,
+     *   frame?: number (default 0),
+     *   frameWidth: number, frameHeight: number,
+     *   cols?: number,
+     *   flipX?: boolean, flipY?: boolean,
+     *   rotation?: number (radians),
+     *   scale?: number,
+     *   alpha?: number
+     * }
+     */
+    drawSprite: function (ctx, opts) {
+      if (!ctx || !opts) return;
+      const img = typeof opts.image === 'string' ? this.getImage(opts.image) : opts.image;
+      if (!img || !img.complete || img.naturalWidth === 0) return;
+
+      const frame = opts.frame || 0;
+      const fw = opts.frameWidth || img.naturalWidth;
+      const fh = opts.frameHeight || img.naturalHeight;
+      const cols = opts.cols || Math.max(1, Math.floor(img.naturalWidth / fw));
+
+      const col = frame % cols;
+      const row = Math.floor(frame / cols);
+      const sx = col * fw;
+      const sy = row * fh;
+
+      const dw = opts.width || fw;
+      const dh = opts.height || fh;
+      const scale = opts.scale || 1;
+
+      ctx.save();
+      if (opts.alpha !== undefined) ctx.globalAlpha = opts.alpha;
+
+      ctx.translate(opts.x, opts.y);
+      if (opts.rotation) ctx.rotate(opts.rotation);
+      if (opts.flipX || opts.flipY) ctx.scale(opts.flipX ? -scale : scale, opts.flipY ? -scale : scale);
+      else if (scale !== 1) ctx.scale(scale, scale);
+
+      ctx.drawImage(img, sx, sy, fw, fh, -dw / 2, -dh / 2, dw, dh);
+      ctx.restore();
+    },
+
+    /**
+     * Render a rich canvas emoji with glowing drop shadow, rotation, and squash/stretch!
+     * options: { size?: number, rotation?: number, shadowColor?: string, shadowBlur?: number, scaleX?: number, scaleY?: number }
+     */
+    drawEmoji: function (ctx, emoji, x, y, size = 32, opts = {}) {
+      if (!ctx || !emoji) return;
+      ctx.save();
+      ctx.translate(x, y);
+      if (opts.rotation) ctx.rotate(opts.rotation);
+      if (opts.scaleX || opts.scaleY) {
+        ctx.scale(opts.scaleX || 1, opts.scaleY || 1);
+      }
+      if (opts.shadowColor) {
+        ctx.shadowColor = opts.shadowColor;
+        ctx.shadowBlur = opts.shadowBlur || 15;
+      }
+      ctx.font = `${Math.round(size)}px -apple-system, "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, 0, 0);
+      ctx.restore();
+    },
+
+    /**
+     * Add floating score / juice text popup (e.g. "+100", "PERFECT!", "COMBO x2")
+     */
+    addFloatingText: function (text, x, y, color = '#FFFFFF', size = 22) {
+      floatingTexts.push({
+        text,
+        x,
+        y,
+        vy: -1.8,
+        color,
+        size,
+        alpha: 1,
+        scale: 1.3,
+        decay: 0.024,
+      });
+    },
+
+    updateFloatingTexts: function (ctx) {
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y += ft.vy;
+        ft.alpha -= ft.decay;
+        ft.scale = Math.max(1, ft.scale - 0.015);
+
+        if (ft.alpha <= 0) {
+          floatingTexts.splice(i, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, ft.alpha);
+        ctx.font = `900 ${Math.round(ft.size * ft.scale)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = ft.color;
+        ctx.shadowColor = ft.color;
+        ctx.shadowBlur = 10;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
     },
   };
 
@@ -317,8 +447,13 @@
         });
       },
     },
+    drawSprite: Graphics.drawSprite.bind(Graphics),
+    drawEmoji: Graphics.drawEmoji.bind(Graphics),
     sound: Sound,
-    fx: Juice,
+    fx: Object.assign(Juice, {
+      addFloatingText: Graphics.addFloatingText.bind(Graphics),
+    }),
+    graphics: Graphics,
     input: Input,
     on: function (eventType, callback) {
       const type = 'JUMBY_' + eventType.toUpperCase();

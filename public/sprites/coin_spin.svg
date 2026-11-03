@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="32" viewBox="0 0 192 32">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE066"/>
+      <stop offset="50%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE68A"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+  </defs>
+  <!-- Frame 0: Full (x: 0..32) -->
+  <g transform="translate(16, 16)">
+    <circle r="14" fill="url(#gold)" stroke="#FFF" stroke-width="1.5"/>
+    <circle r="9" fill="url(#inner)"/>
+    <text x="0" y="4" font-size="10" font-weight="900" font-family="sans-serif" text-anchor="middle" fill="#FFF">$</text>
+  </g>
+  <!-- Frame 1: 3/4 (x: 32..64) -->
+  <g transform="translate(48, 16)">
+    <ellipse rx="11" ry="14" fill="url(#gold)" stroke="#FFF" stroke-width="1.5"/>
+    <ellipse rx="7" ry="9" fill="url(#inner)"/>
+    <text x="0" y="4" font-size="9" font-weight="900" font-family="sans-serif" text-anchor="middle" fill="#FFF">$</text>
+  </g>
+  <!-- Frame 2: 1/2 (x: 64..96) -->
+  <g transform="translate(80, 16)">
+    <ellipse rx="6" ry="14" fill="url(#gold)" stroke="#FFF" stroke-width="1.2"/>
+    <ellipse rx="3.5" ry="9" fill="url(#inner)"/>
+  </g>
+  <!-- Frame 3: Edge (x: 96..128) -->
+  <g transform="translate(112, 16)">
+    <ellipse rx="2.5" ry="14" fill="url(#gold)" stroke="#FFF" stroke-width="1"/>
+  </g>
+  <!-- Frame 4: 1/2 (x: 128..160) -->
+  <g transform="translate(144, 16)">
+    <ellipse rx="6" ry="14" fill="url(#gold)" stroke="#FFF" stroke-width="1.2"/>
+    <ellipse rx="3.5" ry="9" fill="url(#inner)"/>
+  </g>
+  <!-- Frame 5: 3/4 (x: 160..192) -->
+  <g transform="translate(176, 16)">
+    <ellipse rx="11" ry="14" fill="url(#gold)" stroke="#FFF" stroke-width="1.5"/>
+    <ellipse rx="7" ry="9" fill="url(#inner)"/>
+    <text x="0" y="4" font-size="9" font-weight="900" font-family="sans-serif" text-anchor="middle" fill="#FFF">$</text>
+  </g>
+</svg>
