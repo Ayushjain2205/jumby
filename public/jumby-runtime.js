@@ -153,6 +153,14 @@
       }
       return { x: 0, y: 0 };
     },
+    applyShake: function (ctx) {
+      if (shakeIntensity > 0.5) {
+        const ox = (Math.random() - 0.5) * shakeIntensity * 2;
+        const oy = (Math.random() - 0.5) * shakeIntensity * 2;
+        ctx.translate(ox, oy);
+        shakeIntensity *= shakeDecay;
+      }
+    },
     updateAndRender: function (ctx, width, height) {
       if (shakeIntensity > 0.5) {
         shakeIntensity *= shakeDecay;
@@ -183,19 +191,43 @@
     },
   };
 
-  // 4. Unified Input Manager (Touch + Mouse + Keyboard)
+  // 4. Unified Input Manager (Touch + Mouse + Keyboard with continuous drag & coordinate scaling)
   const Input = {
     isDown: false,
     justPressed: false,
     touchPos: { x: 0, y: 0 },
     keysDown: new Set(),
     keysJustPressed: new Set(),
+    _autoResetTimer: null,
     init: function (canvasElement) {
+      if (!canvasElement) return;
+
+      const updatePos = (clientX, clientY) => {
+        const rect = canvasElement.getBoundingClientRect();
+        const scaleX = rect.width ? canvasElement.width / rect.width : 1;
+        const scaleY = rect.height ? canvasElement.height / rect.height : 1;
+        this.touchPos = {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY,
+        };
+      };
+
       const handleDown = (x, y) => {
         this.isDown = true;
         this.justPressed = true;
-        this.touchPos = { x, y };
+        updatePos(x, y);
+
+        // Safety auto-reset so justPressed never stays true forever if endFrame() is omitted
+        if (this._autoResetTimer) clearTimeout(this._autoResetTimer);
+        this._autoResetTimer = setTimeout(() => {
+          this.justPressed = false;
+        }, 50);
       };
+
+      const handleMove = (x, y) => {
+        updatePos(x, y);
+      };
+
       const handleUp = () => {
         this.isDown = false;
       };
@@ -203,14 +235,24 @@
       canvasElement.addEventListener('pointerdown', (e) => {
         handleDown(e.clientX, e.clientY);
       });
+      canvasElement.addEventListener('pointermove', (e) => {
+        handleMove(e.clientX, e.clientY);
+      });
       global.addEventListener('pointerup', handleUp);
+
+      // Touch fallback
+      canvasElement.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches[0]) {
+          handleMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }, { passive: true });
 
       global.addEventListener('keydown', (e) => {
         if (!this.keysDown.has(e.code)) {
           this.keysJustPressed.add(e.code);
         }
         this.keysDown.add(e.code);
-        if (e.code === 'Space' || e.code === 'ArrowUp') {
+        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') {
           this.isDown = true;
           this.justPressed = true;
         }
@@ -218,7 +260,7 @@
 
       global.addEventListener('keyup', (e) => {
         this.keysDown.delete(e.code);
-        if (e.code === 'Space' || e.code === 'ArrowUp') {
+        if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') {
           this.isDown = false;
         }
       });
@@ -226,6 +268,7 @@
     endFrame: function () {
       this.justPressed = false;
       this.keysJustPressed.clear();
+      if (this._autoResetTimer) clearTimeout(this._autoResetTimer);
     },
   };
 

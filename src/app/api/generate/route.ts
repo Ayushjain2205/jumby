@@ -24,8 +24,10 @@ export async function POST(req: NextRequest) {
     const geminiKey = clientApiKey || process.env.GEMINI_API_KEY;
     const openaiKey = clientApiKey || process.env.OPENAI_API_KEY;
 
-    // Ensure there is always a proven baseline code for the LLM to enhance and remix
-    const effectiveBaseCode = baseCode || synthesizeProceduralGame({ prompt, archetype });
+    // If the user is remixing an existing game, pass that code so the AI can modify it.
+    // If creating from scratch, pass undefined so the AI has full freedom to pick the right mechanic and palette.
+    const isRemix = Boolean(baseCode && baseCode.trim().length > 50);
+    const effectiveBaseCode = isRemix ? baseCode : undefined;
 
     // 1. Try Local CLI Proxy API if requested or in auto mode
     const tryProxy = provider === 'proxy' || provider === 'cliproxy' || provider === 'auto';

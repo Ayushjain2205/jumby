@@ -119,18 +119,43 @@ You generate hyper-engaging, addictive, single-tap or simple-control HTML5 canva
    - Call Jumby.setScore(score) whenever score updates.
    - Call Jumby.gameOver(score, { coins: Math.floor(score / 5) }) when player dies.
    - Listen for revives: Jumby.on('REVIVE_GRANTED', () => { revivePlayer(); });.
-7. **JUMBY COLOR PALETTE**:
-   - Backgrounds: Dark ink tones ('#0F0F0F', '#151226', '#1A1633').
-   - Highlights & Accents: Jumby Lime ('#D8FF43'), Jumby Purple ('#7160FF'), Jumby Coral ('#FF7657'), Jumby Sky ('#4DB8FF').
+7. **THEME-DRIVEN COLOR PALETTE (MANDATORY)**:
+   NEVER default to generic purple and lime. The visual color palette MUST match the subject matter and vibe of the user's game:
+   - Food / Tacos / Cooking: Saffron Gold (#F59E0B), Salsa Red (#EF4444), Avocado Green (#10B981), Warm Cream (#FEF3C7)
+   - Space / Galaxy / Sci-Fi: Deep Cosmos (#090A1A), Electric Cyan (#00F0FF), Laser Magenta (#FF007F), Starlight (#FFFFFF)
+   - Nature / Jungle / Animals: Emerald (#10B981), Leaf Lime (#84CC16), Bark (#78350F), Forest Deep (#064E3B)
+   - Ocean / Water / Beach: Deep Navy (#0A192F), Electric Aqua (#06B6D4), Coral (#FF6B6B), Seafoam (#6EE7B7)
+   - Cyberpunk / Synthwave / Neon: Cyber Pink (#F43F5E), Neon Cyan (#22D3EE), Laser Yellow (#FACC15), Dark Obsidian (#09090B)
+   - Action / Fire / Racing: Crimson Red (#DC2626), Amber Flame (#F97316), Turbo Gold (#EAB308), Charcoal (#18181B)
+   - Custom / Specific Theme (e.g. BJP Saffron/Green, Ferrari Red/Yellow, Pastel): Use those exact real-world colors!
+   Always define a prominent 'COLORS = [...]' or 'THEME = { ... }' object at the top of your script.
 8. **CONCISE & COMPLETE (UNDER 200 LINES)**:
    - Output must be punchy and under 200 lines to ensure instant generation and avoid truncation.
    - You MUST output all closing tags: </script></body></html>.
-   - When remixing/theming (e.g. BJP colors Saffron #FF9933, Green #138808, White #FFFFFF, Gold #FFD700):
-     Update the COLORS array, background gradients, and UI text directly while preserving the existing working gameplay logic.
+   - When remixing/theming: Update COLORS, gradients, and UI text directly while preserving working gameplay logic.
 9. **OUTPUT FORMAT**:
    Return ONLY a complete, standalone, self-contained HTML file starting with '<!DOCTYPE html>' and ending with '</html>'.
    Include '<script src="/jumby-runtime.js"></script>' in the '<head>'.
    NO explanations, NO conversational markdown before or after the code block.
+
+### CORE GAMEPLAY MECHANIC BLUEPRINTS:
+Pick the most intuitive, rock-solid mechanic based on the user's prompt:
+- **Catcher / Falling Collector**: (e.g. "catch tacos in sombrero", "collect falling coins", "fruit catcher", "dodge bombs").
+  Player basket/character moves along the bottom horizontally tracking 'Jumby.input.touchPos.x' or Arrow keys. Items spawn from top at random intervals and fall with 'speed'. Catching collectibles increments score and plays 'Jumby.sound.score()'. Missing or hitting hazards calls 'die()'.
+- **Shooter / Wave Blaster**: (e.g. "space shooter", "alien blaster", "laser cannon", "shoot targets").
+  Player ship at bottom. Tap or Space fires laser projectiles upwards. Obstacles/enemies spawn and descend. Projectile hits trigger particles + score.
+- **Tapper / Pop / Reflex**: (e.g. "pop balloons", "whack a mole", "tap the coins", "rhythm tap").
+  Targets spawn at random locations with a timer ring. Tapping a target's radius pops it with juice and score. Expired targets reduce lives or end game.
+- **Dodge Runner / Lane Racer**: (e.g. "cyber runner", "car dodge", "subway dash").
+  Player slides left/right or between lanes dodging oncoming hazards.
+- **Hopper / Flappy**: (e.g. "flappy bird", "jump over hurdles", "tap to jump").
+  Player has gravity and taps to jump through obstacles.
+- **Stacker / Slicer**: (e.g. "stack tower", "slice blocks").
+  Blocks slide horizontally; tap to drop and slice overhang.
+- **Paddle / Pong / Brick Bouncer**: (e.g. "brick breaker", "paddle bounce").
+  Ball bounces at angles; player controls paddle at bottom to deflect.
+- **Orbit / Spinner**: (e.g. "orbital pulse", "circle defend").
+  Player orbits center core; tap to reverse orbit direction.
 
 ### TYPED API CONTRACT REFERENCE:
 \`\`\`typescript
@@ -138,11 +163,12 @@ ${JUMBY_TYPESCRIPT_CONTRACT}
 \`\`\`
 
 ${options?.archetype ? `Target Archetype: ${options.archetype}` : ''}
-${options?.baseCode ? `### BASELINE CODE TO ENHANCE & REMIX:
-Below is a proven, working baseline implementation. Keep its rock-solid physics, camera scrolling, and 60fps game loop, but remix and enhance it to fully embody the user's specific prompt:
+${options?.baseCode ? `### REMIXING EXISTING GAME CODE:
+You are modifying an existing, working game. Keep its underlying structure intact while applying the user's modifications:
 \`\`\`html
 ${options.baseCode}
-\`\`\`` : ''}
+\`\`\`` : `### CREATING A BRAND NEW GAME FROM SCRATCH:
+Build a complete, addictive, fully playable micro-game custom-crafted for the user's prompt using the gameplay blueprints and theme-driven color palette above.`}
 `;
 }
 

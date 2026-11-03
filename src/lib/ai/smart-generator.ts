@@ -6,17 +6,20 @@
 
 export interface GeneratorParams {
   prompt: string;
-  archetype?: 'flappy' | 'orbit' | 'stack' | 'runner' | 'custom';
+  archetype?: 'flappy' | 'orbit' | 'stack' | 'runner' | 'catcher' | 'shooter' | 'custom';
   baseCode?: string;
 }
 
 export function synthesizeProceduralGame(params: GeneratorParams): string {
-  const { prompt, archetype = 'flappy' } = params;
+  const { prompt, archetype } = params;
   const p = prompt.toLowerCase();
 
   // 1. Analyze Title & Concept
   let title = 'Neon Pulse';
-  if (p.includes('ninja') || p.includes('blade') || p.includes('slash')) title = 'Cyber Blade';
+  if (p.includes('taco') || p.includes('sombrero')) title = 'Taco Sombrero Drop';
+  else if (p.includes('catch') || p.includes('basket') || p.includes('fruit')) title = 'Fruit Collector';
+  else if (p.includes('shoot') || p.includes('invader') || p.includes('alien')) title = 'Cosmic Blaster';
+  else if (p.includes('ninja') || p.includes('blade') || p.includes('slash')) title = 'Cyber Blade';
   else if (p.includes('space') || p.includes('galaxy') || p.includes('star')) title = 'Cosmic Drift';
   else if (p.includes('car') || p.includes('race') || p.includes('drift')) title = 'Turbo Racer';
   else if (p.includes('stack') || p.includes('tower')) title = 'Chroma Stack';
@@ -25,9 +28,13 @@ export function synthesizeProceduralGame(params: GeneratorParams): string {
   else if (p.includes('cyber') || p.includes('neon')) title = 'Neon Surge';
 
   // 2. Determine Archetype (Prompt keywords always take priority!)
-  let chosenArchetype: 'flappy' | 'orbit' | 'stack' | 'runner' = 'flappy';
+  let chosenArchetype: 'flappy' | 'orbit' | 'stack' | 'runner' | 'catcher' | 'shooter' = 'catcher';
 
-  if (p.includes('stack') || p.includes('block') || p.includes('tower') || p.includes('slice') || p.includes('rhythm')) {
+  if (p.includes('catch') || p.includes('basket') || p.includes('taco') || p.includes('collector') || p.includes('falling') || p.includes('sombrero') || p.includes('fruit') || p.includes('apple') || p.includes('drop')) {
+    chosenArchetype = 'catcher';
+  } else if (p.includes('shoot') || p.includes('blaster') || p.includes('laser') || p.includes('invader') || p.includes('cannon') || p.includes('alien') || p.includes('bullet') || p.includes('zombie') || p.includes('blast')) {
+    chosenArchetype = 'shooter';
+  } else if (p.includes('stack') || p.includes('block') || p.includes('tower') || p.includes('slice') || p.includes('rhythm')) {
     chosenArchetype = 'stack';
     if (title === 'Neon Pulse') title = 'Stack Slice Tower';
   } else if (p.includes('orbit') || p.includes('circle') || p.includes('planet') || p.includes('pulse')) {
@@ -43,33 +50,70 @@ export function synthesizeProceduralGame(params: GeneratorParams): string {
     chosenArchetype = archetype;
   }
 
-  // 3. Theme Colors
-  let themeColor = '#7160FF'; // Jumby Purple
-  let accentColor = '#D8FF43'; // Jumby Lime
-  let bgTop = '#0F0F0F';
-  let bgBottom = '#1A153A';
+  // 3. Theme-Driven Colors (Never default to generic purple & lime!)
+  let themeColor = '#F59E0B'; // Saffron Gold
+  let accentColor = '#EF4444'; // Red
+  let bgTop = '#18181B';
+  let bgBottom = '#27272A';
 
-  if (p.includes('coral') || p.includes('pink') || p.includes('sunset') || p.includes('red') || p.includes('fire')) {
-    themeColor = '#FF7657'; // Jumby Coral
-    accentColor = '#D8FF43';
-    bgBottom = '#2B1218';
-  } else if (p.includes('lime') || p.includes('green') || p.includes('matrix')) {
-    themeColor = '#D8FF43'; // Jumby Lime
-    accentColor = '#7160FF';
-    bgBottom = '#13210C';
-  } else if (p.includes('sky') || p.includes('blue') || p.includes('ice') || p.includes('water')) {
-    themeColor = '#4DB8FF'; // Jumby Sky
-    accentColor = '#FF7657';
-    bgBottom = '#0B1C28';
+  if (p.includes('taco') || p.includes('food') || p.includes('pizza') || p.includes('burger') || p.includes('sombrero')) {
+    themeColor = '#F59E0B'; // Saffron Gold
+    accentColor = '#EF4444'; // Salsa Red
+    bgTop = '#1C1510';
+    bgBottom = '#2E1E14';
+  } else if (p.includes('bjp') || p.includes('saffron') || p.includes('india')) {
+    themeColor = '#FF9933'; // Saffron
+    accentColor = '#138808'; // Green
+    bgTop = '#0F0F0F';
+    bgBottom = '#1F1B14';
+  } else if (p.includes('space') || p.includes('galaxy') || p.includes('star') || p.includes('cosmos') || p.includes('invader')) {
+    themeColor = '#00F0FF'; // Electric Cyan
+    accentColor = '#FF007F'; // Neon Pink
+    bgTop = '#080816';
+    bgBottom = '#130F2A';
+  } else if (p.includes('ocean') || p.includes('water') || p.includes('sea') || p.includes('aqua') || p.includes('fish')) {
+    themeColor = '#06B6D4'; // Aqua
+    accentColor = '#F43F5E'; // Coral
+    bgTop = '#061626';
+    bgBottom = '#0C2E4A';
+  } else if (p.includes('forest') || p.includes('jungle') || p.includes('leaf') || p.includes('tree') || p.includes('plant') || p.includes('green')) {
+    themeColor = '#10B981'; // Emerald
+    accentColor = '#A3E635'; // Lime
+    bgTop = '#061B12';
+    bgBottom = '#0A2D1E';
+  } else if (p.includes('fire') || p.includes('race') || p.includes('car') || p.includes('turbo') || p.includes('action') || p.includes('war') || p.includes('red')) {
+    themeColor = '#EF4444'; // Crimson
+    accentColor = '#F59E0B'; // Amber Fire
+    bgTop = '#180B0B';
+    bgBottom = '#2D1111';
+  } else if (p.includes('gold') || p.includes('treasure') || p.includes('royale') || p.includes('rich') || p.includes('coin')) {
+    themeColor = '#FACC15'; // Gold
+    accentColor = '#FB923C'; // Amber
+    bgTop = '#141108';
+    bgBottom = '#2B200A';
+  } else if (p.includes('candy') || p.includes('pink') || p.includes('cute') || p.includes('bubble')) {
+    themeColor = '#EC4899'; // Bubblegum Pink
+    accentColor = '#FBBF24'; // Sunshine Yellow
+    bgTop = '#1F101A';
+    bgBottom = '#2E1528';
+  } else if (p.includes('cyber') || p.includes('neon') || p.includes('synthwave')) {
+    themeColor = '#7160FF'; // Cyber Purple
+    accentColor = '#D8FF43'; // Neon Lime
+    bgTop = '#0F0F0F';
+    bgBottom = '#1A153A';
   }
 
   // 4. Speed & Dynamics
   let speedMultiplier = 1.0;
-  if (p.includes('faster') || p.includes('insane') || p.includes('hard') || p.includes('2x')) speedMultiplier = 1.6;
-  if (p.includes('slower') || p.includes('easy') || p.includes('chill')) speedMultiplier = 0.7;
+  if (p.includes('faster') || p.includes('insane') || p.includes('hard') || p.includes('2x')) speedMultiplier = 1.5;
+  if (p.includes('slower') || p.includes('easy') || p.includes('chill')) speedMultiplier = 0.75;
 
   // Synthesize according to chosen archetype
   switch (chosenArchetype) {
+    case 'catcher':
+      return generateCatcherGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
+    case 'shooter':
+      return generateShooterGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
     case 'orbit':
       return generateOrbitGame({ title, themeColor, accentColor, bgTop, bgBottom, speedMultiplier });
     case 'stack':
@@ -872,6 +916,455 @@ function generateRunnerGame(opts: { title: string; themeColor: string; accentCol
       ctx.fill();
       ctx.lineWidth = 3;
       ctx.strokeStyle = '${opts.accentColor}';
+      ctx.stroke();
+      ctx.restore();
+
+      Jumby.fx.updateAndRender(ctx, width, height);
+      ctx.restore();
+
+      Jumby.input.endFrame();
+    }
+
+    loop();
+  </script>
+</body>
+</html>`;
+}
+
+// --------------------------------------------------------------------------
+// 5. CATCHER / FALLING COLLECTOR ARCHETYPE
+// --------------------------------------------------------------------------
+function generateCatcherGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>${opts.title}</title>
+  <script src="/jumby-runtime.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="ui"><div id="score" class="score">0</div></div>
+  <div id="hint">DRAG TO CATCH • AVOID HAZARDS</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const hintEl = document.getElementById('hint');
+
+    let width, height;
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    Jumby.input.init(canvas);
+
+    let state = 'waiting';
+    let score = 0;
+    let frames = 0;
+    let items = [];
+
+    const basket = {
+      x: width / 2,
+      y: height - 70,
+      w: 80,
+      h: 22,
+      speed: 8 * ${opts.speedMultiplier}
+    };
+
+    function spawnItem() {
+      const isHazard = Math.random() < 0.28;
+      items.push({
+        x: Math.random() * (width - 60) + 30,
+        y: -20,
+        radius: isHazard ? 14 : 16,
+        vy: (3.2 + Math.random() * 2) * ${opts.speedMultiplier},
+        isHazard: isHazard,
+        color: isHazard ? '#EF4444' : '${opts.accentColor}'
+      });
+    }
+
+    function startGame() {
+      state = 'playing';
+      score = 0;
+      frames = 0;
+      items = [];
+      basket.x = width / 2;
+      basket.y = height - 70;
+      scoreEl.innerText = '0';
+      hintEl.style.display = 'none';
+      Jumby.setScore(0);
+      Jumby.sound.jump();
+    }
+
+    function die() {
+      state = 'gameover';
+      Jumby.sound.hit();
+      Jumby.fx.shake(16);
+      Jumby.fx.particles(basket.x, basket.y, 25, '#EF4444');
+      hintEl.style.display = 'block';
+      hintEl.innerText = 'MISSED! TAP TO RETRY';
+      Jumby.gameOver(score, { coins: Math.floor(score / 5) });
+    }
+
+    Jumby.on('REVIVE_GRANTED', () => {
+      state = 'playing';
+      items = items.filter(it => it.y > height * 0.4);
+      hintEl.style.display = 'none';
+      Jumby.sound.powerup();
+    });
+
+    function loop() {
+      requestAnimationFrame(loop);
+      frames++;
+
+      ctx.save();
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, '${opts.bgTop}');
+      grad.addColorStop(1, '${opts.bgBottom}');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Handle Input
+      if (Jumby.input.justPressed && (state === 'waiting' || state === 'gameover')) {
+        startGame();
+      }
+
+      if (state === 'playing') {
+        // Continuous smooth drag/touch tracking
+        if (Jumby.input.isDown || Jumby.input.touchPos.x > 0) {
+          const targetX = Jumby.input.touchPos.x;
+          basket.x += (targetX - basket.x) * 0.35;
+        }
+
+        // Keyboard controls fallback
+        if (Jumby.input.keysDown.has('ArrowLeft') || Jumby.input.keysDown.has('KeyA')) {
+          basket.x -= basket.speed;
+        }
+        if (Jumby.input.keysDown.has('ArrowRight') || Jumby.input.keysDown.has('KeyD')) {
+          basket.x += basket.speed;
+        }
+
+        // Clamp basket inside screen
+        basket.x = Math.max(basket.w / 2, Math.min(width - basket.w / 2, basket.x));
+
+        // Spawn items
+        if (frames % Math.floor(45 / ${opts.speedMultiplier}) === 0) {
+          spawnItem();
+        }
+
+        // Update items
+        for (let i = items.length - 1; i >= 0; i--) {
+          const it = items[i];
+          it.y += it.vy;
+
+          // Check collision with basket
+          const inX = it.x > basket.x - basket.w / 2 - it.radius && it.x < basket.x + basket.w / 2 + it.radius;
+          const inY = it.y > basket.y - basket.h / 2 - it.radius && it.y < basket.y + basket.h / 2 + it.radius;
+
+          if (inX && inY) {
+            if (it.isHazard) {
+              die();
+              break;
+            } else {
+              score += 1;
+              scoreEl.innerText = score;
+              Jumby.setScore(score);
+              Jumby.sound.score();
+              Jumby.fx.particles(it.x, it.y, 14, '${opts.accentColor}');
+              items.splice(i, 1);
+              continue;
+            }
+          }
+
+          // Off bottom of screen
+          if (it.y > height + 30) {
+            if (!it.isHazard) {
+              // Missed a collectible
+              Jumby.fx.particles(it.x, height - 10, 6, 'rgba(255,255,255,0.4)');
+            }
+            items.splice(i, 1);
+          }
+        }
+      }
+
+      // Draw Items
+      items.forEach(it => {
+        ctx.save();
+        ctx.fillStyle = it.color;
+        ctx.shadowColor = it.color;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(it.x, it.y, it.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Draw Basket
+      ctx.save();
+      ctx.fillStyle = '${opts.themeColor}';
+      ctx.shadowColor = '${opts.themeColor}';
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.roundRect(basket.x - basket.w / 2, basket.y - basket.h / 2, basket.w, basket.h, 10);
+      ctx.fill();
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.restore();
+
+      Jumby.fx.updateAndRender(ctx, width, height);
+      ctx.restore();
+
+      Jumby.input.endFrame();
+    }
+
+    loop();
+  </script>
+</body>
+</html>`;
+}
+
+// --------------------------------------------------------------------------
+// 6. SHOOTER / WAVE BLASTER ARCHETYPE
+// --------------------------------------------------------------------------
+function generateShooterGame(opts: { title: string; themeColor: string; accentColor: string; bgTop: string; bgBottom: string; speedMultiplier: number }) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>${opts.title}</title>
+  <script src="/jumby-runtime.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: -apple-system, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
+    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; }
+    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="ui"><div id="score" class="score">0</div></div>
+  <div id="hint">TAP TO FIRE • DESTROY TARGETS</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const hintEl = document.getElementById('hint');
+
+    let width, height;
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    Jumby.input.init(canvas);
+
+    let state = 'waiting';
+    let score = 0;
+    let frames = 0;
+    let bullets = [];
+    let enemies = [];
+
+    const ship = {
+      x: width / 2,
+      y: height - 70,
+      radius: 20,
+      speed: 8 * ${opts.speedMultiplier}
+    };
+
+    function spawnEnemy() {
+      enemies.push({
+        x: Math.random() * (width - 80) + 40,
+        y: -25,
+        radius: 18,
+        vy: (2.2 + Math.random() * 1.5) * ${opts.speedMultiplier},
+        color: '${opts.themeColor}'
+      });
+    }
+
+    function fireBullet() {
+      bullets.push({
+        x: ship.x,
+        y: ship.y - ship.radius,
+        vy: -11 * ${opts.speedMultiplier},
+        radius: 5
+      });
+      Jumby.sound.laser();
+      Jumby.fx.particles(ship.x, ship.y - ship.radius, 4, '${opts.accentColor}');
+    }
+
+    function startGame() {
+      state = 'playing';
+      score = 0;
+      frames = 0;
+      bullets = [];
+      enemies = [];
+      ship.x = width / 2;
+      scoreEl.innerText = '0';
+      hintEl.style.display = 'none';
+      Jumby.setScore(0);
+      Jumby.sound.powerup();
+    }
+
+    function die() {
+      state = 'gameover';
+      Jumby.sound.hit();
+      Jumby.fx.shake(16);
+      Jumby.fx.particles(ship.x, ship.y, 25, '#EF4444');
+      hintEl.style.display = 'block';
+      hintEl.innerText = 'BASE BREACHED! TAP TO RETRY';
+      Jumby.gameOver(score, { coins: Math.floor(score / 5) });
+    }
+
+    Jumby.on('REVIVE_GRANTED', () => {
+      state = 'playing';
+      enemies = enemies.filter(e => e.y < height * 0.3);
+      hintEl.style.display = 'none';
+      Jumby.sound.powerup();
+    });
+
+    function loop() {
+      requestAnimationFrame(loop);
+      frames++;
+
+      ctx.save();
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, '${opts.bgTop}');
+      grad.addColorStop(1, '${opts.bgBottom}');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Handle Input
+      if (Jumby.input.justPressed) {
+        if (state === 'waiting' || state === 'gameover') {
+          startGame();
+        } else if (state === 'playing') {
+          fireBullet();
+        }
+      }
+
+      if (state === 'playing') {
+        // Follow touch/pointer horizontally
+        if (Jumby.input.touchPos.x > 0) {
+          ship.x += (Jumby.input.touchPos.x - ship.x) * 0.35;
+        }
+
+        // Keyboard controls
+        if (Jumby.input.keysDown.has('ArrowLeft') || Jumby.input.keysDown.has('KeyA')) {
+          ship.x -= ship.speed;
+        }
+        if (Jumby.input.keysDown.has('ArrowRight') || Jumby.input.keysDown.has('KeyD')) {
+          ship.x += ship.speed;
+        }
+
+        ship.x = Math.max(ship.radius, Math.min(width - ship.radius, ship.x));
+
+        // Auto-fire while holding touch or space
+        if (frames % 12 === 0 && (Jumby.input.isDown || Jumby.input.keysDown.has('Space'))) {
+          fireBullet();
+        }
+
+        // Spawn enemies
+        if (frames % Math.floor(50 / ${opts.speedMultiplier}) === 0) {
+          spawnEnemy();
+        }
+
+        // Update bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.y += b.vy;
+
+          if (b.y < -10) {
+            bullets.splice(i, 1);
+            continue;
+          }
+
+          // Collision with enemies
+          for (let j = enemies.length - 1; j >= 0; j--) {
+            const en = enemies[j];
+            const dist = Math.hypot(b.x - en.x, b.y - en.y);
+            if (dist < b.radius + en.radius) {
+              score += 1;
+              scoreEl.innerText = score;
+              Jumby.setScore(score);
+              Jumby.sound.score();
+              Jumby.fx.particles(en.x, en.y, 16, '${opts.accentColor}');
+              enemies.splice(j, 1);
+              bullets.splice(i, 1);
+              break;
+            }
+          }
+        }
+
+        // Update enemies
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const en = enemies[i];
+          en.y += en.vy;
+
+          if (en.y > height - 60) {
+            die();
+            break;
+          }
+        }
+      }
+
+      // Draw Bullets
+      bullets.forEach(b => {
+        ctx.save();
+        ctx.fillStyle = '${opts.accentColor}';
+        ctx.shadowColor = '${opts.accentColor}';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Draw Enemies
+      enemies.forEach(en => {
+        ctx.save();
+        ctx.fillStyle = en.color;
+        ctx.shadowColor = en.color;
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Draw Ship
+      ctx.save();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = '${opts.accentColor}';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.moveTo(ship.x, ship.y - ship.radius - 4);
+      ctx.lineTo(ship.x - ship.radius, ship.y + ship.radius);
+      ctx.lineTo(ship.x + ship.radius, ship.y + ship.radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '${opts.accentColor}';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
       ctx.restore();
 
