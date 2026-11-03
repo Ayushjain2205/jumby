@@ -35,12 +35,119 @@ import {
 import { extractGameHtml } from '@/lib/ai/runtime-contract';
 import { JumbyMascot } from '@/components/brand/JumbyMascot';
 
-const THEMES = [
-  { name: 'Jumby Purple & Lime', themeColor: '#7160FF', accentColor: '#D8FF43', bg: ['#0F0F0F', '#1D173F'] as [string, string] },
-  { name: 'Jumby Coral & Sky', themeColor: '#FF7657', accentColor: '#4DB8FF', bg: ['#0F0F0F', '#261218'] as [string, string] },
-  { name: 'Jumby Lime Glow', themeColor: '#D8FF43', accentColor: '#7160FF', bg: ['#0F0F0F', '#1A2408'] as [string, string] },
-  { name: 'Jumby Sky Chill', themeColor: '#4DB8FF', accentColor: '#FF7657', bg: ['#0F0F0F', '#0C1E2B'] as [string, string] },
+export interface StudioTheme {
+  id: string;
+  name: string;
+  themeColor: string;
+  accentColor: string;
+  bg: [string, string];
+  colors?: string[];
+  isCustom?: boolean;
+}
+
+export const PRESET_THEMES: StudioTheme[] = [
+  { id: 'purple_lime', name: 'Jumby Purple & Lime', themeColor: '#7160FF', accentColor: '#D8FF43', bg: ['#0F0F0F', '#1D173F'], colors: ['#7160FF', '#D8FF43'] },
+  { id: 'bjp_tricolor', name: 'BJP Saffron & Green', themeColor: '#FF9933', accentColor: '#138808', bg: ['#120A05', '#051205'], colors: ['#FF9933', '#FFFFFF', '#138808', '#FFD700'] },
+  { id: 'coral_sky', name: 'Jumby Coral & Sky', themeColor: '#FF7657', accentColor: '#4DB8FF', bg: ['#0F0F0F', '#261218'], colors: ['#FF7657', '#4DB8FF'] },
+  { id: 'lime_glow', name: 'Jumby Lime Glow', themeColor: '#D8FF43', accentColor: '#7160FF', bg: ['#0F0F0F', '#1A2408'], colors: ['#D8FF43', '#7160FF'] },
+  { id: 'sky_chill', name: 'Jumby Sky Chill', themeColor: '#4DB8FF', accentColor: '#FF7657', bg: ['#0F0F0F', '#0C1E2B'], colors: ['#4DB8FF', '#FF7657'] },
+  { id: 'cyberpunk', name: 'Cyberpunk Neon', themeColor: '#FF007F', accentColor: '#00F0FF', bg: ['#08040C', '#1A0022'], colors: ['#FF007F', '#00F0FF', '#FFE600'] },
+  { id: 'gold_royale', name: 'Golden Royale', themeColor: '#FFD700', accentColor: '#FFA500', bg: ['#0F0F0F', '#261E05'], colors: ['#FFD700', '#FFA500', '#FFFFFF'] },
+  { id: 'midnight', name: 'Midnight Monochrome', themeColor: '#E0E0E0', accentColor: '#707070', bg: ['#050505', '#151515'], colors: ['#FFFFFF', '#AAAAAA', '#555555'] },
 ];
+
+const THEMES = PRESET_THEMES;
+
+function detectThemeFromPrompt(promptText: string): string | null {
+  const lower = promptText.toLowerCase();
+  if (lower.includes('bjp') || lower.includes('saffron') || lower.includes('tricolor') || lower.includes('modi') || lower.includes('bhagwa') || lower.includes('indian')) {
+    return 'bjp_tricolor';
+  }
+  if (lower.includes('cyberpunk') || lower.includes('synthwave') || lower.includes('hot pink') || lower.includes('vaporwave')) {
+    return 'cyberpunk';
+  }
+  if (lower.includes('coral') || lower.includes('peach') || lower.includes('sunset')) {
+    return 'coral_sky';
+  }
+  if (lower.includes('lime') || lower.includes('toxic') || lower.includes('radioactive')) {
+    return 'lime_glow';
+  }
+  if (lower.includes('sky') || lower.includes('ice') || lower.includes('blue') || lower.includes('cyan') || lower.includes('chill')) {
+    return 'sky_chill';
+  }
+  if (lower.includes('gold') || lower.includes('yellow') || lower.includes('royale') || lower.includes('wealth')) {
+    return 'gold_royale';
+  }
+  if (lower.includes('dark') || lower.includes('mono') || lower.includes('noir') || lower.includes('grayscale') || lower.includes('black and white')) {
+    return 'midnight';
+  }
+  if (lower.includes('purple') || lower.includes('violet') || lower.includes('neon')) {
+    return 'purple_lime';
+  }
+  return null;
+}
+
+function extractPaletteFromHtml(html: string): { themeColor: string; accentColor: string; colors: string[] } | null {
+  if (!html) return null;
+  const paletteMatch = html.match(/(?:COLORS|bjpColors|PALETTE|colors|palette)\s*=\s*\[([^\]]+)\]/i);
+  if (paletteMatch) {
+    const rawColors = paletteMatch[1].match(/#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}/g);
+    if (rawColors && rawColors.length >= 2) {
+      return {
+        themeColor: rawColors[0],
+        accentColor: rawColors[1] || rawColors[0],
+        colors: rawColors,
+      };
+    }
+  }
+
+  const allHex = html.match(/#[0-9a-fA-F]{6}/gi) || [];
+  const validHex = allHex.filter((c) => {
+    const l = c.toLowerCase();
+    return l !== '#000000' && l !== '#0f0f0f' && l !== '#ffffff';
+  });
+  if (validHex.length >= 2) {
+    const unique = Array.from(new Set(validHex));
+    return {
+      themeColor: unique[0],
+      accentColor: unique[1] || unique[0],
+      colors: unique.slice(0, 4),
+    };
+  }
+  return null;
+}
+
+function applyThemeToHtml(html: string, theme: StudioTheme): string {
+  if (!html) return html;
+  let updated = html;
+
+  const paletteRegex = /((?:const|let|var)\s+(?:COLORS|bjpColors|PALETTE|colors|palette)\s*=\s*)\[([^\]]+)\]/i;
+  const newColors = theme.colors && theme.colors.length > 0
+    ? theme.colors
+    : [theme.themeColor, theme.accentColor, '#FFFFFF', theme.themeColor];
+
+  const colorsStr = `[${newColors.map((c) => `'${c}'`).join(', ')}]`;
+  if (paletteRegex.test(updated)) {
+    updated = updated.replace(paletteRegex, `$1${colorsStr}`);
+  }
+
+  if (theme.bg && theme.bg.length === 2) {
+    updated = updated.replace(/(background:\s*linear-gradient\([^,]+,\s*)#[0-9a-fA-F]{6}(\s*,\s*)#[0-9a-fA-F]{6}/gi, `$1${theme.bg[0]}$2${theme.bg[1]}`);
+    updated = updated.replace(/(addColorStop\(0,\s*['"])(#[0-9a-fA-F]{6})(['"]\))/i, `$1${theme.bg[0]}$3`);
+    updated = updated.replace(/(addColorStop\(1,\s*['"])(#[0-9a-fA-F]{6})(['"]\))/i, `$1${theme.bg[1]}$3`);
+  }
+
+  return updated;
+}
+
+function applyPhysicsToHtml(html: string, speedMult: number, grav: number): string {
+  if (!html) return html;
+  let updated = html;
+  updated = updated.replace(/(speed\s*[:=]\s*)[\d.]+/gi, `$1${(3.8 * speedMult).toFixed(1)}`);
+  updated = updated.replace(/(speedMultiplier\s*[:=]\s*)[\d.]+/gi, `$1${speedMult.toFixed(2)}`);
+  updated = updated.replace(/(gravity\s*[:=]\s*)[\d.]+/gi, `$1${grav.toFixed(2)}`);
+  return updated;
+}
 
 const ARCHETYPES: { id: GameArchetype; name: string; icon: string; desc: string }[] = [
   { id: 'flappy', name: 'Flappy Jumper', icon: '🐦', desc: 'Tap to flap through vertical obstacles' },
@@ -92,9 +199,17 @@ function CreateStudioContent() {
     parentGame ? `${parentGame.title} (Remix)` : 'Untitled Game'
   );
   const [archetype, setArchetype] = useState<GameArchetype>('flappy');
-  const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
+  const [activeThemeId, setActiveThemeId] = useState<string>('purple_lime');
+  const [customTheme, setCustomTheme] = useState<StudioTheme | null>(null);
   const [speedMultiplier, setSpeedMultiplier] = useState(1.2);
   const [gravity, setGravity] = useState(0.38);
+
+  const allThemes: StudioTheme[] = customTheme
+    ? [customTheme, ...PRESET_THEMES.filter((t) => t.id !== customTheme.id)]
+    : PRESET_THEMES;
+
+  const currentTheme =
+    allThemes.find((t) => t.id === activeThemeId) || allThemes[0];
 
   // Left Studio Panel Tabs: 'chat' | 'tune'
   const [panelTab, setPanelTab] = useState<'chat' | 'tune'>('chat');
@@ -139,12 +254,11 @@ function CreateStudioContent() {
   ]);
 
   const buildHtml = (customConfig?: Partial<GameTemplateConfig>) => {
-    const theme = THEMES[selectedThemeIndex] || THEMES[0];
     return generateGameHtml({
       title: title === 'Untitled Game' ? 'Neon Dash' : title,
-      themeColor: theme.themeColor,
-      accentColor: theme.accentColor,
-      bgGradient: theme.bg,
+      themeColor: currentTheme.themeColor,
+      accentColor: currentTheme.accentColor,
+      bgGradient: currentTheme.bg,
       gameType: archetype,
       speedMultiplier,
       gravity,
@@ -152,14 +266,35 @@ function CreateStudioContent() {
     });
   };
 
+  const handleSelectTheme = (theme: StudioTheme) => {
+    setActiveThemeId(theme.id);
+    if (gameHtml && (gameHtml.includes('<canvas') || gameHtml.includes('<script'))) {
+      const updatedCode = applyThemeToHtml(gameHtml, theme);
+      setHistory((prev) => [...prev, gameHtml]);
+      setGameHtml(updatedCode);
+    } else {
+      const code = generateGameHtml({
+        title: title === 'Untitled Game' ? 'Neon Dash' : title,
+        themeColor: theme.themeColor,
+        accentColor: theme.accentColor,
+        bgGradient: theme.bg,
+        gameType: archetype,
+        speedMultiplier,
+        gravity,
+      });
+      setHistory((prev) => (gameHtml ? [...prev, gameHtml] : []));
+      setGameHtml(code);
+    }
+  };
+
   // Game Code starts EMPTY unless remixing!
   const [gameHtml, setGameHtml] = useState<string>(() => {
     if (parentGame) {
       return generateGameHtml({
         title: `${parentGame.title} (Remix)`,
-        themeColor: THEMES[0].themeColor,
-        accentColor: THEMES[0].accentColor,
-        bgGradient: THEMES[0].bg,
+        themeColor: PRESET_THEMES[0].themeColor,
+        accentColor: PRESET_THEMES[0].accentColor,
+        bgGradient: PRESET_THEMES[0].bg,
         gameType: 'flappy',
         speedMultiplier: 1.2,
         gravity: 0.38,
@@ -218,6 +353,24 @@ function CreateStudioContent() {
     } else if (title === 'Untitled Game') {
       const words = promptText.trim().replace(/[^\w\s]/g, '').split(/\s+/).slice(0, 3).join(' ');
       if (words) setTitle(words.replace(/\b\w/g, (c) => c.toUpperCase()));
+    }
+
+    // Instantly detect and sync Theme from prompt
+    const detectedTheme = detectThemeFromPrompt(promptText);
+    if (detectedTheme) {
+      setActiveThemeId(detectedTheme);
+    }
+
+    // Instantly detect speed and gravity from prompt
+    if (lower.includes('fast') || lower.includes('turbo') || lower.includes('2x speed') || lower.includes('hard')) {
+      setSpeedMultiplier((prev) => Math.min(2.5, Number((prev * 1.3).toFixed(1))));
+    } else if (lower.includes('slow') || lower.includes('relax') || lower.includes('chill') || lower.includes('easy')) {
+      setSpeedMultiplier((prev) => Math.max(0.6, Number((prev * 0.75).toFixed(1))));
+    }
+    if (lower.includes('low gravity') || lower.includes('floaty') || lower.includes('moon')) {
+      setGravity((prev) => Math.max(0.18, Number((prev * 0.7).toFixed(2))));
+    } else if (lower.includes('heavy gravity') || lower.includes('high gravity')) {
+      setGravity((prev) => Math.min(0.70, Number((prev * 1.3).toFixed(2))));
     }
 
     try {
@@ -286,6 +439,40 @@ function CreateStudioContent() {
       setHistory((prev) => [...prev, gameHtml]);
       setGameHtml(finalHtml);
 
+      // Sync theme with generated game colors
+      const extractedPalette = extractPaletteFromHtml(finalHtml);
+      if (extractedPalette) {
+        const isBjp = extractedPalette.colors.some(
+          (c) => c.toUpperCase() === '#FF9933' || c.toUpperCase() === '#138808'
+        );
+        if (isBjp) {
+          setActiveThemeId('bjp_tricolor');
+        } else {
+          const matched = PRESET_THEMES.find(
+            (t) =>
+              t.themeColor.toLowerCase() === extractedPalette.themeColor.toLowerCase() ||
+              t.colors?.some((c) =>
+                extractedPalette.colors.map((x) => x.toLowerCase()).includes(c.toLowerCase())
+              )
+          );
+          if (matched) {
+            setActiveThemeId(matched.id);
+          } else {
+            const aiTheme: StudioTheme = {
+              id: 'custom_ai',
+              name: 'Active AI Palette',
+              themeColor: extractedPalette.themeColor,
+              accentColor: extractedPalette.accentColor,
+              bg: ['#0F0F0F', '#181824'],
+              colors: extractedPalette.colors,
+              isCustom: true,
+            };
+            setCustomTheme(aiTheme);
+            setActiveThemeId('custom_ai');
+          }
+        }
+      }
+
       // Add Assistant completion response
       setMessages((prev) => [
         ...prev,
@@ -322,9 +509,9 @@ function CreateStudioContent() {
     }
     const code = generateGameHtml({
       title: effectiveTitle,
-      themeColor: THEMES[selectedThemeIndex].themeColor,
-      accentColor: THEMES[selectedThemeIndex].accentColor,
-      bgGradient: THEMES[selectedThemeIndex].bg,
+      themeColor: currentTheme.themeColor,
+      accentColor: currentTheme.accentColor,
+      bgGradient: currentTheme.bg,
       gameType: arch,
       speedMultiplier,
       gravity,
@@ -623,49 +810,64 @@ function CreateStudioContent() {
               <div className="p-4 space-y-5">
                 {/* Brand Color Palettes */}
                 <div>
-                  <div className="font-heading font-bold text-xs text-white mb-2.5 flex items-center gap-1.5">
-                    <Palette className="w-3.5 h-3.5 text-jumby-coral" />
-                    <span>Jumby Brand Palettes</span>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="font-heading font-bold text-xs text-white flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-jumby-coral" />
+                      <span>Visual Theme & Palette</span>
+                    </div>
+                    {currentTheme.name && (
+                      <span className="text-[10px] font-mono text-zinc-400 truncate max-w-[150px]">
+                        Active: <span className="text-jumby-lime font-bold">{currentTheme.name}</span>
+                      </span>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">
-                    {THEMES.map((th, idx) => (
-                      <button
-                        key={th.name}
-                        onClick={() => {
-                          setSelectedThemeIndex(idx);
-                          const code = generateGameHtml({
-                            title,
-                            themeColor: th.themeColor,
-                            accentColor: th.accentColor,
-                            bgGradient: th.bg,
-                            gameType: archetype,
-                            speedMultiplier,
-                            gravity,
-                          });
-                          setHistory((prev) => [...prev, gameHtml]);
-                          setGameHtml(code);
-                        }}
-                        className={`p-3 rounded-2xl border text-left transition-all ${
-                          selectedThemeIndex === idx
-                            ? 'border-jumby-lime bg-jumby-lime/10'
-                            : 'border-white/10 bg-zinc-900/60 hover:border-white/20'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <div
-                            className="w-4 h-4 rounded-full border border-white/20"
-                            style={{ backgroundColor: th.themeColor }}
-                          />
-                          <div
-                            className="w-4 h-4 rounded-full border border-white/20"
-                            style={{ backgroundColor: th.accentColor }}
-                          />
-                        </div>
-                        <div className="text-[11px] font-heading font-bold text-white truncate">
-                          {th.name}
-                        </div>
-                      </button>
-                    ))}
+                    {allThemes.map((th) => {
+                      const isSelected = activeThemeId === th.id;
+                      return (
+                        <button
+                          key={th.id}
+                          onClick={() => handleSelectTheme(th)}
+                          className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden ${
+                            isSelected
+                              ? 'border-jumby-lime bg-jumby-lime/15 ring-1 ring-jumby-lime/40 shadow-sm shadow-jumby-lime/10'
+                              : 'border-white/10 bg-zinc-900/60 hover:border-white/20 hover:bg-zinc-900/90'
+                          }`}
+                        >
+                          {th.isCustom && (
+                            <span className="absolute top-1.5 right-2 px-1.5 py-0.5 rounded text-[9px] font-bold font-heading bg-jumby-lime/20 text-jumby-lime border border-jumby-lime/30">
+                              ✨ AI
+                            </span>
+                          )}
+                          <div className="flex items-center gap-1.5 mb-2">
+                            {th.colors && th.colors.length > 2 ? (
+                              th.colors.slice(0, 4).map((c, i) => (
+                                <div
+                                  key={i}
+                                  className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-xs"
+                                  style={{ backgroundColor: c }}
+                                />
+                              ))
+                            ) : (
+                              <>
+                                <div
+                                  className="w-4 h-4 rounded-full border border-white/20 shadow-xs"
+                                  style={{ backgroundColor: th.themeColor }}
+                                />
+                                <div
+                                  className="w-4 h-4 rounded-full border border-white/20 shadow-xs"
+                                  style={{ backgroundColor: th.accentColor }}
+                                />
+                              </>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-heading font-bold text-white truncate flex items-center justify-between">
+                            <span>{th.name}</span>
+                            {isSelected && <Check className="w-3 h-3 text-jumby-lime flex-shrink-0 ml-1" />}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -690,7 +892,11 @@ function CreateStudioContent() {
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         setSpeedMultiplier(val);
-                        setGameHtml(buildHtml({ speedMultiplier: val }));
+                        if (gameHtml && (gameHtml.includes('<canvas') || gameHtml.includes('<script'))) {
+                          setGameHtml(applyPhysicsToHtml(gameHtml, val, gravity));
+                        } else {
+                          setGameHtml(buildHtml({ speedMultiplier: val }));
+                        }
                       }}
                       className="w-full accent-jumby-lime"
                     />
@@ -710,7 +916,11 @@ function CreateStudioContent() {
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
                         setGravity(val);
-                        setGameHtml(buildHtml({ gravity: val }));
+                        if (gameHtml && (gameHtml.includes('<canvas') || gameHtml.includes('<script'))) {
+                          setGameHtml(applyPhysicsToHtml(gameHtml, speedMultiplier, val));
+                        } else {
+                          setGameHtml(buildHtml({ gravity: val }));
+                        }
                       }}
                       className="w-full accent-jumby-purple"
                     />
