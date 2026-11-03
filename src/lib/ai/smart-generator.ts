@@ -394,15 +394,27 @@ function generateFlappyGame(opts: GameGenOptions) {
           die();
         }
 
-        // Spawn obstacles
-        if (frames % Math.floor(75 / ${opts.speedMultiplier}) === 0) {
-          spawnItem();
+        // Spawn obstacles with level scaling and breather
+        const spawnInterval = Jumby.level.getSpawnInterval(75 / ${opts.speedMultiplier}, score, 35);
+        if (frames % spawnInterval === 0) {
+          if (!Jumby.level.isBreather) {
+            spawnItem();
+          } else {
+            // Breather reward: spawn collectible target instead of hazard
+            items.push({
+              x: width + 20,
+              y: Math.random() * (height - 180) + 90,
+              type: 'target',
+              radius: 16
+            });
+          }
         }
 
-        // Update items
+        // Update items with scaled speed
+        const currentSpeed = itemSpeed * Jumby.level.multiplier;
         for (let i = items.length - 1; i >= 0; i--) {
           const item = items[i];
-          item.x -= itemSpeed;
+          item.x -= currentSpeed;
 
           // Collision detection
           const dx = item.x - player.x;
@@ -588,14 +600,16 @@ function generateOrbitGame(opts: GameGenOptions) {
       }
 
       if (state === 'playing') {
-        angle += 0.042 * dir * ${opts.speedMultiplier};
+        const currentSpeedMult = ${opts.speedMultiplier} * Jumby.level.multiplier;
+        angle += 0.042 * dir * currentSpeedMult;
 
-        if (frames % Math.floor(80 / ${opts.speedMultiplier}) === 0) {
+        const spawnInterval = Jumby.level.getSpawnInterval(80 / ${opts.speedMultiplier}, score, 38);
+        if (frames % spawnInterval === 0 && !Jumby.level.isBreather) {
           const spawnAngle = Math.random() * Math.PI * 2;
           lasers.push({
             angle: spawnAngle,
             dist: width * 0.7,
-            speed: 3.5 * ${opts.speedMultiplier},
+            speed: 3.5 * currentSpeedMult,
             radius: 12
           });
         }
@@ -993,11 +1007,12 @@ function generateRunnerGame(opts: GameGenOptions) {
       }
 
       if (state === 'playing') {
-        if (frames % Math.floor(55 / ${opts.speedMultiplier}) === 0) {
+        const spawnInterval = Jumby.level.getSpawnInterval(55 / ${opts.speedMultiplier}, score, 26);
+        if (frames % spawnInterval === 0 && !Jumby.level.isBreather) {
           obstacles.push({
             lane: Math.floor(Math.random() * 3),
             y: -50,
-            speed: 5.5 * ${opts.speedMultiplier},
+            speed: (5.5 * ${opts.speedMultiplier}) * Jumby.level.multiplier,
             radius: 20
           });
         }
@@ -1111,12 +1126,13 @@ function generateCatcherGame(opts: GameGenOptions) {
     };
 
     function spawnItem() {
-      const isHazard = Math.random() < 0.28;
+      const isFever = Jumby.level.isBreather;
+      const isHazard = isFever ? false : Math.random() < Math.min(0.42, 0.22 * Jumby.level.multiplier);
       items.push({
         x: Math.random() * (width - 60) + 30,
         y: -20,
         radius: 18,
-        vy: (3.2 + Math.random() * 2) * ${opts.speedMultiplier},
+        vy: (3.2 + Math.random() * 2) * ${opts.speedMultiplier} * Jumby.level.multiplier,
         isHazard: isHazard,
         emoji: isHazard ? '${opts.hazardEmoji}' : '${opts.targetEmoji}'
       });
@@ -1134,6 +1150,12 @@ function generateCatcherGame(opts: GameGenOptions) {
       Jumby.setScore(0);
       Jumby.sound.jump();
       Jumby.sound.bgm.start('${opts.bgmVibe}');
+      Jumby.level.init({
+        pointsPerLevel: 10,
+        onLevelUp: (lvl) => {
+          Jumby.level.banner('LEVEL ' + lvl + '!', '🌟 FEVER BONUS ROUND! 🌟', '#FFD700', 2500);
+        }
+      });
     }
 
     function die() {
@@ -1315,7 +1337,7 @@ function generateShooterGame(opts: GameGenOptions) {
         x: Math.random() * (width - 80) + 40,
         y: -25,
         radius: 18,
-        vy: (2.2 + Math.random() * 1.5) * ${opts.speedMultiplier},
+        vy: (2.2 + Math.random() * 1.5) * ${opts.speedMultiplier} * Jumby.level.multiplier,
         emoji: '${opts.hazardEmoji}'
       });
     }
@@ -1343,6 +1365,13 @@ function generateShooterGame(opts: GameGenOptions) {
       Jumby.setScore(0);
       Jumby.sound.powerup();
       Jumby.sound.bgm.start('${opts.bgmVibe}');
+      Jumby.level.init({
+        pointsPerLevel: 10,
+        curve: 'waves',
+        onLevelUp: (wave) => {
+          Jumby.level.banner('WAVE ' + wave + '!', 'INCOMING SWARM!', '${opts.accentColor}', 2400);
+        }
+      });
     }
 
     function die() {
@@ -1405,8 +1434,9 @@ function generateShooterGame(opts: GameGenOptions) {
           fireBullet();
         }
 
-        // Spawn enemies
-        if (frames % Math.floor(50 / ${opts.speedMultiplier}) === 0) {
+        // Spawn enemies with wave interval and breather
+        const spawnInterval = Jumby.level.getSpawnInterval(50 / ${opts.speedMultiplier}, score, 22);
+        if (frames % spawnInterval === 0 && !Jumby.level.isBreather) {
           spawnEnemy();
         }
 

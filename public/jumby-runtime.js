@@ -117,6 +117,15 @@
         setTimeout(() => this.playTone(f, 0.1, 'sine', 0.2), i * 60);
       });
     },
+    fanfare: function () {
+      // Ascending celebratory 5-note arpeggio with shimmer
+      const notes = [523.25, 659.25, 783.99, 987.77, 1046.5];
+      notes.forEach((freq, idx) => {
+        setTimeout(() => {
+          this.playTone(freq, 0.16, 'triangle', 0.28);
+        }, idx * 65);
+      });
+    },
   };
 
   // 2.5 Procedural 8-Bit BGM Synthesizer (Zero asset download, responsive Web Audio loop)
@@ -409,6 +418,11 @@
 
       // Update & render floating texts
       Graphics.updateFloatingTexts(ctx);
+
+      // Render Level & Difficulty Banner if active
+      if (typeof Level !== 'undefined' && Level.render) {
+        Level.render(ctx, width, height);
+      }
     },
   };
 
@@ -620,15 +634,241 @@
     },
   };
 
+  // 5. Level & Progressive Difficulty Engine
+  const Level = {
+    current: 1,
+    score: 0,
+    multiplier: 1.0,
+    progress: 0.0,
+    isBreather: false,
+    _breatherUntil: 0,
+
+    // Configuration
+    enabled: true,
+    autoBanner: true,
+    pointsPerLevel: 10,
+    maxMultiplier: 2.2,
+    breatherDuration: 2500, // 2.5s safe breather window after leveling up
+    curve: 'smooth', // 'smooth' | 'stepped' | 'waves'
+    onLevelUp: null,
+
+    // Active banner state for visual rendering
+    activeBanner: null, // { title, subtitle, color, startTime, duration }
+
+    init: function (opts = {}) {
+      this.enabled = opts.enabled !== undefined ? !!opts.enabled : true;
+      this.autoBanner = opts.autoBanner !== undefined ? !!opts.autoBanner : true;
+      this.current = opts.startLevel || 1;
+      this.pointsPerLevel = opts.pointsPerLevel || 10;
+      this.maxMultiplier = opts.maxMultiplier || 2.2;
+      this.breatherDuration = opts.breatherDuration !== undefined ? opts.breatherDuration : 2500;
+      this.curve = opts.curve || 'smooth';
+      this.onLevelUp = typeof opts.onLevelUp === 'function' ? opts.onLevelUp : null;
+      this.multiplier = this._calcMultiplier(this.current);
+      this.score = 0;
+      this.progress = 0;
+      this.isBreather = false;
+      this._breatherUntil = 0;
+      this.activeBanner = null;
+    },
+
+    reset: function () {
+      this.current = 1;
+      this.score = 0;
+      this.multiplier = 1.0;
+      this.progress = 0.0;
+      this.isBreather = false;
+      this._breatherUntil = 0;
+      this.activeBanner = null;
+    },
+
+    _calcLevel: function (score) {
+      if (typeof this.pointsPerLevel === 'function') {
+        let lvl = 1;
+        while (score >= this.pointsPerLevel(lvl)) {
+          lvl++;
+        }
+        return lvl;
+      }
+      if (this.curve === 'smooth' || this.curve === 'exponential') {
+        const base = this.pointsPerLevel;
+        let threshold = 0;
+        let lvl = 1;
+        while (true) {
+          const needed = base + (lvl - 1) * Math.floor(base * 0.4);
+          if (score < threshold + needed) {
+            this.progress = Math.max(0, Math.min(1, (score - threshold) / needed));
+            break;
+          }
+          threshold += needed;
+          lvl++;
+        }
+        return lvl;
+      } else {
+        const lvl = Math.floor(score / this.pointsPerLevel) + 1;
+        this.progress = (score % this.pointsPerLevel) / this.pointsPerLevel;
+        return lvl;
+      }
+    },
+
+    _calcMultiplier: function (lvl) {
+      if (lvl <= 1) return 1.0;
+      const rate = 0.22;
+      const m = 1.0 + (this.maxMultiplier - 1.0) * (1 - Math.exp(-rate * (lvl - 1)));
+      return Math.round(m * 100) / 100;
+    },
+
+    check: function (score) {
+      if (!this.enabled) return this.current;
+      const s = Number(score) || 0;
+      this.score = s;
+      const newLvl = this._calcLevel(s);
+
+      const now = Date.now();
+      if (this.isBreather && now >= this._breatherUntil) {
+        this.isBreather = false;
+      }
+
+      if (newLvl > this.current) {
+        const prevLvl = this.current;
+        this.current = newLvl;
+        this.multiplier = this._calcMultiplier(this.current);
+
+        if (this.breatherDuration > 0) {
+          this.isBreather = true;
+          this._breatherUntil = now + this.breatherDuration;
+        }
+
+        if (this.autoBanner) {
+          this.banner(`LEVEL ${this.current}!`, `SPEED ${this.multiplier}x`, '#FFD700', 2200);
+        }
+
+        Sound.fanfare();
+        Juice.shake(12);
+
+        if (this.onLevelUp) {
+          try {
+            this.onLevelUp(this.current, prevLvl);
+          } catch (e) {
+            console.warn('[Jumby onLevelUp Error]', e);
+          }
+        }
+      }
+
+      return this.current;
+    },
+
+    banner: function (title, subtitle = '', color = '#FFD700', duration = 2200) {
+      this.activeBanner = {
+        title,
+        subtitle,
+        color,
+        startTime: Date.now(),
+        duration,
+      };
+    },
+
+    getSpeed: function (baseSpeed, score) {
+      if (score !== undefined) this.check(score);
+      return baseSpeed * this.multiplier;
+    },
+
+    getSpawnInterval: function (baseInterval, score, minInterval = 25) {
+      if (score !== undefined) this.check(score);
+      return Math.max(minInterval, Math.floor(baseInterval / this.multiplier));
+    },
+
+    render: function (ctx, width, height) {
+      if (this.isBreather && Date.now() >= this._breatherUntil) {
+        this.isBreather = false;
+      }
+
+      if (!this.activeBanner || !ctx) return;
+
+      const elapsed = Date.now() - this.activeBanner.startTime;
+      if (elapsed > this.activeBanner.duration) {
+        this.activeBanner = null;
+        return;
+      }
+
+      const progress = elapsed / this.activeBanner.duration;
+      let alpha = 1;
+      if (progress < 0.15) {
+        alpha = progress / 0.15;
+      } else if (progress > 0.75) {
+        alpha = (1 - progress) / 0.25;
+      }
+
+      let scale = 1.0;
+      if (progress < 0.25) {
+        const p = progress / 0.25;
+        scale = 0.4 + Math.sin(p * Math.PI) * 0.75 + p * 0.6;
+      }
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+
+      const cx = width / 2;
+      const cy = height * 0.28;
+
+      const ribbonWidth = Math.min(width * 0.85, 340);
+      const ribbonHeight = this.activeBanner.subtitle ? 76 : 54;
+      const rx = cx - ribbonWidth / 2;
+      const ry = cy - ribbonHeight / 2;
+
+      ctx.shadowColor = this.activeBanner.color;
+      ctx.shadowBlur = 25;
+      ctx.fillStyle = 'rgba(15, 15, 24, 0.90)';
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(rx, ry, ribbonWidth, ribbonHeight, 16);
+      } else {
+        ctx.rect(rx, ry, ribbonWidth, ribbonHeight);
+      }
+      ctx.fill();
+
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = this.activeBanner.color;
+      ctx.stroke();
+
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+
+      ctx.font = '900 28px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = this.activeBanner.color;
+      ctx.shadowBlur = 15;
+      ctx.fillText(this.activeBanner.title, 0, this.activeBanner.subtitle ? -11 : 0);
+
+      if (this.activeBanner.subtitle) {
+        ctx.font = '800 13px -apple-system, sans-serif';
+        ctx.fillStyle = this.activeBanner.color;
+        ctx.shadowBlur = 8;
+        ctx.fillText(this.activeBanner.subtitle.toUpperCase(), 0, 17);
+      }
+
+      ctx.restore();
+    },
+  };
+
   // The Primary Jumby API
   const Jumby = {
     ready: function () {
       sendToParent('JUMBY_READY');
     },
     setScore: function (score) {
-      sendToParent('JUMBY_SCORE_UPDATE', { score: Number(score) });
+      const num = Number(score) || 0;
+      if (num === 0) {
+        Level.reset();
+      } else {
+        Level.check(num);
+      }
+      sendToParent('JUMBY_SCORE_UPDATE', { score: num });
     },
     gameOver: function (score, details = {}) {
+      Level.activeBanner = null;
       sendToParent('JUMBY_GAME_OVER', { score: Number(score), details });
     },
     storage: {
@@ -668,6 +908,7 @@
     drawSprite: Graphics.drawSprite.bind(Graphics),
     drawEmoji: Graphics.drawEmoji.bind(Graphics),
     sound: Sound,
+    level: Level,
     fx: Object.assign(Juice, {
       addFloatingText: Graphics.addFloatingText.bind(Graphics),
     }),
