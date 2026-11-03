@@ -460,9 +460,70 @@
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(callback);
     },
+    // Self-Healing Helper for user execution
+    safeCall: function (fn) {
+      try {
+        if (typeof fn === 'function') fn();
+      } catch (err) {
+        console.warn('[Jumby SafeCall Caught]', err);
+      }
+    },
   };
 
   global.Jumby = Jumby;
+
+  // 6. Runtime Error Shield & Self-Healing Interceptor
+  global.addEventListener('error', function (e) {
+    console.warn('[Jumby Runtime Shield] Caught unhandled script error:', e.message, 'at', (e.lineno || '?') + ':' + (e.colno || '?'));
+    sendToParent('JUMBY_RUNTIME_ERROR', {
+      message: e.message || 'Unknown runtime script error',
+      line: e.lineno,
+      col: e.colno,
+      filename: e.filename,
+    });
+    showRecoveryToast(e.message);
+  });
+
+  global.addEventListener('unhandledrejection', function (e) {
+    const reason = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+    console.warn('[Jumby Runtime Shield] Caught unhandled promise rejection:', reason);
+    sendToParent('JUMBY_RUNTIME_ERROR', {
+      message: reason,
+    });
+  });
+
+  function showRecoveryToast(msg) {
+    if (document.getElementById('jumby-recovery-shield')) return;
+    const toast = document.createElement('div');
+    toast.id = 'jumby-recovery-shield';
+    toast.style.cssText = 'position:fixed;bottom:16px;left:16px;right:16px;background:rgba(20,20,28,0.92);backdrop-filter:blur(8px);border:1px solid rgba(255,100,100,0.4);border-radius:14px;padding:12px 14px;color:#fff;font-family:-apple-system,sans-serif;font-size:12px;z-index:999999;box-shadow:0 10px 25px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:space-between;gap:8px;';
+    toast.innerHTML = '<span style="display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="color:#FF7657;">⚠️</span> <span>Glitch recovered: ' + (msg ? msg.substring(0, 40) : 'Recovered') + '</span></span><button id="jumby-recover-btn" style="background:#7160FF;color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;">Restart</button>';
+    document.body.appendChild(toast);
+    const btn = document.getElementById('jumby-recover-btn');
+    if (btn) {
+      btn.onclick = function () {
+        toast.remove();
+        global.location.reload();
+      };
+    }
+    setTimeout(function () {
+      if (toast && toast.parentNode) toast.remove();
+    }, 6000);
+  }
+
+  // 7. Auto-Bind Canvas & Fallback Resize
+  global.addEventListener('load', function () {
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      if (canvas.width === 300 && canvas.height === 150) {
+        canvas.width = global.innerWidth;
+        canvas.height = global.innerHeight;
+      }
+      if (!Input.boundCanvas) {
+        Input.init(canvas);
+      }
+    }
+  });
 
   // Auto-notify ready
   if (document.readyState === 'complete' || document.readyState === 'interactive') {

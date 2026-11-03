@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildSystemPrompt, extractGameHtml } from '@/lib/ai/runtime-contract';
+import { buildSystemPrompt } from '@/lib/ai/runtime-contract';
 import { synthesizeProceduralGame } from '@/lib/ai/smart-generator';
+import { validateAndHealGameHtml } from '@/lib/ai/game-healer';
 
 export async function POST(req: NextRequest) {
   try {
@@ -152,9 +153,11 @@ async function streamFromCliProxy(
         if (trimmed.startsWith('data: ')) {
           const payload = trimmed.slice(6);
           if (payload === '[DONE]') {
-            const finalHtml = extractGameHtml(accumulated);
+            const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
             streamController.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ done: true, fullHtml: finalHtml })}\n\n`)
+              encoder.encode(
+                `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+              )
             );
             try {
               streamController.terminate();
@@ -177,9 +180,11 @@ async function streamFromCliProxy(
       }
     },
     flush(streamController) {
-      const finalHtml = extractGameHtml(accumulated);
+      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
       streamController.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ done: true, fullHtml: finalHtml })}\n\n`)
+        encoder.encode(
+          `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+        )
       );
     },
   });
@@ -302,9 +307,11 @@ async function streamFromGemini(apiKey: string, prompt: string, archetype?: stri
       }
     },
     flush(controller) {
-      const finalHtml = extractGameHtml(accumulated);
+      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
       controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ done: true, fullHtml: finalHtml })}\n\n`)
+        encoder.encode(
+          `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+        )
       );
     },
   });
@@ -369,9 +376,11 @@ async function streamFromOpenAI(apiKey: string, prompt: string, archetype?: stri
       }
     },
     flush(controller) {
-      const finalHtml = extractGameHtml(accumulated);
+      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
       controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ done: true, fullHtml: finalHtml })}\n\n`)
+        encoder.encode(
+          `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+        )
       );
     },
   });

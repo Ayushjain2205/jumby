@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { Game } from '@/types/game';
 import { savePublishedGame } from '@/lib/games/game-registry';
+import { validateAndHealGameHtml } from '@/lib/ai/game-healer';
 
 
 export async function POST(req: NextRequest) {
@@ -21,6 +22,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Game HTML code is required' }, { status: 400 });
     }
 
+    // Auto-heal game HTML before writing to disk
+    const healingResult = validateAndHealGameHtml(html, { prompt, archetype });
+    const finalHtmlToPublish = healingResult.html;
+
     // Generate safe clean slug
     const baseSlug = title
       .toLowerCase()
@@ -36,7 +41,7 @@ export async function POST(req: NextRequest) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
     const targetHtmlPath = path.join(targetDir, 'index.html');
-    fs.writeFileSync(targetHtmlPath, html, 'utf-8');
+    fs.writeFileSync(targetHtmlPath, finalHtmlToPublish, 'utf-8');
 
     // 2. Create game metadata record
     const newGame: Game = {

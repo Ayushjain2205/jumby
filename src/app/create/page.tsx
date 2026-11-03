@@ -33,7 +33,7 @@ import {
   GameTemplateConfig,
   GameArchetype,
 } from '@/lib/templates/game-generator';
-import { extractGameHtml } from '@/lib/ai/runtime-contract';
+import { validateAndHealGameHtml } from '@/lib/ai/game-healer';
 import { JumbyMascot } from '@/components/brand/JumbyMascot';
 import {
   GAME_FONTS,
@@ -191,6 +191,43 @@ function CreateStudioContent() {
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
   const [mounted, setMounted] = useState(false);
+  const [runtimeGlitch, setRuntimeGlitch] = useState<{ message: string; line?: number } | null>(null);
+
+  // Runtime Error Shield Listener
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'JUMBY_RUNTIME_ERROR') {
+        console.warn('[Create Studio] Captured game runtime glitch:', data);
+        setRuntimeGlitch({
+          message: data.message || 'Script glitch detected during play',
+          line: data.line,
+        });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const handleAutoFixGlitch = () => {
+    if (!gameHtml) return;
+    const healed = validateAndHealGameHtml(gameHtml, {
+      prompt: title,
+      archetype,
+    });
+    setGameHtml(healed.html);
+    setRuntimeGlitch(null);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `msg_ai_fix_${Date.now()}`,
+        sender: 'assistant',
+        text: `🛡️ Applied self-healing patch to game scripts! Auto-fixed: ${healed.issuesFixed.join(', ') || 'runtime glitch'}. Reloaded preview.`,
+        timestamp: 'Just now',
+      },
+    ]);
+  };
 
   const handleSaveApiKey = (key: string) => {
     setApiKey(key);
@@ -410,11 +447,19 @@ function CreateStudioContent() {
 
       let finalHtml = receivedCompleteHtml;
       if (!finalHtml && accumulatedCode) {
-        finalHtml = extractGameHtml(accumulatedCode);
+        finalHtml = accumulatedCode;
       }
       if (!finalHtml || finalHtml.trim().length < 50) {
         finalHtml = gameHtml;
       }
+
+      // Self-Healing Code Validation & Logic Repair
+      const healingResult = validateAndHealGameHtml(finalHtml, {
+        prompt: promptText,
+        archetype: targetArchetype,
+      });
+      finalHtml = healingResult.html;
+      setRuntimeGlitch(null);
 
       // Ensure the game has an expressive typography font matching the prompt/archetype
       let fontEnrichedHtml = finalHtml;
@@ -437,13 +482,18 @@ function CreateStudioContent() {
       if (extracted.bgColor) setBgColor(extracted.bgColor);
       if (extracted.colors.length > 0) setPaletteColors(extracted.colors);
 
-      // Add Assistant completion response
+      // Add Assistant completion response with healing summary
+      const fixSummary =
+        healingResult.issuesFixed.length > 0
+          ? ` 🛡️ Auto-healed: ${healingResult.issuesFixed.slice(0, 2).join(', ')}.`
+          : '';
+
       setMessages((prev) => [
         ...prev,
         {
           id: `msg_ai_${Date.now()}`,
           sender: 'assistant',
-          text: `Game synthesized! Injected high-score tracking, 8-bit audio, and screen juice. Try playing in the live preview on the right!`,
+          text: `Game synthesized! Injected high-score tracking, 8-bit audio, and screen juice.${fixSummary} Try playing in the live preview on the right!`,
           timestamp: 'Just now',
         },
       ]);
@@ -1045,6 +1095,25 @@ function CreateStudioContent() {
             <div className="w-full h-full flex flex-col items-center justify-center">
               {/* Phone Frame Mockup for Realistic Portrait Feel */}
               <div className="relative w-full max-w-[390px] h-full max-h-[800px] rounded-[36px] overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col">
+                {/* Self-Healing Glitch Alert Banner */}
+                {runtimeGlitch && (
+                  <div className="absolute top-4 left-4 right-4 z-30 bg-zinc-900/95 border border-red-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md flex items-center justify-between gap-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <span className="text-sm">🛡️</span>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className="text-[11px] font-bold text-white leading-tight">Runtime Glitch Caught</span>
+                        <span className="text-[10px] text-zinc-400 truncate leading-tight">{runtimeGlitch.message}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleAutoFixGlitch}
+                      className="px-2.5 py-1 rounded-lg bg-jumby-purple hover:bg-jumby-purple/90 active:scale-95 text-white font-heading font-black text-[10px] shadow-lg shadow-jumby-purple/20 transition-all shrink-0"
+                    >
+                      Auto-Fix
+                    </button>
+                  </div>
+                )}
+
                 {mounted ? (
                   gameHtml ? (
                     <iframe
