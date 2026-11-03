@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemPrompt, extractGameHtml } from '@/lib/ai/runtime-contract';
 import { synthesizeProceduralGame } from '@/lib/ai/smart-generator';
 
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -18,20 +17,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
+    const cliProxyUrl = process.env.CLI_PROXY_URL || 'http://127.0.0.1:8317';
+    const cliProxyKey = process.env.CLI_PROXY_KEY || '123456';
+    const cliProxyModel = process.env.CLI_PROXY_MODEL || 'gemini-3-flash';
+
     const geminiKey = clientApiKey || process.env.GEMINI_API_KEY;
     const openaiKey = clientApiKey || process.env.OPENAI_API_KEY;
 
-    const useGemini = provider === 'gemini' || (!provider || provider === 'auto') && geminiKey;
-    const useOpenAI = provider === 'openai' || (!provider || provider === 'auto') && openaiKey && !geminiKey;
+    // 1. Try Local CLI Proxy API if requested or in auto mode
+    const tryProxy = provider === 'proxy' || provider === 'cliproxy' || provider === 'auto';
+    if (tryProxy && cliProxyUrl) {
+      try {
+        const proxyStream = await streamFromCliProxy(
+          cliProxyUrl,
+          cliProxyKey,
+          cliProxyModel,
+          prompt,
+          archetype,
+          baseCode
+        );
+        if (proxyStream) {
+          return proxyStream;
+        }
+      } catch (err) {
+        console.warn('[/api/generate] CLI Proxy attempt failed, falling back:', err);
+      }
+    }
 
-    // Check if live external LLM can be used
+    // 2. Fall back to external Gemini / OpenAI if keys provided
+    const useGemini = provider === 'gemini' || (provider === 'auto' && geminiKey);
+    const useOpenAI = provider === 'openai' || (provider === 'auto' && openaiKey && !geminiKey);
+
     if (useGemini && geminiKey) {
       return streamFromGemini(geminiKey, prompt, archetype, baseCode);
     } else if (useOpenAI && openaiKey) {
       return streamFromOpenAI(openaiKey, prompt, archetype, baseCode);
     }
 
-    // Default: High-fidelity procedural dynamic generation with SSE streaming
+    // 3. Fallback: High-fidelity procedural dynamic generation with SSE streaming
     return streamProceduralGame(prompt, archetype, baseCode);
   } catch (error: any) {
     console.error('[/api/generate] Error:', error);
@@ -40,6 +63,137 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Stream game generation from local CLI Proxy API (CPA) using OpenAI-compatible SSE format
+ */
+async function streamFromCliProxy(
+  proxyUrl: string,
+  proxyKey: string,
+  model: string,
+  prompt: string,
+  archetype?: string,
+  baseCode?: string
+): Promise<Response | null> {
+  const systemPrompt = buildSystemPrompt({ archetype, baseCode });
+  const endpoint = `${proxyUrl.replace(/\/+$/, '')}/v1/chat/completions`;
+
+  const controller = new AbortController();
+  // 5 second timeout to establish connection to local proxy
+  const connectTimeout = setTimeout(() => controller.abort(), 6000);
+
+  let response: globalThis.Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${proxyKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt },
+        ],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 8192,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(connectTimeout);
+    console.warn(`[CLI Proxy] Connection failed at ${endpoint}:`, err);
+    return null;
+  }
+  clearTimeout(connectTimeout);
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.warn(`[CLI Proxy] Non-200 response (${response.status}):`, errText);
+    return null;
+  }
+
+  if (!response.body) {
+    return null;
+  }
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  let accumulated = '';
+  let buffer = '';
+
+  const transformStream = new TransformStream({
+    start(streamController) {
+      // Send initial progress indicators to the studio UI
+      streamController.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ step: `🤖 Connecting to ${model} via CLI Proxy...` })}\n\n`)
+      );
+      streamController.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ step: '⚡ Synthesizing micro-game logic & juice...' })}\n\n`)
+      );
+    },
+    transform(chunk, streamController) {
+      buffer += decoder.decode(chunk, { stream: true });
+      const lines = buffer.split('\n');
+      // Keep last potentially incomplete line in buffer
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith(':')) continue;
+        if (trimmed.startsWith('data: ')) {
+          const payload = trimmed.slice(6);
+          if (payload === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(payload);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              accumulated += delta;
+              streamController.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ chunk: delta })}\n\n`)
+              );
+            }
+          } catch {
+            // Partial or malformed JSON chunk, ignore
+          }
+        }
+      }
+    },
+    flush(streamController) {
+      // Process any remaining buffered data
+      if (buffer.trim().startsWith('data: ')) {
+        const payload = buffer.trim().slice(6);
+        if (payload !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(payload);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              accumulated += delta;
+              streamController.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ chunk: delta })}\n\n`)
+              );
+            }
+          } catch {}
+        }
+      }
+
+      const finalHtml = extractGameHtml(accumulated);
+      streamController.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ done: true, fullHtml: finalHtml })}\n\n`)
+      );
+    },
+  });
+
+  return new Response(response.body.pipeThrough(transformStream), {
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    },
+  });
 }
 
 /**
