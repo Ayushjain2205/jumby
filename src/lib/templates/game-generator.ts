@@ -3,6 +3,8 @@
  * Produces complete, runnable HTML5 Canvas games with window.Jumby SDK integration across 4 core game archetypes.
  */
 
+import { injectOrReplaceFontInHtml, detectFontVibe } from '@/lib/fonts/game-fonts';
+
 export type GameArchetype = 'flappy' | 'orbit' | 'stack' | 'runner';
 
 export interface GameTemplateConfig {
@@ -13,21 +15,29 @@ export interface GameTemplateConfig {
   gameType: GameArchetype;
   speedMultiplier: number;
   gravity: number;
+  fontVibe?: string;
   customJsSnippet?: string;
 }
 
 export function generateGameHtml(config: GameTemplateConfig): string {
+  let html = '';
   switch (config.gameType) {
     case 'orbit':
-      return generateOrbitHtml(config);
+      html = generateOrbitHtml(config);
+      break;
     case 'stack':
-      return generateStackHtml(config);
+      html = generateStackHtml(config);
+      break;
     case 'runner':
-      return generateRunnerHtml(config);
+      html = generateRunnerHtml(config);
+      break;
     case 'flappy':
     default:
-      return generateFlappyHtml(config);
+      html = generateFlappyHtml(config);
+      break;
   }
+  const vibe = config.fontVibe || detectFontVibe(config.title, config.gameType).id;
+  return injectOrReplaceFontInHtml(html, vibe);
 }
 
 // 1. FLAPPY JUMPER ARCHETYPE

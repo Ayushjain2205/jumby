@@ -15,6 +15,7 @@ import {
   Volume2,
   MessageSquare,
   Palette,
+  Type,
   Send,
   Share2,
   Play,
@@ -34,6 +35,12 @@ import {
 } from '@/lib/templates/game-generator';
 import { extractGameHtml } from '@/lib/ai/runtime-contract';
 import { JumbyMascot } from '@/components/brand/JumbyMascot';
+import {
+  GAME_FONTS,
+  detectFontVibe,
+  extractFontFromHtml,
+  injectOrReplaceFontInHtml,
+} from '@/lib/fonts/game-fonts';
 
 function extractPaletteFromHtml(html: string): {
   themeColor: string;
@@ -160,6 +167,7 @@ function CreateStudioContent() {
   const [accentColor, setAccentColor] = useState('#D8FF43');
   const [bgColor, setBgColor] = useState('#0F0F0F');
   const [paletteColors, setPaletteColors] = useState<string[]>(['#7160FF', '#D8FF43']);
+  const [activeFontVibe, setActiveFontVibe] = useState<string>('cartoon');
   const [speedMultiplier, setSpeedMultiplier] = useState(1.2);
   const [gravity, setGravity] = useState(0.38);
 
@@ -214,6 +222,7 @@ function CreateStudioContent() {
       gameType: archetype,
       speedMultiplier,
       gravity,
+      fontVibe: activeFontVibe,
       ...customConfig,
     });
   };
@@ -250,6 +259,17 @@ function CreateStudioContent() {
       const updated = replaceColorInHtml(gameHtml, oldColor, newHex);
       setHistory((prev) => [...prev, gameHtml]);
       setGameHtml(updated);
+    }
+  };
+
+  const handleFontChange = (fontId: string) => {
+    setActiveFontVibe(fontId);
+    if (gameHtml && (gameHtml.includes('<canvas') || gameHtml.includes('<script'))) {
+      const updated = injectOrReplaceFontInHtml(gameHtml, fontId);
+      setHistory((prev) => [...prev, gameHtml]);
+      setGameHtml(updated);
+    } else {
+      setGameHtml(buildHtml({ fontVibe: fontId }));
     }
   };
 
@@ -396,11 +416,22 @@ function CreateStudioContent() {
         finalHtml = gameHtml;
       }
 
+      // Ensure the game has an expressive typography font matching the prompt/archetype
+      let fontEnrichedHtml = finalHtml;
+      if (!finalHtml.includes('fonts.googleapis.com')) {
+        const detectedVibe = detectFontVibe(promptText, targetArchetype);
+        fontEnrichedHtml = injectOrReplaceFontInHtml(finalHtml, detectedVibe.id);
+        setActiveFontVibe(detectedVibe.id);
+      } else {
+        const activeVibe = extractFontFromHtml(finalHtml);
+        setActiveFontVibe(activeVibe.id);
+      }
+
       setHistory((prev) => [...prev, gameHtml]);
-      setGameHtml(finalHtml);
+      setGameHtml(fontEnrichedHtml);
 
       // Sync live game colors directly with the Fine-Tune controls
-      const extracted = extractPaletteFromHtml(finalHtml);
+      const extracted = extractPaletteFromHtml(fontEnrichedHtml);
       if (extracted.themeColor) setThemeColor(extracted.themeColor);
       if (extracted.accentColor) setAccentColor(extracted.accentColor);
       if (extracted.bgColor) setBgColor(extracted.bgColor);
@@ -440,6 +471,8 @@ function CreateStudioContent() {
     if (title === 'Untitled Game') {
       setTitle(archName);
     }
+    const targetFont = detectFontVibe('', arch).id;
+    setActiveFontVibe(targetFont);
     const code = generateGameHtml({
       title: effectiveTitle,
       themeColor: themeColor,
@@ -448,6 +481,7 @@ function CreateStudioContent() {
       gameType: arch,
       speedMultiplier,
       gravity,
+      fontVibe: targetFont,
     });
     setHistory((prev) => (gameHtml ? [...prev, gameHtml] : []));
     setGameHtml(code);
@@ -873,6 +907,50 @@ function CreateStudioContent() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Game Typography & Font Vibe */}
+                <div className="space-y-3 pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div className="font-heading font-bold text-xs text-white flex items-center gap-1.5">
+                      <Type className="w-3.5 h-3.5 text-jumby-sky" />
+                      <span>Typography & Font Vibe</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-400">
+                      Active: <span className="text-jumby-sky font-bold">{GAME_FONTS.find((f) => f.id === activeFontVibe)?.name || 'Custom'}</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    {GAME_FONTS.map((font) => {
+                      const isSelected = activeFontVibe === font.id;
+                      return (
+                        <button
+                          key={font.id}
+                          onClick={() => handleFontChange(font.id)}
+                          className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between group ${
+                            isSelected
+                              ? 'border-jumby-sky bg-jumby-sky/15 ring-1 ring-jumby-sky/40 shadow-sm shadow-jumby-sky/10'
+                              : 'border-white/10 bg-zinc-900/60 hover:border-white/20 hover:bg-zinc-900/90'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-base select-none">{font.icon}</span>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold font-heading text-white flex items-center gap-1.5">
+                                <span>{font.name}</span>
+                                <span className="text-[10px] text-zinc-400 font-mono">({font.fontFamily})</span>
+                              </div>
+                              <div className="text-[10px] text-zinc-400 truncate max-w-[200px]">
+                                {font.description}
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-jumby-sky shrink-0 ml-2" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Physics Sliders */}

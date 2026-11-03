@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Valentine Tic Tac Toe</title>
+  <script src="/jumby-runtime.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #FFF0F5; font-family: -apple-system, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; }
+    #ui { position: absolute; top: 30px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
+    .score { font-size: 42px; font-weight: 900; color: #D63384; text-shadow: 0 0 20px rgba(214, 51, 132, 0.4); }
+    .subtitle { font-size: 16px; font-weight: 700; color: #FF69B4; margin-top: 5px; text-shadow: 0 0 10px rgba(255, 105, 180, 0.4); }
+    #hint { position: absolute; bottom: 12%; left: 0; right: 0; text-align: center; color: #FF1493; font-size: 18px; font-weight: 800; text-shadow: 0 0 10px rgba(255, 20, 147, 0.3); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div id="score" class="score">WINS: 0</div>
+    <div id="subtitle" class="subtitle">VS CUPID • YOUR TURN (❤️)</div>
+  </div>
+  <div id="hint">TAP ANY CELL TO PLAY</div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const subtitleEl = document.getElementById('subtitle');
+    const hintEl = document.getElementById('hint');
+
+    let width, height;
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    Jumby.input.init(canvas);
+
+    let wins = 0;
+    let board = ['', '', '', '', '', '', '', '', ''];
+    let turn = 'X'; // 'X' is Player (Heart), 'O' is AI (Rose/Gift)
+    let gameState = 'playing'; // 'playing' | 'gameover'
+    let winningLine = null;
+    let aiTimer = 0;
+
+    function getGridRects() {
+      const size = Math.min(width, height) * 0.82;
+      const startX = (width - size) / 2;
+      const startY = (height - size) / 2 + 20;
+      const cellSize = size / 3;
+
+      let rects = [];
+      for (let i = 0; i < 9; i++) {
+        let r = Math.floor(i / 3);
+        let c = i % 3;
+        rects.push({
+          x: startX + c * cellSize,
+          y: startY + r * cellSize,
+          size: cellSize
+        });
+      }
+      return rects;
+    }
+
+    function checkWinner(b) {
+      const winsCombos = [
+        [0,1,2], [3,4,5], [6,7,8], // rows
+        [0,3,6], [1,4,7], [2,5,8], // cols
+        [0,4,8], [2,4,6]           // diags
+      ];
+      for (let combo of winsCombos) {
+        const [a, c, d] = combo;
+        if (b[a] && b[a] === b[c] && b[a] === b[d]) {
+          return { winner: b[a], combo };
+        }
+      }
+      if (!b.includes('')) return { winner: 'tie', combo: null };
+      return null;
+    }
+
+    function aiMove() {
+      if (gameState !== 'playing') return;
+
+      let move = -1;
+      
+      // 1. Check if AI can win
+      for (let i = 0; i < 9; i++) {
+        if (board[i] === '') {
+          board[i] = 'O';
+          if (checkWinner(board)?.winner === 'O') { move = i; board[i] = ''; break; }
+          board[i] = '';
+        }
+      }
+
+      // 2. Check if AI needs to block X
+      if (move === -1) {
+        for (let i = 0; i < 9; i++) {
+          if (board[i] === '') {
+            board[i] = 'X';
+            if (checkWinner(board)?.winner === 'X') { move = i; board[i] = ''; break; }
+            board[i] = '';
+          }
+        }
+      }
+
+      // 3. Take center if free
+      if (move === -1 && board[4] === '') move = 4;
+
+      // 4. Random available
+      if (move === -1) {
+        let empty = board.map((v, idx) => v === '' ? idx : null).filter(v => v !== null);
+        if (empty.length > 0) {
+          move = empty[Math.floor(Math.random() * empty.length)];
+        }
+      }
+
+      if (move !== -1) {
+        board[move] = 'O';
+        Jumby.sound.score();
+        const rects = getGridRects();
+        Jumby.fx.particles(rects[move].x + rects[move].size/2, rects[move].y + rects[move].size/2, 12, '#FF69B4');
+        
+        let res = checkWinner(board);
+        if (res) {
+          handleEnd(res);
+        } else {
+          turn = 'X';
+          subtitleEl.innerText = "VS CUPID • YOUR TURN (❤️)";
+        }
+      }
+    }
+
+    function handleEnd(res) {
+      gameState = 'gameover';
+      winningLine = res.combo;
+      if (res.winner === 'X') {
+        wins++;
+        scoreEl.innerText = 'WINS: ' + wins;
+        subtitleEl.innerText = "TRUE LOVE! 💖";
+        Jumby.sound.coin();
+        Jumby.fx.shake(10);
+        Jumby.setScore(wins);
+        Jumby.gameOver(wins, { coins: wins * 10 });
+        hintEl.innerText = 'TAP ANYWHERE TO PLAY AGAIN';
+      } else if (res.winner === 'O') {
+        subtitleEl.innerText = "CUPID WINS! 💘";
+        Jumby.sound.hit();
+        Jumby.fx.shake(14);
+        hintEl.innerText = 'TAP ANYWHERE TO TRY AGAIN';
+      } else {
+        subtitleEl.innerText = "SWEET TIE! 💕";
+        Jumby.sound.laser();
+        hintEl.innerText = 'TAP ANYWHERE TO PLAY AGAIN';
+      }
+    }
+
+    function resetBoard() {
+      board = ['', '', '', '', '', '', '', '', ''];
+      gameState = 'playing';
+      winningLine = null;
+      turn = 'X';
+      subtitleEl.innerText = "VS CUPID • YOUR TURN (❤️)";
+      hintEl.innerText = 'TAP ANY CELL TO PLAY';
+      Jumby.sound.jump();
+    }
+
+    Jumby.ready();
+
+    function loop() {
+      requestAnimationFrame(loop);
+
+      ctx.save();
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, '#FFF0F5');
+      grad.addColorStop(1, '#FFE4E1');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
+
+      const rects = getGridRects();
+
+      // Handle Input
+      if (Jumby.input.justPressed) {
+        if (gameState === 'gameover') {
+          resetBoard();
+        } else if (gameState === 'playing' && turn === 'X') {
+          const pos = Jumby.input.touchPos;
+          for (let i = 0; i < 9; i++) {
+            let r = rects[i];
+            if (pos.x >= r.x && pos.x <= r.x + r.size && pos.y >= r.y && pos.y <= r.y + r.size) {
+              if (board[i] === '') {
+                board[i] = 'X';
+                Jumby.sound.jump();
+                Jumby.fx.particles(r.x + r.size/2, r.y + r.size/2, 14, '#FF1493');
+                
+                let res = checkWinner(board);
+                if (res) {
+                  handleEnd(res);
+                } else {
+                  turn = 'O';
+                  subtitleEl.innerText = "VS CUPID • THINKING...";
+                  aiTimer = setTimeout(aiMove, 400);
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      // Draw Grid Lines
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#FFC0CB';
+      ctx.shadowColor = 'rgba(255, 105, 180, 0.3)';
+      ctx.shadowBlur = 10;
+
+      const first = rects[0];
+      const last = rects[8];
+      const totalSize = last.x + last.size - first.x;
+
+      // Vertical lines
+      for (let i = 1; i < 3; i++) {
+        let lx = first.x + i * first.size;
+        ctx.beginPath();
+        ctx.moveTo(lx, first.y);
+        ctx.lineTo(lx, first.y + totalSize);
+        ctx.stroke();
+      }
+      // Horizontal lines
+      for (let i = 1; i < 3; i++) {
+        let ly = first.y + i * first.size;
+        ctx.beginPath();
+        ctx.moveTo(first.x, ly);
+        ctx.lineTo(first.x + totalSize, ly);
+        ctx.stroke();
+      }
+
+      // Draw Marks (Hearts ❤️ and Bows 🎀)
+      rects.forEach((r, i) => {
+        let val = board[i];
+        let cx = r.x + r.size / 2;
+        let cy = r.y + r.size / 2;
+
+        if (val === 'X') {
+          // Draw Cute Heart
+          ctx.save();
+          ctx.fillStyle = '#FF1493';
+          ctx.shadowColor = '#FF69B4';
+          ctx.shadowBlur = 12;
+          let size = r.size * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy + size * 0.3);
+          ctx.bezierCurveTo(cx, cy - size * 0.1, cx - size * 0.6, cy - size * 0.5, cx - size * 0.6, cy - size * 0.1);
+          ctx.bezierCurveTo(cx - size * 0.6, cy + size * 0.3, cx, cy + size * 0.6, cx, cy + size * 0.8);
+          ctx.bezierCurveTo(cx, cy + size * 0.6, cx + size * 0.6, cy + size * 0.3, cx + size * 0.6, cy - size * 0.1);
+          ctx.bezierCurveTo(cx + size * 0.6, cy - size * 0.5, cx, cy - size * 0.1, cx, cy + size * 0.3);
+          ctx.fill();
+          ctx.restore();
+        } else if (val === 'O') {
+          // Draw Gift Box / Bow
+          ctx.save();
+          ctx.fillStyle = '#DB7093';
+          ctx.shadowColor = '#FFB6C1';
+          ctx.shadowBlur = 12;
+          let boxSize = r.size * 0.45;
+          ctx.fillRect(cx - boxSize/2, cy - boxSize/2 + 5, boxSize, boxSize - 5);
+          // Ribbon
+          ctx.fillStyle = '#FF69B4';
+          ctx.fillRect(cx - 4, cy - boxSize/2 + 5, 8, boxSize - 5);
+          ctx.fillRect(cx - boxSize/2, cy - 4, boxSize, 8);
+          ctx.restore();
+        }
+      });
+
+      // Draw Winning Line
+      if (winningLine) {
+        ctx.save();
+        ctx.strokeStyle = '#FF1493';
+        ctx.shadowColor = '#FF69B4';
+        ctx.shadowBlur = 15;
+        ctx.lineWidth = 10;
+        ctx.lineCap = 'round';
+
+        let startR = rects[winningLine[0]];
+        let endR = rects[winningLine[2]];
+        ctx.beginPath();
+        ctx.moveTo(startR.x + startR.size/2, startR.y + startR.size/2);
+        ctx.lineTo(endR.x + endR.size/2, endR.y + endR.size/2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      Jumby.fx.updateAndRender(ctx, width, height);
+      ctx.restore();
+      Jumby.input.endFrame();
+    }
+
+    loop();
+  </script>
+</body>
+</html>
