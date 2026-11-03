@@ -78,9 +78,6 @@ export function MobileShell({ children }: MobileShellProps) {
 
         {/* Mobile Device Frame */}
         <div className="relative w-full h-full md:w-[420px] md:h-[92vh] md:max-h-[860px] md:rounded-[44px] md:border-[5px] md:border-zinc-800/80 md:shadow-[0_0_60px_rgba(0,0,0,0.9),0_0_80px_rgba(113,96,255,0.15)] overflow-hidden bg-jumby-ink flex flex-col z-10">
-          {/* Subtle Mobile Speaker Notch on Desktop */}
-          <div className="hidden md:block absolute top-2.5 left-1/2 -translate-x-1/2 w-24 h-3.5 bg-zinc-900 rounded-full z-50 pointer-events-none" />
-
           {/* Inner Content (Feed + Modals) */}
           <div className="relative w-full h-full overflow-hidden bg-jumby-ink">
             {children}

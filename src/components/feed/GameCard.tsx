@@ -142,8 +142,8 @@ export function GameCard({ game, isActive }: GameCardProps) {
 
   return (
     <div className="relative w-full h-full flex flex-col bg-jumby-ink overflow-hidden select-none">
-      {/* Sleek, Brand Aligned Top Bar */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-b from-[#0F0F0F]/90 via-[#0F0F0F]/50 to-transparent">
+      {/* Dedicated Top Bar Header (Not an overlay - can be modified later) */}
+      <header className="w-full shrink-0 z-20 flex items-center justify-between px-3.5 py-2.5 bg-zinc-950 border-b border-white/10">
         {/* Left: Brand Icon + Title + Creator */}
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
           <Link href="/" aria-label="Jumby Home" className="active:scale-95 transition-transform shrink-0">
@@ -201,58 +201,60 @@ export function GameCard({ game, isActive }: GameCardProps) {
             {copied ? <Check className="w-3.5 h-3.5 text-jumby-lime stroke-[3]" /> : <Share2 className="w-3.5 h-3.5" />}
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* 100% Uncluttered Game Canvas */}
-      <iframe
-        ref={iframeRef}
-        src={game.bundleUrl}
-        title={game.title}
-        sandbox="allow-scripts allow-pointer-lock"
-        className="w-full h-full border-0 z-0 bg-[#070714]"
-      />
+      {/* 100% Uncluttered Game Canvas Area */}
+      <div className="relative flex-1 w-full min-h-0 bg-[#070714] overflow-hidden">
+        <iframe
+          ref={iframeRef}
+          src={game.bundleUrl}
+          title={game.title}
+          sandbox="allow-scripts allow-pointer-lock"
+          className="w-full h-full border-0 block"
+        />
 
-      {/* In-Feed Sponsored Ad CTA Overlay (Brand Lime Button) */}
-      {game.isSponsored && game.sponsorCta && (
-        <div className="absolute bottom-5 left-4 right-4 z-20">
-          <a
-            href={game.sponsorUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-3.5 rounded-full bg-jumby-lime hover:brightness-105 active:scale-98 text-jumby-ink font-heading font-black text-xs shadow-xl shadow-jumby-lime/20 transition-all flex items-center justify-center gap-2"
-          >
-            <span>{game.sponsorCta}</span>
-            <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-          </a>
-        </div>
-      )}
-
-      {/* Game Over Modal Styled with Jumby Swatch */}
-      {gameOverScore !== null && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-jumby-ink/85 backdrop-blur-md p-6 animate-fade-in font-sans">
-          <div className="w-full max-w-xs rounded-3xl bg-zinc-900 border border-jumby-lavender/15 p-6 text-center shadow-2xl">
-            <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1 font-heading">
-              GAME OVER
-            </div>
-            <div className="text-5xl font-heading font-black mb-2 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-jumby-purple via-jumby-sky to-jumby-lime">
-              {gameOverScore}
-            </div>
-            <div className="text-xs text-zinc-400 mb-6 font-sans">
-              Personal Best: {Math.max(gameOverScore, game.stats.highScore || 0)}
-            </div>
-
-            {/* Primary Brand Button: Jumby Lime (#D8FF43) with Black text as per Swatch Spec */}
-            <button
-              onClick={handleRestart}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-full bg-jumby-lime text-jumby-ink font-heading font-black text-xs shadow-lg shadow-jumby-lime/25 hover:brightness-105 active:scale-95 transition-all"
+        {/* In-Feed Sponsored Ad CTA Overlay (Brand Lime Button) */}
+        {game.isSponsored && game.sponsorCta && (
+          <div className="absolute bottom-5 left-4 right-4 z-20">
+            <a
+              href={game.sponsorUrl || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3.5 rounded-full bg-jumby-lime hover:brightness-105 active:scale-98 text-jumby-ink font-heading font-black text-xs shadow-xl shadow-jumby-lime/20 transition-all flex items-center justify-center gap-2"
             >
-              <RotateCcw className="w-4 h-4 stroke-[2.5]" />
-              <span>Play Again</span>
+              <span>{game.sponsorCta}</span>
               <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-            </button>
+            </a>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Game Over Modal Styled with Jumby Swatch */}
+        {gameOverScore !== null && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-jumby-ink/85 backdrop-blur-md p-6 animate-fade-in font-sans">
+            <div className="w-full max-w-xs rounded-3xl bg-zinc-900 border border-jumby-lavender/15 p-6 text-center shadow-2xl">
+              <div className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-1 font-heading">
+                GAME OVER
+              </div>
+              <div className="text-5xl font-heading font-black mb-2 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-jumby-purple via-jumby-sky to-jumby-lime">
+                {gameOverScore}
+              </div>
+              <div className="text-xs text-zinc-400 mb-6 font-sans">
+                Personal Best: {Math.max(gameOverScore, game.stats.highScore || 0)}
+              </div>
+
+              {/* Primary Brand Button: Jumby Lime (#D8FF43) with Black text as per Swatch Spec */}
+              <button
+                onClick={handleRestart}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-full bg-jumby-lime text-jumby-ink font-heading font-black text-xs shadow-lg shadow-jumby-lime/25 hover:brightness-105 active:scale-95 transition-all"
+              >
+                <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                <span>Play Again</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

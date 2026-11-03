@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "id": "game_1793714029055_cvfv",
+    "slug": "make-a-tik-cvfv",
+    "title": "Make A Tik",
+    "description": "Game synthesized! Injected high-score tracking, 8-bit audio, and screen juice. Try playing in the live preview on the right!",
+    "prompt": "Game synthesized! Injected high-score tracking, 8-bit audio, and screen juice. Try playing in the live preview on the right!",
+    "creator": {
+      "id": "usr_me",
+      "name": "Creator",
+      "username": "creator",
+      "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=make-a-tik-cvfv"
+    },
+    "parentGameId": null,
+    "parentGameTitle": null,
+    "engine": "canvas2d",
+    "bundleUrl": "/games/make-a-tik-cvfv/index.html",
+    "stats": {
+      "plays": 1,
+      "likes": 1,
+      "remixes": 0,
+      "highScore": 0
+    },
+    "tags": [
+      "AI Generated",
+      "flappy",
+      "New"
+    ],
+    "controlsHint": "Tap or Space to Play",
+    "createdAt": "2026-11-03T13:53:49.055Z"
+  }
+]
