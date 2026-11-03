@@ -149,7 +149,16 @@ async function streamFromCliProxy(
         if (!trimmed || trimmed.startsWith(':')) continue;
         if (trimmed.startsWith('data: ')) {
           const payload = trimmed.slice(6);
-          if (payload === '[DONE]') continue;
+          if (payload === '[DONE]') {
+            const finalHtml = extractGameHtml(accumulated);
+            streamController.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ done: true, fullHtml: finalHtml })}\n\n`)
+            );
+            try {
+              streamController.terminate();
+            } catch {}
+            return;
+          }
           try {
             const parsed = JSON.parse(payload);
             const delta = parsed.choices?.[0]?.delta?.content;
@@ -166,23 +175,6 @@ async function streamFromCliProxy(
       }
     },
     flush(streamController) {
-      // Process any remaining buffered data
-      if (buffer.trim().startsWith('data: ')) {
-        const payload = buffer.trim().slice(6);
-        if (payload !== '[DONE]') {
-          try {
-            const parsed = JSON.parse(payload);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (delta) {
-              accumulated += delta;
-              streamController.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ chunk: delta })}\n\n`)
-              );
-            }
-          } catch {}
-        }
-      }
-
       const finalHtml = extractGameHtml(accumulated);
       streamController.enqueue(
         encoder.encode(`data: ${JSON.stringify({ done: true, fullHtml: finalHtml })}\n\n`)

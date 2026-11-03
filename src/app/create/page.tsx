@@ -32,6 +32,7 @@ import {
   GameTemplateConfig,
   GameArchetype,
 } from '@/lib/templates/game-generator';
+import { extractGameHtml } from '@/lib/ai/runtime-contract';
 import { JumbyMascot } from '@/components/brand/JumbyMascot';
 
 const THEMES = [
@@ -274,7 +275,14 @@ function CreateStudioContent() {
         }
       }
 
-      const finalHtml = receivedCompleteHtml || accumulatedCode || gameHtml;
+      let finalHtml = receivedCompleteHtml;
+      if (!finalHtml && accumulatedCode) {
+        finalHtml = extractGameHtml(accumulatedCode);
+      }
+      if (!finalHtml || finalHtml.trim().length < 50) {
+        finalHtml = gameHtml;
+      }
+
       setHistory((prev) => [...prev, gameHtml]);
       setGameHtml(finalHtml);
 

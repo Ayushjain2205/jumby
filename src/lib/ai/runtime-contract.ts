@@ -110,7 +110,12 @@ You generate hyper-engaging, addictive, single-tap or simple-control HTML5 canva
 6. **JUMBY COLOR PALETTE**:
    - Backgrounds: Dark ink tones ('#0F0F0F', '#151226', '#1A1633').
    - Highlights & Accents: Jumby Lime ('#D8FF43'), Jumby Purple ('#7160FF'), Jumby Coral ('#FF7657'), Jumby Sky ('#4DB8FF').
-7. **OUTPUT FORMAT**:
+7. **CONCISE & COMPLETE (UNDER 200 LINES)**:
+   - Output must be punchy and under 200 lines to ensure instant generation and avoid truncation.
+   - You MUST output all closing tags: </script></body></html>.
+   - When remixing/theming (e.g. BJP colors Saffron #FF9933, Green #138808, White #FFFFFF, Gold #FFD700):
+     Update the COLORS array, background gradients, and UI text directly while preserving the existing working gameplay logic.
+8. **OUTPUT FORMAT**:
    Return ONLY a complete, standalone, self-contained HTML file starting with '<!DOCTYPE html>' and ending with '</html>'.
    Include '<script src="/jumby-runtime.js"></script>' in the '<head>'.
    NO explanations, NO conversational markdown before or after the code block.
@@ -122,7 +127,7 @@ ${JUMBY_TYPESCRIPT_CONTRACT}
 
 ${options?.archetype ? `Target Archetype: ${options.archetype}` : ''}
 ${options?.baseCode ? `### BASELINE CODE TO ENHANCE & REMIX:
-Below is a proven, working baseline implementation. Keep its rock-solid physics, camera scrolling, and 60fps game loop, but remix and enhance it to fully embody the user's specific prompt (add their requested theme, rhythm sync, custom visual shaders, combo multipliers, and audio effects):
+Below is a proven, working baseline implementation. Keep its rock-solid physics, camera scrolling, and 60fps game loop, but remix and enhance it to fully embody the user's specific prompt:
 \`\`\`html
 ${options.baseCode}
 \`\`\`` : ''}
@@ -130,33 +135,48 @@ ${options.baseCode}
 }
 
 /**
- * Cleanly extracts raw HTML from AI response, stripping any surrounding markdown code fences.
+ * Cleanly extracts raw HTML from AI response, stripping any surrounding markdown code fences,
+ * conversational text, and gracefully repairing incomplete closing tags.
  */
 export function extractGameHtml(aiOutput: string): string {
+  if (!aiOutput || typeof aiOutput !== 'string') return '';
   let cleaned = aiOutput.trim();
 
-  // Strip ```html ... ``` or ``` ... ```
-  if (cleaned.startsWith('```')) {
-    const firstNewline = cleaned.indexOf('\n');
-    if (firstNewline !== -1) {
-      cleaned = cleaned.substring(firstNewline + 1);
+  // 1. Extract content from code block if present
+  const codeBlockMatch = cleaned.match(/```(?:html|xml)?\s*\n?([\s\S]*?)(\n?```|$)/i);
+  if (codeBlockMatch && codeBlockMatch[1]) {
+    cleaned = codeBlockMatch[1].trim();
+  }
+
+  // 2. Discard any conversational text before <!DOCTYPE html> or <html
+  const docTypeIdx = cleaned.indexOf('<!DOCTYPE html');
+  const htmlTagIdx = cleaned.indexOf('<html');
+
+  if (docTypeIdx !== -1) {
+    cleaned = cleaned.substring(docTypeIdx);
+  } else if (htmlTagIdx !== -1) {
+    cleaned = '<!DOCTYPE html>\n' + cleaned.substring(htmlTagIdx);
+  }
+
+  // 3. Discard any conversational text after </html>
+  const htmlEndIdx = cleaned.indexOf('</html>');
+  if (htmlEndIdx !== -1) {
+    cleaned = cleaned.substring(0, htmlEndIdx + 7);
+  } else {
+    // If cut off before </html>, close open tags so browser can parse it without syntax errors
+    if (!cleaned.includes('</script>') && cleaned.includes('<script')) {
+      cleaned += '\n</script>';
     }
+    if (!cleaned.includes('</body>')) {
+      cleaned += '\n</body>';
+    }
+    cleaned += '\n</html>';
   }
 
-  if (cleaned.endsWith('```')) {
-    cleaned = cleaned.substring(0, cleaned.lastIndexOf('```')).trim();
-  }
-
-  // Ensure it has <!DOCTYPE html>
-  if (!cleaned.includes('<!DOCTYPE html>') && cleaned.includes('<html')) {
-    const htmlIndex = cleaned.indexOf('<html');
-    cleaned = '<!DOCTYPE html>\n' + cleaned.substring(htmlIndex);
-  }
-
-  // Ensure /jumby-runtime.js is present in head
+  // 4. Ensure /jumby-runtime.js is present in head
   if (!cleaned.includes('jumby-runtime.js') && cleaned.includes('<head>')) {
     cleaned = cleaned.replace('<head>', '<head>\n  <script src="/jumby-runtime.js"></script>');
   }
 
-  return cleaned;
+  return cleaned.trim();
 }
