@@ -41,6 +41,13 @@ import {
   AttachedImage,
 } from '@/components/create/LovableHeroCreator';
 import { TemplatePickerModal } from '@/components/create/TemplatePickerModal';
+import {
+  GenerativeDifficultyWidget,
+  GenerativeBossWidget,
+  GenerativePowerupsWidget,
+  GenerativeWidgetType,
+  DifficultyConfig,
+} from '@/components/create/GenerativeChatWidgets';
 import { WalletProvider } from '@/context/WalletContext';
 import {
   GAME_FONTS,
@@ -132,6 +139,10 @@ interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  widget?: {
+    type: GenerativeWidgetType;
+    data?: any;
+  };
 }
 
 function AnimatedGeniusTitle() {
@@ -528,6 +539,70 @@ function CreateStudioContent() {
     }
   };
 
+  const handleTriggerWidget = (type: GenerativeWidgetType) => {
+    if (type === 'difficulty') {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_widget_${Date.now()}`,
+          sender: 'assistant',
+          text: 'Here are your interactive Level & Difficulty controls. Adjust pacing, hazard rate, and progression style:',
+          timestamp: 'Just now',
+          widget: {
+            type: 'difficulty',
+            data: {
+              speedMultiplier,
+              preset: speedMultiplier > 1.5 ? 'chaos' : speedMultiplier < 1.0 ? 'chill' : 'balanced',
+            },
+          },
+        },
+      ]);
+    } else if (type === 'boss') {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_widget_${Date.now()}`,
+          sender: 'assistant',
+          text: 'Design a Boss Encounter for your game. Choose the boss archetype and trigger score milestone:',
+          timestamp: 'Just now',
+          widget: { type: 'boss' },
+        },
+      ]);
+    } else if (type === 'powerups') {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_widget_${Date.now()}`,
+          sender: 'assistant',
+          text: 'Select collectible power-up drops and perks to inject into the game canvas:',
+          timestamp: 'Just now',
+          widget: { type: 'powerups' },
+        },
+      ]);
+    }
+  };
+
+  const handleApplyDifficultyConfig = (config: DifficultyConfig) => {
+    setSpeedMultiplier(config.speedMultiplier);
+
+    if (gameHtml && (gameHtml.includes('<canvas') || gameHtml.includes('<script'))) {
+      const updated = applyPhysicsToHtml(gameHtml, config.speedMultiplier, gravity);
+      setGameHtml(updated);
+    } else {
+      setGameHtml(buildHtml({ speedMultiplier: config.speedMultiplier }));
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `msg_applied_${Date.now()}`,
+        sender: 'assistant',
+        text: `⚡ Pacing applied and live-reloaded! Set to **${config.preset.toUpperCase()}** pacing (${config.speedMultiplier.toFixed(1)}x speed, ${config.hazardDensity} hazard density, ${config.progressionMode} progression mode).`,
+        timestamp: 'Just now',
+      },
+    ]);
+  };
+
   const handleSelectArchetype = (arch: GameArchetype) => {
     setArchetype(arch);
     const archName = ARCHETYPES.find((a) => a.id === arch)?.name || arch;
@@ -796,7 +871,28 @@ function CreateStudioContent() {
                             : 'bg-zinc-900 border border-white/10 text-zinc-200 rounded-tl-none font-sans'
                         }`}
                       >
-                        {m.text}
+                        <div>{m.text}</div>
+
+                        {/* Generative UI Widgets */}
+                        {m.widget?.type === 'difficulty' && (
+                          <GenerativeDifficultyWidget
+                            initialConfig={m.widget.data}
+                            isGenerating={isGenerating}
+                            onApply={handleApplyDifficultyConfig}
+                          />
+                        )}
+                        {m.widget?.type === 'boss' && (
+                          <GenerativeBossWidget
+                            isGenerating={isGenerating}
+                            onApply={(bossPrompt) => handleApplyPrompt(bossPrompt)}
+                          />
+                        )}
+                        {m.widget?.type === 'powerups' && (
+                          <GenerativePowerupsWidget
+                            isGenerating={isGenerating}
+                            onApply={(powerupPrompt) => handleApplyPrompt(powerupPrompt)}
+                          />
+                        )}
                       </div>
                     </div>
                   ))}
@@ -810,8 +906,39 @@ function CreateStudioContent() {
                   )}
                 </div>
 
-
-                {/* Prompt Input Form */}
+                {/* Generative UI Quick Tool Action Pills */}
+                <div className="px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-t border-white/5 bg-zinc-950/70">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 shrink-0">
+                    Quick Tools:
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isGenerating}
+                    onClick={() => handleTriggerWidget('difficulty')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-jumby-purple/15 hover:bg-jumby-purple/25 border border-jumby-purple/40 text-[11px] font-heading font-bold text-white transition-all active:scale-95 disabled:opacity-40 shrink-0 cursor-pointer"
+                  >
+                    <span>🎚️</span>
+                    <span>Level & Difficulty</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isGenerating}
+                    onClick={() => handleTriggerWidget('boss')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-[11px] font-heading font-bold text-zinc-300 hover:text-white transition-all active:scale-95 disabled:opacity-40 shrink-0 cursor-pointer"
+                  >
+                    <span>👾</span>
+                    <span>Add Boss Battle</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isGenerating}
+                    onClick={() => handleTriggerWidget('powerups')}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-[11px] font-heading font-bold text-zinc-300 hover:text-white transition-all active:scale-95 disabled:opacity-40 shrink-0 cursor-pointer"
+                  >
+                    <span>🎁</span>
+                    <span>Power-ups & Perks</span>
+                  </button>
+                </div>
                 <div className="p-3 border-t border-white/10 bg-zinc-900/40">
                   <form
                     onSubmit={(e) => {
