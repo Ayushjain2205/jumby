@@ -8,8 +8,6 @@ import {
   ArrowLeft,
   RotateCcw,
   Upload,
-  Code,
-  Eye,
   Check,
   Sliders,
   Volume2,
@@ -171,9 +169,6 @@ function CreateStudioContent() {
 
   // Left Studio Panel Tabs: 'chat' | 'tune'
   const [panelTab, setPanelTab] = useState<'chat' | 'tune'>('chat');
-
-  // Preview Workspace Tabs: 'preview' | 'code'
-  const [workspaceTab, setWorkspaceTab] = useState<'preview' | 'code'>('preview');
 
   // Generation / Prompt State
   const [inputPrompt, setInputPrompt] = useState('');
@@ -621,32 +616,6 @@ function CreateStudioContent() {
             </button>
           )}
 
-          {/* Preview / Code Tab */}
-          <div className="flex bg-zinc-900 rounded-full p-0.5 border border-white/10">
-            <button
-              onClick={() => setWorkspaceTab('preview')}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-heading font-bold transition-all ${
-                workspaceTab === 'preview'
-                  ? 'bg-jumby-purple text-white shadow'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Preview</span>
-            </button>
-            <button
-              onClick={() => setWorkspaceTab('code')}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-heading font-bold transition-all ${
-                workspaceTab === 'code'
-                  ? 'bg-jumby-purple text-white shadow'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Code className="w-3.5 h-3.5" />
-              <span>Code</span>
-            </button>
-          </div>
-
           {/* Primary Publish Button: Jumby Lime (#D8FF43) */}
           <button
             onClick={handlePublish}
@@ -1056,81 +1025,72 @@ function CreateStudioContent() {
           </div>
         </div>
 
-        {/* Right Side: Live In-Memory Sandbox / Code Editor */}
+        {/* Right Side: Live Interactive Phone Simulator */}
         <div className="flex-1 bg-black flex flex-col items-center justify-center p-2 sm:p-4 relative overflow-hidden">
-          {workspaceTab === 'preview' ? (
-            <div className="w-full h-full flex flex-col items-center justify-center">
-              {/* Phone Frame Mockup for Realistic Portrait Feel */}
-              <div className="relative w-full max-w-[390px] h-full max-h-[800px] rounded-[36px] overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col">
-                {/* Self-Healing Glitch Alert Banner */}
-                {runtimeGlitch && (
-                  <div className="absolute top-4 left-4 right-4 z-30 bg-zinc-900/95 border border-red-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md flex items-center justify-between gap-2 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="text-sm">🛡️</span>
-                      <div className="flex flex-col overflow-hidden">
-                        <span className="text-[11px] font-bold text-white leading-tight">Runtime Glitch Caught</span>
-                        <span className="text-[10px] text-zinc-400 truncate leading-tight">{runtimeGlitch.message}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleAutoFixGlitch}
-                      className="px-2.5 py-1 rounded-lg bg-jumby-purple hover:bg-jumby-purple/90 active:scale-95 text-white font-heading font-black text-[10px] shadow-lg shadow-jumby-purple/20 transition-all shrink-0"
-                    >
-                      Auto-Fix
-                    </button>
+          <div className="w-full h-full flex flex-col items-center justify-center">
+            {/* Phone Frame Mockup for Realistic Portrait Feel */}
+            <div className="relative w-full max-w-[390px] h-full max-h-[800px] rounded-[36px] overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col">
+              {/* Generation Overlay while cooking */}
+              {isGenerating && (
+                <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
+                  <div className="w-16 h-16 rounded-3xl bg-jumby-lime/15 border border-jumby-lime/30 flex items-center justify-center mb-4 text-jumby-lime shadow-xl shadow-jumby-lime/20 animate-pulse">
+                    <Sparkles className="w-8 h-8 animate-spin" />
                   </div>
-                )}
+                  <span className="font-heading font-black text-sm text-white mb-1">
+                    {generationStep || 'Building Micro-Game...'}
+                  </span>
+                  <span className="text-xs text-zinc-400 font-sans">
+                    Generating visuals, physics & audio synth...
+                  </span>
+                </div>
+              )}
 
-                {mounted ? (
-                  gameHtml ? (
-                    <iframe
-                      ref={iframeRef}
-                      srcDoc={gameHtml}
-                      title="Live Preview"
-                      sandbox="allow-scripts allow-pointer-lock"
-                      className="w-full h-full border-none bg-black flex-1"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-zinc-950 via-jumby-ink to-zinc-950 relative overflow-hidden select-none">
-                      <div className="absolute inset-0 bg-[radial-gradient(#7160FF_1px,transparent_1px)] [background-size:20px_20px] opacity-25" />
-
-                      <div className="relative w-20 h-20 rounded-3xl bg-jumby-purple/15 border border-jumby-purple/30 flex items-center justify-center mb-5 text-jumby-purple shadow-2xl shadow-jumby-purple/20">
-                        <JumbyMascot className="w-12 h-12 animate-bounce" />
-                      </div>
-
-                      <AnimatedGeniusTitle />
+              {/* Self-Healing Glitch Alert Banner */}
+              {runtimeGlitch && (
+                <div className="absolute top-4 left-4 right-4 z-30 bg-zinc-900/95 border border-red-500/50 rounded-2xl p-3 shadow-2xl backdrop-blur-md flex items-center justify-between gap-2 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="text-sm">🛡️</span>
+                    <div className="flex flex-col overflow-hidden">
+                      <span className="text-[11px] font-bold text-white leading-tight">Runtime Glitch Caught</span>
+                      <span className="text-[10px] text-zinc-400 truncate leading-tight">{runtimeGlitch.message}</span>
                     </div>
-                  )
+                  </div>
+                  <button
+                    onClick={handleAutoFixGlitch}
+                    className="px-2.5 py-1 rounded-lg bg-jumby-purple hover:bg-jumby-purple/90 active:scale-95 text-white font-heading font-black text-[10px] shadow-lg shadow-jumby-purple/20 transition-all shrink-0"
+                  >
+                    Auto-Fix
+                  </button>
+                </div>
+              )}
+
+              {mounted ? (
+                gameHtml ? (
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={gameHtml}
+                    title="Live Preview"
+                    sandbox="allow-scripts allow-pointer-lock"
+                    className="w-full h-full border-none bg-black flex-1"
+                  />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-xs">
-                    Loading studio...
+                  <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-zinc-950 via-jumby-ink to-zinc-950 relative overflow-hidden select-none">
+                    <div className="absolute inset-0 bg-[radial-gradient(#7160FF_1px,transparent_1px)] [background-size:20px_20px] opacity-25" />
+
+                    <div className="relative w-20 h-20 rounded-3xl bg-jumby-purple/15 border border-jumby-purple/30 flex items-center justify-center mb-5 text-jumby-purple shadow-2xl shadow-jumby-purple/20">
+                      <JumbyMascot className="w-12 h-12 animate-bounce" />
+                    </div>
+
+                    <AnimatedGeniusTitle />
                   </div>
-                )}
-              </div>
+                )
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-xs">
+                  Loading studio...
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="w-full h-full flex flex-col bg-zinc-950 rounded-2xl border border-white/10 p-4">
-              <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
-                <span className="font-mono text-xs text-zinc-400">
-                  index.html • HTML5 Canvas + Jumby SDK
-                </span>
-                <button
-                  onClick={() => setWorkspaceTab('preview')}
-                  className="px-3 py-1 rounded-full bg-jumby-lime text-jumby-ink font-heading font-black text-xs hover:brightness-105 active:scale-95 transition-all flex items-center gap-1"
-                >
-                  <Play className="w-3 h-3 fill-current" />
-                  <span>Run Changes</span>
-                </button>
-              </div>
-              <textarea
-                value={gameHtml}
-                placeholder={`<!-- No game generated yet. -->\n<!-- Type an idea in the AI Assistant on the left or select a template archetype to generate game code! -->`}
-                onChange={(e) => setGameHtml(e.target.value)}
-                className="flex-1 w-full bg-transparent text-cyan-300 placeholder-zinc-600 font-mono text-xs resize-none focus:outline-none overflow-auto leading-relaxed"
-                spellCheck={false}
-              />
-            </div>
-          )}
+          </div>
         </div>
       </div>
       {/* Publish Success Modal */}
