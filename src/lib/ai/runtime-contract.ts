@@ -230,10 +230,12 @@ Pick the most intuitive, rock-solid mechanic based on the user's prompt:
     - Isometric 30° projection math: toScreen(x, y, z): { x: originX + (x - z) * Math.cos(Math.PI/6), y: originY + (x + z) * Math.sin(Math.PI/6) - y }.
     - Each block has 3 isometric faces: Top diamond face (bright pastel), Front-Left face (medium shade), Front-Right face (dark shadow).
     - Alternate sliding axis: Block N sweeps along the X axis, Block N+1 sweeps along the Z axis!
+    - Movement & Boundary Clamps: Limit must be 220px (e.g. limit = 220). Spawn sliding block at -limit with dir = 1!
+    - Clamping logic MUST be: if (b.x >= limit) { b.x = limit; b.dir = -1; } else if (b.x <= -limit) { b.x = -limit; b.dir = 1; }. NEVER use 'dir *= -1' without clamping positions or when spawned outside boundary!
     - Slicing: Trim overhang and spawn a falling 3D debris slab with gravity (vy += 0.8) and alpha fade.
     - Perfect Match: If abs(diff) < 5px, snap flush with "+50 PERFECT!" and coin sound.
     - Smooth vertical camera lerp (cameraY += (targetCameraY - cameraY) * 0.1) so the tower climbs upward.
-    - Start playing immediately. Tap anywhere on gameover resets and immediately starts playing.
+    - Immediate Start: Call resetGame() immediately at script execution so base block and moving block are active and sweeping across the screen right away. Do NOT leave in frozen 'waiting' state! Tap anywhere on gameover resets and immediately starts playing.
 - **Paddle / Pong / Brick Bouncer**: (e.g. "brick breaker", "paddle bounce").
   Ball bounces at angles; player controls paddle at bottom to deflect.
 - **Orbit / Spinner**: (e.g. "orbital pulse", "circle defend").

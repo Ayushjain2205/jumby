@@ -233,6 +233,51 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
     issuesFixed.push('Injected tap-to-restart safeguard for gameover/waiting states');
   }
 
+  // G. DOMContentLoaded in srcdoc iframe safety
+  // In srcdoc iframes, DOMContentLoaded may have already fired before the script executes
+  if (jsPatched.includes('DOMContentLoaded')) {
+    jsPatched = jsPatched.replace(
+      /(?:window|document)\.addEventListener\s*\(\s*['"]DOMContentLoaded['"]\s*,\s*(?:\(\s*\)\s*=>|function\s*\(\s*\))\s*\{/g,
+      '(function __jumby_run_game() {\n'
+    );
+    // Replace trailing }); with })();
+    jsPatched = jsPatched.replace(/\}\s*\)\s*;\s*$/, '})();');
+    issuesFixed.push('Unwrapped DOMContentLoaded listener so game runs immediately in srcdoc iframe');
+  }
+
+  // H. Stacker & Physics Boundary Oscillation Healer
+  // Fixes: if (block.x > 180 || block.x < -180) moveDir *= -1; which traps blocks spawned outside boundary
+  const boundaryPattern = /if\s*\(\s*(\w+\.(?:x|z|y|pos|coordinate))\s*>\s*(\d+(?:\.\d+)?)\s*\|\|\s*\1\s*<\s*-(\d+(?:\.\d+)?)\s*\)\s*(\w+(?:\.\w+)?)\s*\*=\s*-1;?/g;
+  if (boundaryPattern.test(jsPatched)) {
+    jsPatched = jsPatched.replace(boundaryPattern, (match, prop, maxLimit, minLimit, dirVar) => {
+      const bound = Math.max(parseFloat(maxLimit), 220);
+      return `if (${prop} >= ${bound}) { ${prop} = ${bound}; ${dirVar} = -Math.abs(${dirVar}); } else if (${prop} <= -${bound}) { ${prop} = -${bound}; ${dirVar} = Math.abs(${dirVar}); }`;
+    });
+    issuesFixed.push('Healed boundary oscillation traps into directional clamp bounces');
+  }
+
+  const absBoundaryPattern = /if\s*\(\s*Math\.abs\(\s*(\w+\.(?:x|z|y|pos|coordinate))\s*\)\s*>\s*(\d+(?:\.\d+)?)\s*\)\s*(\w+(?:\.\w+)?)\s*\*=\s*-1;?/g;
+  if (absBoundaryPattern.test(jsPatched)) {
+    jsPatched = jsPatched.replace(absBoundaryPattern, (match, prop, limit, dirVar) => {
+      const bound = Math.max(parseFloat(limit), 220);
+      return `if (${prop} >= ${bound}) { ${prop} = ${bound}; ${dirVar} = -Math.abs(${dirVar}); } else if (${prop} <= -${bound}) { ${prop} = -${bound}; ${dirVar} = Math.abs(${dirVar}); }`;
+    });
+    issuesFixed.push('Healed Math.abs boundary oscillation traps into directional clamp bounces');
+  }
+
+  // I. Auto-Start Uninitialized Games
+  // If game defines resetGame/startGame/initGame but never calls it, it sits frozen in waiting state
+  const resetFnMatch = jsPatched.match(/function\s+(resetGame|startGame|initGame|initStack|reset)\s*\(/i);
+  if (resetFnMatch) {
+    const fnName = resetFnMatch[1];
+    const callRegex = new RegExp(`(?<!function\\s+)${fnName}\\s*\\(`, 'g');
+    const matches = jsPatched.match(callRegex) || [];
+    if (matches.length <= 1) {
+      jsPatched += `\n    // Auto-started by Jumby Healer\n    if (typeof ${fnName} === 'function') { try { ${fnName}(); } catch (e) { console.warn('[Jumby Auto-Start]', e); } }\n`;
+      issuesFixed.push(`Auto-started uninitialized game with '${fnName}()'`);
+    }
+  }
+
   // Replace script contents with patched code
   if (scriptMatch && scriptMatch[0]) {
     code = code.replace(scriptMatch[0], `<script>\n${jsPatched}\n  </script>`);

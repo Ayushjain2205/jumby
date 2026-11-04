@@ -379,7 +379,11 @@ function CreateStudioContent() {
   useEffect(() => {
     setMounted(true);
     if (gameHtml) {
-      setHistory([gameHtml]);
+      const healed = validateAndHealGameHtml(gameHtml, { archetype });
+      if (healed.issuesFixed.length > 0) {
+        setGameHtml(healed.html);
+      }
+      setHistory([healed.html || gameHtml]);
     }
   }, []);
 
