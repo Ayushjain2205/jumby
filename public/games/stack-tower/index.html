@@ -7,17 +7,21 @@
   <script src="/jumby-sdk.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; -webkit-user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #12101F; font-family: 'Fredoka', cursive, sans-serif; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0F0D1C; font-family: 'Fredoka', cursive, sans-serif; }
     canvas { display: block; width: 100%; height: 100%; }
-    #ui { position: absolute; top: 28px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
+    #ui { position: absolute; top: 32px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
     .score { font-size: 64px; font-weight: 900; color: #ffffff; text-shadow: 0 4px 25px rgba(0,0,0,0.5); }
-    #hint { position: absolute; bottom: 22%; left: 0; right: 0; text-align: center; color: #D8FF43; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); pointer-events: none; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.97); } }
+    .combo { font-size: 20px; font-weight: 800; color: #D8FF43; text-shadow: 0 2px 12px rgba(0,0,0,0.6); min-height: 28px; }
+    #hint { position: absolute; bottom: 18%; left: 0; right: 0; text-align: center; color: #D8FF43; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); pointer-events: none; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.97); } }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="ui"><div id="score" class="score">0</div></div>
+  <div id="ui">
+    <div id="score" class="score">0</div>
+    <div id="combo" class="combo"></div>
+  </div>
   <div id="hint">TAP TO SLICE & STACK</div>
   <canvas id="canvas"></canvas>
 
@@ -25,6 +29,7 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
+    const comboEl = document.getElementById('combo');
     const hintEl = document.getElementById('hint');
 
     let width, height;
@@ -35,7 +40,69 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // Isometric 3D Projection Constants (30 degree tilt)
+    // Built-in Web Audio Synthesizer (Ascending pentatonic chimes & slice snaps)
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        const AudioCtor = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtor) audioCtx = new AudioCtor();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    const PENTATONIC = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99];
+    function playChime(comboIndex) {
+      const actx = getAudioCtx();
+      if (!actx) return;
+      const freq = PENTATONIC[Math.min(comboIndex, PENTATONIC.length - 1)];
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, actx.currentTime);
+      gain.gain.setValueAtTime(0.22, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 0.36);
+    }
+
+    function playSnap() {
+      const actx = getAudioCtx();
+      if (!actx) return;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(380, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(140, actx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.18, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 0.09);
+    }
+
+    function playHit() {
+      const actx = getAudioCtx();
+      if (!actx) return;
+      const osc = actx.createOscillator();
+      const gain = actx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(120, actx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, actx.currentTime + 0.25);
+      gain.gain.setValueAtTime(0.25, actx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(actx.destination);
+      osc.start();
+      osc.stop(actx.currentTime + 0.26);
+    }
+
+    // Isometric 3D Projection (30 degree tilt)
     const ISO_ANGLE = Math.PI / 6;
     const COS_A = Math.cos(ISO_ANGLE);
     const SIN_A = Math.sin(ISO_ANGLE);
@@ -56,12 +123,6 @@
       return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
     }
 
-    function getPastelColor(index) {
-      const hue = (210 + index * 14) % 360;
-      return "hsl(" + hue + ", 78%, 68%)";
-    }
-
-    // Convert hsl to hex for shading helper
     function hslToHex(h, s, l) {
       l /= 100;
       const a = s * Math.min(l, 1 - l) / 100;
@@ -75,30 +136,34 @@
 
     const BLOCK_HEIGHT = 22;
     const INITIAL_SIZE = 140;
+    const LIMIT = 180;
 
     let state = 'playing'; // 'playing' | 'dead'
     let score = 0;
+    let combo = 0;
     let stack = [];
     let activeBlock = null;
-    let fallingDebris = [];
+    let debris = [];
     let cameraY = 0;
     let targetCameraY = 0;
 
     function resetGame() {
       state = 'playing';
       score = 0;
+      combo = 0;
       cameraY = 0;
       targetCameraY = 0;
-      fallingDebris = [];
+      debris = [];
       scoreEl.textContent = '0';
+      comboEl.textContent = '';
       hintEl.style.display = 'none';
 
-      const baseHex = hslToHex(210, 78, 68);
+      const baseHex = hslToHex(210, 80, 68);
       stack = [
         {
-          x: -INITIAL_SIZE / 2,
+          x: 0,
+          z: 0,
           y: 0,
-          z: -INITIAL_SIZE / 2,
           w: INITIAL_SIZE,
           d: INITIAL_SIZE,
           h: BLOCK_HEIGHT,
@@ -116,21 +181,19 @@
     function spawnNextBlock() {
       const top = stack[stack.length - 1];
       const axis = stack.length % 2 === 1 ? 'x' : 'z'; // Alternate X and Z
-      const nextHex = hslToHex((210 + stack.length * 14) % 360, 78, 68);
-      const limit = INITIAL_SIZE * 1.8;
-      const speed = (3.8 + Math.min(score * 0.08, 3.2)) * 1.2;
+      const nextHex = hslToHex((210 + stack.length * 10) % 360, 80, 68);
+      const speed = 3.6 + Math.min(score * 0.08, 3.2);
 
       activeBlock = {
         axis: axis,
-        x: axis === 'x' ? -limit : top.x,
+        x: axis === 'x' ? -LIMIT : top.x,
+        z: axis === 'z' ? -LIMIT : top.z,
         y: top.y + BLOCK_HEIGHT,
-        z: axis === 'z' ? -limit : top.z,
         w: top.w,
         d: top.d,
         h: BLOCK_HEIGHT,
         speed: speed,
         dir: 1,
-        limit: limit,
         color: nextHex
       };
     }
@@ -146,12 +209,12 @@
         const absDiff = Math.abs(diff);
 
         // 1. Total Miss
-        if (absDiff >= activeBlock.w) {
-          fallingDebris.push({
+        if (absDiff >= top.w) {
+          debris.push({
             ...activeBlock,
             vy: 0,
-            rotX: 0,
-            rotZ: activeBlock.dir * 0.06,
+            rot: 0,
+            rotDir: activeBlock.dir * 0.08,
             alpha: 1.0
           });
           activeBlock = null;
@@ -159,73 +222,87 @@
           return;
         }
 
-        // 2. Perfect Placement (< 5px)
-        if (absDiff < 5) {
+        // 2. Perfect Placement (< 4px)
+        if (absDiff < 4) {
+          combo++;
+          playChime(combo);
           activeBlock.x = top.x;
+
+          // Expand block slightly after 7 consecutive perfects
+          if (combo >= 7) {
+            activeBlock.w = Math.min(INITIAL_SIZE, activeBlock.w + 8);
+          }
+
           stack.push({
             x: top.x,
-            y: activeBlock.y,
             z: top.z,
-            w: top.w,
+            y: activeBlock.y,
+            w: activeBlock.w,
             d: top.d,
             h: BLOCK_HEIGHT,
             color: activeBlock.color
           });
+
+          comboEl.textContent = combo > 1 ? `PERFECT x${combo}!` : 'PERFECT!';
           if (window.Jumby) {
             if (window.Jumby.sound) window.Jumby.sound.coin();
             if (window.Jumby.fx) {
-              const scr = toScreen(top.x + top.w / 2, activeBlock.y + BLOCK_HEIGHT, top.z + top.d / 2, width / 2, height * 0.68 + cameraY);
+              const scr = toScreen(top.x, activeBlock.y + BLOCK_HEIGHT, top.z, width / 2, height * 0.65 + cameraY);
               window.Jumby.fx.particles(scr.x, scr.y, 22, '#D8FF43');
-              window.Jumby.fx.addFloatingText('PERFECT! +50', scr.x, scr.y - 15, '#D8FF43', 24);
+              window.Jumby.fx.addFloatingText(`PERFECT! +50`, scr.x, scr.y - 15, '#D8FF43', 24);
             }
           }
         } else {
-          // Slice overhang
-          const newW = activeBlock.w - absDiff;
-          const newX = diff > 0 ? activeBlock.x : top.x;
+          // Overhang Slice
+          combo = 0;
+          comboEl.textContent = '';
+          playSnap();
+
+          const newW = top.w - absDiff;
+          const newX = top.x + diff / 2;
           const debrisW = absDiff;
-          const debrisX = diff > 0 ? top.x + newW : activeBlock.x;
+          const debrisX = diff > 0 ? newX + (newW / 2) + (debrisW / 2) : newX - (newW / 2) - (debrisW / 2);
 
           stack.push({
             x: newX,
-            y: activeBlock.y,
             z: top.z,
+            y: activeBlock.y,
             w: newW,
             d: top.d,
             h: BLOCK_HEIGHT,
             color: activeBlock.color
           });
 
-          fallingDebris.push({
+          debris.push({
             x: debrisX,
-            y: activeBlock.y,
             z: top.z,
+            y: activeBlock.y,
             w: debrisW,
             d: top.d,
             h: BLOCK_HEIGHT,
             color: activeBlock.color,
             vy: 0,
-            rotX: 0,
-            rotZ: diff > 0 ? 0.07 : -0.07,
+            rot: 0,
+            rotDir: diff > 0 ? 0.08 : -0.08,
             alpha: 1.0
           });
 
-          if (window.Jumby) {
-            if (window.Jumby.sound) window.Jumby.sound.score();
+          if (window.Jumby && window.Jumby.sound) {
+            window.Jumby.sound.score();
           }
         }
       } else {
-        // Z Axis Slicing
+        // Z Axis
         const diff = activeBlock.z - top.z;
         const absDiff = Math.abs(diff);
 
         // 1. Total Miss
-        if (absDiff >= activeBlock.d) {
-          fallingDebris.push({
+        if (absDiff >= top.d) {
+          debris.push({
             ...activeBlock,
             vy: 0,
-            rotX: activeBlock.dir * 0.06,
-            rotZ: 0,
+            rot: 0,
+            rotDir: activeBlock.dir * 0.08,
             alpha: 1.0
           });
           activeBlock = null;
@@ -233,59 +310,72 @@
           return;
         }
 
-        // 2. Perfect Placement (< 5px)
-        if (absDiff < 5) {
+        // 2. Perfect Placement (< 4px)
+        if (absDiff < 4) {
+          combo++;
+          playChime(combo);
           activeBlock.z = top.z;
-          stack.push({
-            x: top.x,
-            y: activeBlock.y,
-            z: top.z,
-            w: top.w,
-            d: top.d,
-            h: BLOCK_HEIGHT,
-            color: activeBlock.color
-          });
-          if (window.Jumby) {
-            if (window.Jumby.sound) window.Jumby.sound.coin();
-            if (window.Jumby.fx) {
-              const scr = toScreen(top.x + top.w / 2, activeBlock.y + BLOCK_HEIGHT, top.z + top.d / 2, width / 2, height * 0.68 + cameraY);
-              window.Jumby.fx.particles(scr.x, scr.y, 22, '#D8FF43');
-              window.Jumby.fx.addFloatingText('PERFECT! +50', scr.x, scr.y - 15, '#D8FF43', 24);
-            }
+
+          if (combo >= 7) {
+            activeBlock.d = Math.min(INITIAL_SIZE, activeBlock.d + 8);
           }
-        } else {
-          // Slice overhang along Z
-          const newD = activeBlock.d - absDiff;
-          const newZ = diff > 0 ? activeBlock.z : top.z;
-          const debrisD = absDiff;
-          const debrisZ = diff > 0 ? top.z + newD : activeBlock.z;
 
           stack.push({
             x: top.x,
+            z: top.z,
             y: activeBlock.y,
+            w: top.w,
+            d: activeBlock.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+
+          comboEl.textContent = combo > 1 ? `PERFECT x${combo}!` : 'PERFECT!';
+          if (window.Jumby) {
+            if (window.Jumby.sound) window.Jumby.sound.coin();
+            if (window.Jumby.fx) {
+              const scr = toScreen(top.x, activeBlock.y + BLOCK_HEIGHT, top.z, width / 2, height * 0.65 + cameraY);
+              window.Jumby.fx.particles(scr.x, scr.y, 22, '#D8FF43');
+              window.Jumby.fx.addFloatingText(`PERFECT! +50`, scr.x, scr.y - 15, '#D8FF43', 24);
+            }
+          }
+        } else {
+          // Overhang Slice
+          combo = 0;
+          comboEl.textContent = '';
+          playSnap();
+
+          const newD = top.d - absDiff;
+          const newZ = top.z + diff / 2;
+          const debrisD = absDiff;
+          const debrisZ = diff > 0 ? newZ + (newD / 2) + (debrisD / 2) : newZ - (newD / 2) - (debrisD / 2);
+
+          stack.push({
+            x: top.x,
             z: newZ,
+            y: activeBlock.y,
             w: top.w,
             d: newD,
             h: BLOCK_HEIGHT,
             color: activeBlock.color
           });
 
-          fallingDebris.push({
+          debris.push({
             x: top.x,
-            y: activeBlock.y,
             z: debrisZ,
+            y: activeBlock.y,
             w: top.w,
             d: debrisD,
             h: BLOCK_HEIGHT,
             color: activeBlock.color,
             vy: 0,
-            rotX: diff > 0 ? 0.07 : -0.07,
-            rotZ: 0,
+            rot: 0,
+            rotDir: diff > 0 ? 0.08 : -0.08,
             alpha: 1.0
           });
 
-          if (window.Jumby) {
-            if (window.Jumby.sound) window.Jumby.sound.score();
+          if (window.Jumby && window.Jumby.sound) {
+            window.Jumby.sound.score();
           }
         }
       }
@@ -294,12 +384,13 @@
       scoreEl.textContent = score;
       if (window.Jumby) window.Jumby.setScore(score);
 
-      targetCameraY += BLOCK_HEIGHT;
+      targetCameraY = (stack.length - 1) * BLOCK_HEIGHT;
       spawnNextBlock();
     }
 
     function die() {
       state = 'dead';
+      playHit();
       hintEl.style.display = 'block';
       hintEl.textContent = 'MISSED! TAP TO RETRY';
       if (window.Jumby) {
@@ -310,6 +401,7 @@
     }
 
     function handleAction() {
+      getAudioCtx();
       if (state === 'dead') {
         resetGame();
       } else if (state === 'playing') {
@@ -327,54 +419,54 @@
 
     function drawIsoBlock(b, originX, originY) {
       const x = b.x;
-      const y = b.y;
       const z = b.z;
+      const y = b.y;
       const w = b.w;
       const d = b.d;
       const h = b.h;
 
       // 8 Isometric Vertices
-      const p1 = toScreen(x, y + h, z, originX, originY);
-      const p2 = toScreen(x + w, y + h, z, originX, originY);
-      const p3 = toScreen(x + w, y + h, z + d, originX, originY);
-      const p4 = toScreen(x, y + h, z + d, originX, originY);
+      const pBack  = toScreen(x - w / 2, y + h, z - d / 2, originX, originY);
+      const pRight = toScreen(x + w / 2, y + h, z - d / 2, originX, originY);
+      const pFront = toScreen(x + w / 2, y + h, z + d / 2, originX, originY);
+      const pLeft  = toScreen(x - w / 2, y + h, z + d / 2, originX, originY);
 
-      const p5 = toScreen(x, y, z + d, originX, originY);
-      const p6 = toScreen(x + w, y, z + d, originX, originY);
-      const p7 = toScreen(x + w, y, z, originX, originY);
+      const bLeft  = toScreen(x - w / 2, y, z + d / 2, originX, originY);
+      const bFront = toScreen(x + w / 2, y, z + d / 2, originX, originY);
+      const bRight = toScreen(x + w / 2, y, z - d / 2, originX, originY);
 
       // 1. Front-Left Face (medium shade)
-      ctx.fillStyle = shade(b.color, -16);
+      ctx.fillStyle = shade(b.color, -18);
       ctx.beginPath();
-      ctx.moveTo(p4.x, p4.y);
-      ctx.lineTo(p3.x, p3.y);
-      ctx.lineTo(p6.x, p6.y);
-      ctx.lineTo(p5.x, p5.y);
+      ctx.moveTo(pLeft.x, pLeft.y);
+      ctx.lineTo(pFront.x, pFront.y);
+      ctx.lineTo(bFront.x, bFront.y);
+      ctx.lineTo(bLeft.x, bLeft.y);
       ctx.closePath();
       ctx.fill();
 
       // 2. Front-Right Face (darker shadow)
-      ctx.fillStyle = shade(b.color, -32);
+      ctx.fillStyle = shade(b.color, -34);
       ctx.beginPath();
-      ctx.moveTo(p2.x, p2.y);
-      ctx.lineTo(p3.x, p3.y);
-      ctx.lineTo(p6.x, p6.y);
-      ctx.lineTo(p7.x, p7.y);
+      ctx.moveTo(pFront.x, pFront.y);
+      ctx.lineTo(pRight.x, pRight.y);
+      ctx.lineTo(bRight.x, bRight.y);
+      ctx.lineTo(bFront.x, bFront.y);
       ctx.closePath();
       ctx.fill();
 
       // 3. Top Face (bright pastel)
       ctx.fillStyle = b.color;
       ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.lineTo(p3.x, p3.y);
-      ctx.lineTo(p4.x, p4.y);
+      ctx.moveTo(pBack.x, pBack.y);
+      ctx.lineTo(pRight.x, pRight.y);
+      ctx.lineTo(pFront.x, pFront.y);
+      ctx.lineTo(pLeft.x, pLeft.y);
       ctx.closePath();
       ctx.fill();
 
       // Subtle top rim highlight
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -384,69 +476,95 @@
     function loop() {
       requestAnimationFrame(loop);
 
+      // Smooth Camera Lerp
+      cameraY += (targetCameraY - cameraY) * 0.12;
+      const originX = width / 2;
+      const originY = height * 0.65 + cameraY;
+
       // Background Gradient
       const grad = ctx.createLinearGradient(0, 0, 0, height);
-      grad.addColorStop(0, '#1E1A34');
-      grad.addColorStop(1, '#0F0D1B');
+      grad.addColorStop(0, '#1D173F');
+      grad.addColorStop(1, '#0B0914');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      // Smooth Camera Lerp
-      cameraY += (targetCameraY - cameraY) * 0.1;
-      const originX = width / 2;
-      const originY = height * 0.68 + cameraY;
-
-      // Update Moving Active Block
+      // Active Block Sweep
       if (state === 'playing' && activeBlock) {
         if (activeBlock.axis === 'x') {
           activeBlock.x += activeBlock.speed * activeBlock.dir;
-          if (activeBlock.x > activeBlock.limit) {
-            activeBlock.x = activeBlock.limit;
+          if (activeBlock.x >= LIMIT) {
+            activeBlock.x = LIMIT;
             activeBlock.dir = -1;
-          } else if (activeBlock.x < -activeBlock.limit) {
-            activeBlock.x = -activeBlock.limit;
+          } else if (activeBlock.x <= -LIMIT) {
+            activeBlock.x = -LIMIT;
             activeBlock.dir = 1;
           }
         } else {
           activeBlock.z += activeBlock.speed * activeBlock.dir;
-          if (activeBlock.z > activeBlock.limit) {
-            activeBlock.z = activeBlock.limit;
+          if (activeBlock.z >= LIMIT) {
+            activeBlock.z = LIMIT;
             activeBlock.dir = -1;
-          } else if (activeBlock.z < -activeBlock.limit) {
-            activeBlock.z = -activeBlock.limit;
+          } else if (activeBlock.z <= -LIMIT) {
+            activeBlock.z = -LIMIT;
             activeBlock.dir = 1;
           }
         }
       }
 
-      // 1. Draw Static Stacked Blocks (rendered from base up)
+      // Draw Foundation Pedestal (Grounds the entire tower)
+      drawIsoBlock({
+        x: 0,
+        z: 0,
+        y: -300,
+        w: INITIAL_SIZE,
+        d: INITIAL_SIZE,
+        h: 300,
+        color: '#1A162B'
+      }, originX, originY);
+
+      // Draw Static Stacked Blocks
       for (let i = 0; i < stack.length; i++) {
         drawIsoBlock(stack[i], originX, originY);
       }
 
-      // 2. Draw Moving Active Block
+      // Draw Moving Active Block
       if (state === 'playing' && activeBlock) {
         drawIsoBlock(activeBlock, originX, originY);
       }
 
-      // 3. Render Falling Debris with Gravity Physics
-      for (let i = fallingDebris.length - 1; i >= 0; i--) {
-        const d = fallingDebris[i];
-        d.y -= d.vy;
-        d.vy += 0.8; // gravity
-        d.alpha -= 0.02;
+      // Render Falling Debris with Gravity Physics
+      if (debris.length > 0) {
+        for (let i = debris.length - 1; i >= 0; i--) {
+          const d = debris[i];
+          d.vy += 0.75;
+          d.y -= d.vy;
+          d.rot += d.rotDir;
+          d.alpha -= 0.018;
 
-        if (d.alpha <= 0 || d.y < -300) {
-          fallingDebris.splice(i, 1);
-          continue;
+          if (d.alpha <= 0 || d.y < -350) {
+            debris.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, d.alpha);
+          const center = toScreen(d.x, d.y + d.h / 2, d.z, originX, originY);
+          ctx.translate(center.x, center.y);
+          ctx.rotate(d.rot);
+          drawIsoBlock({
+            x: 0,
+            z: 0,
+            y: -d.h / 2,
+            w: d.w,
+            d: d.d,
+            h: d.h,
+            color: d.color
+          }, 0, 0);
+          ctx.restore();
         }
-
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, d.alpha);
-        drawIsoBlock(d, originX, originY);
-        ctx.restore();
       }
 
+      // Jumby Platform Particle & Juice Overlay
       if (window.Jumby && window.Jumby.fx) {
         window.Jumby.fx.updateAndRender(ctx, width, height);
       }

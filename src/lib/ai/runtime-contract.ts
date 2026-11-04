@@ -226,16 +226,30 @@ Pick the most intuitive, rock-solid mechanic based on the user's prompt:
   Player has gravity and taps to jump through obstacles.
 - **Stacker / Slicer (Ketchapp Stack style)**: (e.g. "stack tower", "slice blocks", "pastel stacker").
   * Rules & Architecture:
-    - TRUE 3D ISOMETRIC PROJECTION ONLY. Never draw flat 2D squares with offset borders!
-    - Isometric 30° projection math: toScreen(x, y, z): { x: originX + (x - z) * Math.cos(Math.PI/6), y: originY + (x + z) * Math.sin(Math.PI/6) - y }.
-    - Each block has 3 isometric faces: Top diamond face (bright pastel), Front-Left face (medium shade), Front-Right face (dark shadow).
-    - Alternate sliding axis: Block N sweeps along the X axis, Block N+1 sweeps along the Z axis!
-    - Movement & Boundary Clamps: Limit must be 220px (e.g. limit = 220). Spawn sliding block at -limit with dir = 1!
-    - Clamping logic MUST be: if (b.x >= limit) { b.x = limit; b.dir = -1; } else if (b.x <= -limit) { b.x = -limit; b.dir = 1; }. NEVER use 'dir *= -1' without clamping positions or when spawned outside boundary!
-    - Slicing: Trim overhang and spawn a falling 3D debris slab with gravity (vy += 0.8) and alpha fade.
-    - Perfect Match: If abs(diff) < 5px, snap flush with "+50 PERFECT!" and coin sound.
-    - Smooth vertical camera lerp (cameraY += (targetCameraY - cameraY) * 0.1) so the tower climbs upward.
-    - Immediate Start: Call resetGame() immediately at script execution so base block and moving block are active and sweeping across the screen right away. Do NOT leave in frozen 'waiting' state! Tap anywhere on gameover resets and immediately starts playing.
+    - TRUE 3D ISOMETRIC PROJECTION ONLY. (x, z) MUST be the CENTER of the block!
+    - Isometric 30° projection math: toScreen(x, y, z, originX, originY): { x: originX + (x - z) * Math.cos(Math.PI/6), y: originY + (x + z) * Math.sin(Math.PI/6) - y }.
+    - The 8 Isometric Vertices for block (x, z, y, w, d, h):
+      pBack = toScreen(x - w/2, y + h, z - d/2); pRight = toScreen(x + w/2, y + h, z - d/2);
+      pFront = toScreen(x + w/2, y + h, z + d/2); pLeft = toScreen(x - w/2, y + h, z + d/2);
+      bLeft = toScreen(x - w/2, y, z + d/2); bFront = toScreen(x + w/2, y, z + d/2); bRight = toScreen(x + w/2, y, z - d/2);
+    - Draw 3 Watertight Faces:
+      1. Front-Left Face: moveTo(pLeft) -> lineTo(pFront) -> lineTo(bFront) -> lineTo(bLeft), fill with shade(color, -18).
+      2. Front-Right Face: moveTo(pFront) -> lineTo(pRight) -> lineTo(bRight) -> lineTo(bFront), fill with shade(color, -34).
+      3. Top Face: moveTo(pBack) -> lineTo(pRight) -> lineTo(pFront) -> lineTo(pLeft), fill with color.
+    - Ground Pedestal (MANDATORY): Draw a foundation pedestal below the base block: { x: 0, z: 0, y: -300, w: 140, d: 140, h: 300, color: '#1A162B' } to ground the tower.
+    - Alternate sliding axis: Block N sweeps along X, Block N+1 sweeps along Z.
+    - Movement Clamps (LIMIT = 180): if (b.x >= LIMIT) { b.x = LIMIT; b.dir = -1; } else if (b.x <= -LIMIT) { b.x = -LIMIT; b.dir = 1; }.
+    - Centered Slicing Formulas:
+      * If axis === 'x': diff = active.x - top.x; absDiff = Math.abs(diff);
+        - If absDiff < 4: Snap to top.x, combo++, ascending chime, +50 PERFECT!
+        - If absDiff >= top.w: Total miss, drop entire block, die().
+        - Else: newW = top.w - absDiff; newX = top.x + diff / 2; debrisW = absDiff; debrisX = diff > 0 ? newX + newW/2 + debrisW/2 : newX - newW/2 - debrisW/2;
+      * If axis === 'z': diff = active.z - top.z; absDiff = Math.abs(diff);
+        - If absDiff < 4: Snap to top.z, combo++, ascending chime, +50 PERFECT!
+        - If absDiff >= top.d: Total miss, drop entire block, die().
+        - Else: newD = top.d - absDiff; newZ = top.z + diff / 2; debrisD = absDiff; debrisZ = diff > 0 ? newZ + newD/2 + debrisD/2 : newZ - newD/2 - debrisD/2;
+    - Camera Tracking: targetCameraY = (stack.length - 1) * BLOCK_HEIGHT; cameraY += (targetCameraY - cameraY) * 0.12; originY = height * 0.65 + cameraY.
+    - Immediate Start: Call resetGame() at startup so the block sweeps across immediately. Tap anywhere resets and restarts instantly.
 - **Paddle / Pong / Brick Bouncer**: (e.g. "brick breaker", "paddle bounce").
   Ball bounces at angles; player controls paddle at bottom to deflect.
 - **Orbit / Spinner**: (e.g. "orbital pulse", "circle defend").

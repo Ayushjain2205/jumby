@@ -206,11 +206,33 @@ function CreateStudioContent() {
 
   const handleSelectTemplate = (template: Game) => {
     setSelectedTemplate(template);
+    const isStack =
+      template.tags.some((t) => t.toLowerCase().includes('stack')) ||
+      template.title.toLowerCase().includes('stack') ||
+      template.title.toLowerCase().includes('build');
+    const isOrbit =
+      template.tags.some((t) => t.toLowerCase().includes('orbit') || t.toLowerCase().includes('dodge')) ||
+      template.title.toLowerCase().includes('orbit');
+    const arch: GameArchetype = isStack ? 'stack' : isOrbit ? 'orbit' : 'flappy';
+    setArchetype(arch);
     setTitle(`${template.title} (Remix)`);
-    if (template.tags.some((t) => t.toLowerCase().includes('stack'))) setArchetype('stack');
-    else if (template.tags.some((t) => t.toLowerCase().includes('orbit') || t.toLowerCase().includes('dodge'))) setArchetype('orbit');
-    else setArchetype('flappy');
     setInputPrompt(`A remix of ${template.title} with faster speed and neon colors`);
+
+    const targetFont = detectFontVibe('', arch).id;
+    setActiveFontVibe(targetFont);
+    const code = generateGameHtml({
+      title: template.title,
+      themeColor: themeColor,
+      accentColor: accentColor,
+      bgGradient: [bgColor, bgColor],
+      gameType: arch,
+      speedMultiplier: 1.0,
+      gravity: 0.38,
+      fontVibe: targetFont,
+    });
+    setHistory((prev) => (gameHtml ? [...prev, gameHtml] : []));
+    setGameHtml(code);
+    setHasStartedGenerating(true);
   };
 
   // Left Studio Panel Tabs: 'chat' | 'tune'

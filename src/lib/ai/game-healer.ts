@@ -265,7 +265,35 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
     issuesFixed.push('Healed Math.abs boundary oscillation traps into directional clamp bounces');
   }
 
-  // I. Auto-Start Uninitialized Games
+  // I. 3D Isometric Stacker Face Color & Inverted Y Healer
+  if (jsPatched.includes('.color.left') || jsPatched.includes('.color.right') || jsPatched.includes('.color.top')) {
+    jsPatched = jsPatched.replace(/\b(\w+)\.color\.left\b/g, '(typeof $1.color === "object" ? $1.color.left : shade($1.color, -18))');
+    jsPatched = jsPatched.replace(/\b(\w+)\.color\.right\b/g, '(typeof $1.color === "object" ? $1.color.right : shade($1.color, -34))');
+    jsPatched = jsPatched.replace(/\b(\w+)\.color\.top\b/g, '(typeof $1.color === "object" ? $1.color.top : $1.color)');
+    issuesFixed.push('Healed color face object references to procedural shading functions');
+  }
+
+  if (jsPatched.includes('prev.y - blockHeight') || jsPatched.includes('prev.y - BLOCK_HEIGHT')) {
+    jsPatched = jsPatched.replace(/prev\.y\s*-\s*(blockHeight|BLOCK_HEIGHT)/g, 'prev.y + $1');
+    issuesFixed.push('Inverted downward stack growth to upward stack growth');
+  }
+
+  if ((jsPatched.includes('shade(') || jsPatched.includes('shade (')) && !jsPatched.includes('function shade(')) {
+    const shadeFn = `
+    function shade(col, p) {
+      let num = parseInt((col || '#38BDF8').slice(1), 16);
+      let amt = Math.round(2.55 * p);
+      let R = (num >> 16) + amt;
+      let G = (num >> 8 & 0x00FF) + amt;
+      let B = (num & 0x0000FF) + amt;
+      return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
+    }
+`;
+    jsPatched = shadeFn + jsPatched;
+    issuesFixed.push('Injected missing 3D isometric shade() lighting function');
+  }
+
+  // J. Auto-Start Uninitialized Games
   // If game defines resetGame/startGame/initGame but never calls it, it sits frozen in waiting state
   const resetFnMatch = jsPatched.match(/function\s+(resetGame|startGame|initGame|initStack|reset)\s*\(/i);
   if (resetFnMatch) {
