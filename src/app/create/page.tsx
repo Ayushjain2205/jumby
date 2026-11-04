@@ -810,26 +810,6 @@ function CreateStudioContent() {
                   )}
                 </div>
 
-                {/* Prompt Quick Suggestion Pills */}
-                <div className="px-3 py-2 flex gap-1.5 overflow-x-auto no-scrollbar border-t border-white/5 bg-zinc-950/40">
-                  {[
-                    '⚡ Cyber Runner 3-lane dodge',
-                    '🪐 Orbital laser pulse survival',
-                    '🧱 Rhythm block stack tower',
-                    '🐦 Neon flappy jumper',
-                    '🔥 2x insane speed trail',
-                    '🌊 Low gravity floaty bounce',
-                  ].map((s) => (
-                    <button
-                      key={s}
-                      disabled={isGenerating}
-                      onClick={() => handleApplyPrompt(s)}
-                      className="whitespace-nowrap px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] text-zinc-300 font-sans transition-all active:scale-95 disabled:opacity-40"
-                    >
-                      + {s}
-                    </button>
-                  ))}
-                </div>
 
                 {/* Prompt Input Form */}
                 <div className="p-3 border-t border-white/10 bg-zinc-900/40">
