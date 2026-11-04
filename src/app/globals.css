@@ -71,3 +71,30 @@ h1, h2, h3, h4, h5, h6, .font-heading, [class*="font-heading"] {
   background-clip: text;
   animation: text-shimmer 4s ease-in-out infinite;
 }
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1.5deg);
+  }
+}
+
+.animate-float {
+  animation: float 3.5s ease-in-out infinite;
+}
+
+@keyframes shimmer-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-shimmer-slide {
+  animation: shimmer-slide 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+

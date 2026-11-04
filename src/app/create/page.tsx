@@ -1273,16 +1273,38 @@ function CreateStudioContent() {
 
               {/* Generation Overlay while cooking */}
               {isGenerating && (
-                <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
-                  <div className="w-16 h-16 rounded-3xl bg-jumby-lime/15 border border-jumby-lime/30 flex items-center justify-center mb-4 text-jumby-lime shadow-xl shadow-jumby-lime/20 animate-pulse">
-                    <Sparkles className="w-8 h-8 animate-spin" />
+                <div className="absolute inset-0 z-30 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
+                  {/* 3D Mascot visual with floating effect and glowing ambient backdrop */}
+                  <div className="relative mb-3 flex items-center justify-center">
+                    <div className="absolute -inset-4 rounded-full bg-jumby-purple/20 blur-xl animate-pulse" />
+                    <img
+                      src="/images/generating-mascot.png"
+                      alt="Jumby coding your micro-game..."
+                      className="relative w-40 h-40 sm:w-48 sm:h-48 object-contain animate-float drop-shadow-[0_16px_28px_rgba(113,96,255,0.4)] select-none pointer-events-none"
+                    />
                   </div>
-                  <span className="font-heading font-black text-sm text-white mb-1">
+
+                  {/* Engine Badge */}
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-jumby-purple/15 border border-jumby-purple/35 text-jumby-lime mb-2">
+                    <Sparkles className="w-3.5 h-3.5 animate-spin text-jumby-lime" />
+                    <span className="font-heading font-black text-[11px] uppercase tracking-wider">
+                      Jumby AI Studio
+                    </span>
+                  </div>
+
+                  {/* Dynamic generation step text */}
+                  <h4 className="font-heading font-black text-base sm:text-lg text-white tracking-wide max-w-[280px] leading-snug">
                     {generationStep || 'Building Micro-Game...'}
-                  </span>
-                  <span className="text-xs text-zinc-400 font-sans">
-                    Generating visuals, physics & audio synth...
-                  </span>
+                  </h4>
+
+                  <p className="text-[11px] sm:text-xs text-zinc-400 font-sans mt-1 max-w-[240px]">
+                    Synthesizing visuals, game juice, physics & 8-bit audio synth...
+                  </p>
+
+                  {/* Shimmer progress bar */}
+                  <div className="w-40 sm:w-48 h-1.5 rounded-full bg-white/10 overflow-hidden mt-3.5 relative">
+                    <div className="absolute inset-y-0 w-24 bg-gradient-to-r from-jumby-purple via-jumby-lime to-jumby-purple rounded-full animate-shimmer-slide" />
+                  </div>
                 </div>
               )}
 
