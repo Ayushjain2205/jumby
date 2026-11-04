@@ -829,6 +829,7 @@ function generateStackGame(opts: GameGenOptions) {
       cameraY = 0;
       targetCameraY = 0;
       debris = [];
+      lastActionTime = Date.now() + 250;
       scoreEl.innerText = "0";
       comboEl.innerText = "";
       hintEl.style.display = "none";
@@ -1059,7 +1060,13 @@ function generateStackGame(opts: GameGenOptions) {
       Jumby.gameOver(score);
     }
 
-    function handleAction() {
+    let lastActionTime = 0;
+    function handleAction(e) {
+      if (e && e.type === "keydown" && e.code !== "Space" && e.code !== "ArrowUp") return;
+      const now = Date.now();
+      if (now - lastActionTime < 220) return;
+      lastActionTime = now;
+
       getAudioCtx();
       if (state === "dead") {
         resetGame();
@@ -1072,7 +1079,7 @@ function generateStackGame(opts: GameGenOptions) {
     window.addEventListener("keydown", (e) => {
       if (e.code === "Space" || e.code === "ArrowUp") {
         e.preventDefault();
-        handleAction();
+        handleAction(e);
       }
     });
 
@@ -1135,9 +1142,6 @@ function generateStackGame(opts: GameGenOptions) {
     function loop() {
       requestAnimationFrame(loop);
 
-      if (Jumby.input.justPressed) {
-        handleAction();
-      }
 
       // Smooth Camera Lerp
       cameraY += (targetCameraY - cameraY) * 0.12;
@@ -1195,14 +1199,13 @@ function generateStackGame(opts: GameGenOptions) {
         drawIsoBlock(activeBlock, originX, originY);
       }
 
-      // Render Falling Debris with Gravity Physics
+      // Render Falling Debris with Gravity Physics (Clean downward drop in isometric perspective)
       if (debris.length > 0) {
         for (let i = debris.length - 1; i >= 0; i--) {
           const d = debris[i];
-          d.vy += 0.75;
+          d.vy += 0.85;
           d.y -= d.vy;
-          d.rot += d.rotDir;
-          d.alpha -= 0.018;
+          d.alpha -= 0.02;
 
           if (d.alpha <= 0 || d.y < -350) {
             debris.splice(i, 1);
@@ -1211,18 +1214,7 @@ function generateStackGame(opts: GameGenOptions) {
 
           ctx.save();
           ctx.globalAlpha = Math.max(0, d.alpha);
-          const center = toScreen(d.x, d.y + d.h / 2, d.z, originX, originY);
-          ctx.translate(center.x, center.y);
-          ctx.rotate(d.rot);
-          drawIsoBlock({
-            x: 0,
-            z: 0,
-            y: -d.h / 2,
-            w: d.w,
-            d: d.d,
-            h: d.h,
-            color: d.color
-          }, 0, 0);
+          drawIsoBlock(d, originX, originY);
           ctx.restore();
         }
       }

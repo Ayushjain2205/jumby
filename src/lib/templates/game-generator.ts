@@ -573,6 +573,7 @@ function generateStackHtml(config: GameTemplateConfig): string {
       cameraY = 0;
       targetCameraY = 0;
       debris = [];
+      lastActionTime = Date.now() + 250;
       scoreEl.textContent = '0';
       comboEl.textContent = '';
       hintEl.style.display = 'none';
@@ -818,7 +819,13 @@ function generateStackHtml(config: GameTemplateConfig): string {
       }
     }
 
-    function handleAction() {
+    let lastActionTime = 0;
+    function handleAction(e) {
+      if (e && e.type === 'keydown' && e.code !== 'Space' && e.code !== 'ArrowUp') return;
+      const now = Date.now();
+      if (now - lastActionTime < 220) return;
+      lastActionTime = now;
+
       getAudioCtx();
       if (state === 'dead') {
         resetGame();
@@ -831,7 +838,7 @@ function generateStackHtml(config: GameTemplateConfig): string {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault();
-        handleAction();
+        handleAction(e);
       }
     });
 
@@ -950,14 +957,13 @@ function generateStackHtml(config: GameTemplateConfig): string {
         drawIsoBlock(activeBlock, originX, originY);
       }
 
-      // Render Falling Debris with Gravity Physics
+      // Render Falling Debris with Gravity Physics (Clean downward drop in isometric perspective)
       if (debris.length > 0) {
         for (let i = debris.length - 1; i >= 0; i--) {
           const d = debris[i];
-          d.vy += 0.75;
+          d.vy += 0.85;
           d.y -= d.vy;
-          d.rot += d.rotDir;
-          d.alpha -= 0.018;
+          d.alpha -= 0.02;
 
           if (d.alpha <= 0 || d.y < -350) {
             debris.splice(i, 1);
@@ -966,18 +972,7 @@ function generateStackHtml(config: GameTemplateConfig): string {
 
           ctx.save();
           ctx.globalAlpha = Math.max(0, d.alpha);
-          const center = toScreen(d.x, d.y + d.h / 2, d.z, originX, originY);
-          ctx.translate(center.x, center.y);
-          ctx.rotate(d.rot);
-          drawIsoBlock({
-            x: 0,
-            z: 0,
-            y: -d.h / 2,
-            w: d.w,
-            d: d.d,
-            h: d.h,
-            color: d.color
-          }, 0, 0);
+          drawIsoBlock(d, originX, originY);
           ctx.restore();
         }
       }
