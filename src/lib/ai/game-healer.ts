@@ -171,6 +171,13 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
       const c = document.querySelector('canvas');
       if (c) Jumby.input.init(c);
     }
+    if (typeof Jumby !== 'undefined' && !Jumby.awardCoins) {
+      Jumby.awardCoins = function (amount, details) {
+        if (typeof window !== 'undefined' && window.parent) {
+          window.parent.postMessage({ source: 'JUMBY_GAME', type: 'JUMBY_AWARD_COINS', amount: amount || 1, ...(typeof details === 'object' ? details : {}) }, '*');
+        }
+      };
+    }
 `;
     jsPatched = inputInit + jsPatched;
     issuesFixed.push('Auto-initialized Jumby.input unified touch/pointer controls');

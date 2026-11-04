@@ -877,6 +877,15 @@
       Level.activeBanner = null;
       sendToParent('JUMBY_GAME_OVER', { score: Number(score), details });
     },
+    awardCoins: function (amount = 1, details = {}) {
+      const payload = typeof details === 'string' ? { reason: details } : (details || {});
+      sendToParent('JUMBY_AWARD_COINS', {
+        amount: Math.max(1, Number(amount) || 1),
+        item: payload.item || payload.name || 'Collectible',
+        icon: payload.icon || payload.emoji || '',
+        ...payload,
+      });
+    },
     storage: {
       get: function (key) {
         return new Promise((resolve) => {
