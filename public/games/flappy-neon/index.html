@@ -123,7 +123,10 @@
         x: width,
         top: topHeight,
         bottom: height - topHeight - pipeGap,
-        passed: false
+        passed: false,
+        hasCrystal: Math.random() > 0.35,
+        crystalY: topHeight + pipeGap / 2,
+        crystalCollected: false,
       });
     }
 
@@ -263,6 +266,18 @@
             }
           }
 
+          // Collectible Neon Core pickup detection
+          if (p.hasCrystal && !p.crystalCollected) {
+            const cDist = Math.hypot(player.x - (p.x + pipeWidth / 2), player.y - p.crystalY);
+            if (cDist < player.radius + 18) {
+              p.crystalCollected = true;
+              if (window.Jumby) {
+                window.Jumby.awardCoins(1, { item: 'Neon Core', icon: '⚡' });
+                window.Jumby.sound.score();
+              }
+            }
+          }
+
           if (
             player.invulnerableFrames === 0 &&
             player.x + player.radius > p.x &&
@@ -278,6 +293,32 @@
 
         if (player.y + player.radius > height || player.y - player.radius < 0) {
           die();
+        }
+      }
+
+      // Draw Floating Procedural Neon Crystals
+      for (const p of pipes) {
+        if (p.hasCrystal && !p.crystalCollected) {
+          const cx = p.x + pipeWidth / 2;
+          const cy = p.crystalY + Math.sin(frames * 0.1) * 6;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(frames * 0.05);
+          ctx.shadowBlur = 16;
+          ctx.shadowColor = '#D8FF43';
+          ctx.fillStyle = '#D8FF43';
+          ctx.beginPath();
+          ctx.moveTo(0, -12);
+          ctx.lineTo(9, 0);
+          ctx.lineTo(0, 12);
+          ctx.lineTo(-9, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(0, 0, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
         }
       }
 

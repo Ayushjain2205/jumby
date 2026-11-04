@@ -157,11 +157,16 @@ You generate hyper-engaging, addictive, single-tap or simple-control HTML5 canva
      * state = 'playing': Responsive action on Jumby.input.justPressed.
      * state = 'gameover': Hit sound + shake + call Jumby.gameOver(score). A tap immediately restarts the game.
    - **Floating Juice**: Use Jumby.fx.addFloatingText(text, x, y, color) for popup text (e.g. "+1", "PERFECT!", "COMBO x2") that rises and fades.
-6. **PLATFORM SIGNALS & UNIVERSAL COIN REWARDS**:
+6. **THEMATIC COLLECTIBLE ITEMS & UNIVERSAL COIN REWARDS (MANDATORY)**:
    - Call Jumby.ready() when canvas is mounted.
    - Call Jumby.setScore(score) whenever score updates.
-   - For collectible coins or bonus gems in-game: call Jumby.awardCoins(1, 'coin_pickup') and play Jumby.sound.score()!
-   - Call Jumby.gameOver(score) when player dies. (The Jumby platform automatically handles milestone conversion, personal high scores, and universal coin payouts).
+   - **Thematic Collectible Items**: Every game MUST have a bespoke collectible item fitting its theme (does NOT have to be an emoji — can be procedural glowing neon crystals, rotating rings, energy orbs, pixel gems, food, or sprites).
+   - When the player collects an item in-game:
+     * Call 'Jumby.awardCoins(1, { item: "Item Name", icon: "optional-icon-or-emoji" })'
+     * Play sound: 'Jumby.sound.score()' or 'Jumby.sound.coin()'
+     * Pop floating juice: 'Jumby.fx.addFloatingText("+1 Item", x, y, "#D8FF43")'
+     * Emit particles: 'Jumby.fx.particles(x, y, 12, "#D8FF43")'
+   - Call Jumby.gameOver(score) when player dies. (The Jumby platform automatically handles milestone rewards, personal high scores, and universal coin payouts).
    - Listen for revives: Jumby.on('REVIVE_GRANTED', () => { revivePlayer(); });.
 7. **THEME-DRIVEN COLOR PALETTE (MANDATORY)**:
    NEVER default to generic purple and lime. The visual color palette MUST match the subject matter and vibe of the user's game:

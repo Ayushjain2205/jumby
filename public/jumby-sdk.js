@@ -73,10 +73,16 @@
     },
 
     /**
-     * Award collectible coins during gameplay (e.g. coin pickups)
+     * Award collectible items/coins during gameplay (e.g. rings, eggs, stars, or crystals)
      */
-    awardCoins: function (amount = 1, reason = 'collectible') {
-      sendToParent('JUMBY_AWARD_COINS', { amount: Math.max(1, Number(amount) || 1), reason });
+    awardCoins: function (amount = 1, details = {}) {
+      const payload = typeof details === 'string' ? { reason: details } : (details || {});
+      sendToParent('JUMBY_AWARD_COINS', {
+        amount: Math.max(1, Number(amount) || 1),
+        item: payload.item || payload.name || 'Collectible',
+        icon: payload.icon || payload.emoji || '',
+        ...payload,
+      });
     },
 
     /**

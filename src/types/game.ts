@@ -60,6 +60,7 @@ export interface JumbyMessagePayload {
   value?: unknown;
   requestId?: string;
   item?: string;
+  icon?: string;
   priceCoins?: number;
   success?: boolean;
   rewardGranted?: boolean;

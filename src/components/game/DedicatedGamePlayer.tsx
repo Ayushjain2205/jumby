@@ -16,6 +16,8 @@ interface RunSummary {
   baseReward: number;
   milestoneReward: number;
   pickupReward: number;
+  pickupItemName?: string;
+  pickupItemIcon?: string;
   totalReward: number;
 }
 
@@ -33,6 +35,7 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
   });
 
   const [sessionPickups, setSessionPickups] = useState(0);
+  const [customItem, setCustomItem] = useState<{ name: string; icon: string } | null>(null);
   const [floatingCoin, setFloatingCoin] = useState<string | null>(null);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
 
@@ -79,14 +82,18 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
         setCurrentScore(data.score);
       }
 
-      // 2. In-Game Collectible Coin Pickups
+      // 2. In-Game Collectible Coin/Item Pickups
       if (data.type === 'JUMBY_AWARD_COINS') {
         const amount = Math.max(1, Number(data.amount) || 1);
+        const itemName = data.item || 'Item';
+        const itemIcon = data.icon || '';
+        setCustomItem({ name: itemName, icon: itemIcon });
         addCoins(amount);
         setSessionPickups((prev) => prev + amount);
 
-        // Show floating coin toast
-        setFloatingCoin(`+${amount} 🪙`);
+        // Show floating toast with custom item icon or name
+        const displayLabel = itemIcon ? `+${amount} ${itemIcon}` : `+${amount} ${itemName}`;
+        setFloatingCoin(displayLabel);
         setTimeout(() => setFloatingCoin(null), 1500);
         playRewardSound(false);
       }
@@ -125,6 +132,8 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
           baseReward: base,
           milestoneReward: milestone,
           pickupReward: sessionPickups,
+          pickupItemName: customItem?.name || 'Pickups',
+          pickupItemIcon: customItem?.icon || '',
           totalReward: totalEarned + sessionPickups,
         });
       }
@@ -132,7 +141,7 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [addCoins, currentScore, highScore, game.id, sessionPickups]);
+  }, [addCoins, currentScore, highScore, game.id, sessionPickups, customItem]);
 
   const handleRestart = () => {
     setRunSummary(null);
@@ -293,7 +302,10 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
                 )}
                 {runSummary.pickupReward > 0 && (
                   <div className="flex justify-between items-center text-amber-400">
-                    <span>In-Game Pickups</span>
+                    <span>
+                      {runSummary.pickupItemIcon ? `${runSummary.pickupItemIcon} ` : ''}
+                      {runSummary.pickupItemName || 'Pickups'} (x{runSummary.pickupReward})
+                    </span>
                     <span className="font-mono font-bold">+{runSummary.pickupReward} 🪙</span>
                   </div>
                 )}
