@@ -73,6 +73,13 @@
     },
 
     /**
+     * Award collectible coins during gameplay (e.g. coin pickups)
+     */
+    awardCoins: function (amount = 1, reason = 'collectible') {
+      sendToParent('JUMBY_AWARD_COINS', { amount: Math.max(1, Number(amount) || 1), reason });
+    },
+
+    /**
      * Persistent Game Memory / Cloud Save
      */
     storage: {

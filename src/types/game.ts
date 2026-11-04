@@ -39,6 +39,7 @@ export type JumbyMessageType =
   | 'JUMBY_READY'
   | 'JUMBY_SCORE_UPDATE'
   | 'JUMBY_GAME_OVER'
+  | 'JUMBY_AWARD_COINS'
   | 'JUMBY_STORAGE_GET'
   | 'JUMBY_STORAGE_SET'
   | 'JUMBY_STORAGE_RESPONSE'
@@ -53,6 +54,8 @@ export interface JumbyMessagePayload {
   type: JumbyMessageType;
   gameId?: string;
   score?: number;
+  amount?: number;
+  reason?: string;
   key?: string;
   value?: unknown;
   requestId?: string;
