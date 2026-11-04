@@ -355,6 +355,26 @@ function CreateStudioContent() {
   const [history, setHistory] = useState<string[]>([]);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    requestAnimationFrame(() => {
+      if (chatEndRef.current) {
+        chatEndRef.current.scrollIntoView({ behavior, block: 'end' });
+      }
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTo({
+          top: chatScrollRef.current.scrollHeight,
+          behavior,
+        });
+      }
+    });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isGenerating]);
 
   useEffect(() => {
     setMounted(true);
@@ -540,13 +560,15 @@ function CreateStudioContent() {
   };
 
   const handleTriggerWidget = (type: GenerativeWidgetType) => {
+    if (panelTab !== 'chat') setPanelTab('chat');
+
     if (type === 'difficulty') {
       setMessages((prev) => [
         ...prev,
         {
           id: `msg_widget_${Date.now()}`,
           sender: 'assistant',
-          text: 'Here are your interactive Level & Difficulty controls. Adjust pacing, hazard rate, and progression style:',
+          text: 'Adjust level pacing and progression:',
           timestamp: 'Just now',
           widget: {
             type: 'difficulty',
@@ -563,7 +585,7 @@ function CreateStudioContent() {
         {
           id: `msg_widget_${Date.now()}`,
           sender: 'assistant',
-          text: 'Design a Boss Encounter for your game. Choose the boss archetype and trigger score milestone:',
+          text: 'Configure your boss encounter:',
           timestamp: 'Just now',
           widget: { type: 'boss' },
         },
@@ -574,12 +596,15 @@ function CreateStudioContent() {
         {
           id: `msg_widget_${Date.now()}`,
           sender: 'assistant',
-          text: 'Select collectible power-up drops and perks to inject into the game canvas:',
+          text: 'Choose power-up drops for your game:',
           timestamp: 'Just now',
           widget: { type: 'powerups' },
         },
       ]);
     }
+
+    setTimeout(() => scrollToBottom('smooth'), 50);
+    setTimeout(() => scrollToBottom('smooth'), 150);
   };
 
   const handleApplyDifficultyConfig = (config: DifficultyConfig) => {
@@ -849,12 +874,12 @@ function CreateStudioContent() {
           </div>
 
           {/* Panel Content */}
-          <div className="flex-1 overflow-y-auto">
+          <div className={`flex-1 min-h-0 ${panelTab === 'chat' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'}`}>
             {/* 1. CHAT TAB */}
             {panelTab === 'chat' && (
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col h-full min-h-0">
                 {/* Chat Messages */}
-                <div className="flex-1 p-4 space-y-3.5 overflow-y-auto">
+                <div ref={chatScrollRef} className="flex-1 min-h-0 p-4 space-y-3.5 overflow-y-auto scroll-smooth">
                   {messages.map((m) => (
                     <div
                       key={m.id}
@@ -911,6 +936,8 @@ function CreateStudioContent() {
                       <span>{generationStep || 'Generating game...'}</span>
                     </div>
                   )}
+
+                  <div ref={chatEndRef} className="h-0 w-full" />
                 </div>
 
                 {/* Quick Tool Pills */}
