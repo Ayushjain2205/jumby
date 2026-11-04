@@ -207,6 +207,7 @@ function CreateStudioContent() {
 
   // Generation / Prompt State
   const [inputPrompt, setInputPrompt] = useState('');
+  const [hasStartedGenerating, setHasStartedGenerating] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string | null>(null);
 
@@ -355,6 +356,7 @@ function CreateStudioContent() {
   const handleApplyPrompt = async (promptText: string) => {
     if (!promptText.trim() || isGenerating) return;
 
+    setHasStartedGenerating(true);
     const userMsg: ChatMessage = {
       id: `msg_${Date.now()}`,
       sender: 'user',
@@ -608,11 +610,11 @@ function CreateStudioContent() {
     osc.stop(ctx.currentTime + 0.15);
   };
 
-  const isHeroState = !gameHtml && !isGenerating && messages.length <= 1;
+  const isHeroState = !hasStartedGenerating && !isGenerating;
 
   if (isHeroState) {
     return (
-      <div className="h-screen w-screen bg-jumby-ink text-white overflow-hidden font-sans">
+      <>
         <LovableHeroCreator
           prompt={inputPrompt}
           onPromptChange={setInputPrompt}
@@ -636,7 +638,7 @@ function CreateStudioContent() {
           onClose={() => setIsTemplatePickerOpen(false)}
           onSelectTemplate={handleSelectTemplate}
         />
-      </div>
+      </>
     );
   }
 
@@ -645,13 +647,14 @@ function CreateStudioContent() {
       {/* Top Studio Navbar */}
       <header className="flex items-center justify-between px-4 py-2.5 bg-zinc-950 border-b border-white/10 z-30 shrink-0">
         <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            aria-label="Back to feed"
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-95"
+          <button
+            type="button"
+            onClick={() => setHasStartedGenerating(false)}
+            aria-label="Back to create"
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all active:scale-95 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-          </Link>
+          </button>
 
           <div>
             <div className="flex items-center gap-2">

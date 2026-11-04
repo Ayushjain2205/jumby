@@ -7,7 +7,20 @@ import { GameTile } from './GameTile';
 import { JumbyLogo } from '@/components/brand/JumbyLogo';
 import { useWallet } from '@/context/WalletContext';
 import { CoinShopModal } from '@/components/modals/CoinShopModal';
-import { Search, Plus, Sparkles, Flame, Gamepad2, Zap, X } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Sparkles,
+  Flame,
+  Gamepad2,
+  Zap,
+  X,
+  Compass,
+  Layers,
+  Users,
+  Bell,
+  ChevronDown,
+} from 'lucide-react';
 
 interface ExploreGridProps {
   games: Game[];
@@ -58,35 +71,84 @@ export function ExploreGrid({ games }: ExploreGridProps) {
 
   return (
     <div className="min-h-screen w-full bg-jumby-ink text-white flex flex-col font-sans">
-      {/* Top Header: Brand on left, Coins & Create on right */}
-      <header className="sticky top-0 z-40 bg-zinc-950/90 backdrop-blur-xl border-b border-white/10 px-4 sm:px-6 py-3">
+      {/* Top Header: Brand & Navigation on left, Coins & Profile on right */}
+      <header className="sticky top-0 z-40 bg-[#141227]/90 backdrop-blur-xl border-b border-white/5 px-4 sm:px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Brand Logo */}
-          <Link href="/" className="shrink-0 flex items-center gap-2">
-            <JumbyLogo size="sm" />
-          </Link>
+          {/* Brand Logo & Navigation */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link href="/" className="shrink-0 flex items-center">
+              <JumbyLogo size="sm" />
+            </Link>
 
-          {/* Right Controls: Coins + Create */}
+            <div className="h-5 w-px bg-white/15 hidden sm:block" />
+
+            <nav className="flex items-center gap-1 sm:gap-1.5">
+              {/* Create Pill */}
+              <Link
+                href="/create"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-jumby-purple hover:text-white text-zinc-300 font-heading font-black text-xs transition-all active:scale-95"
+              >
+                <Gamepad2 className="w-3.5 h-3.5 text-jumby-lime" />
+                <span>Create</span>
+              </Link>
+
+              {/* Active Explore */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-jumby-purple to-[#8374ff] text-white font-sans font-bold text-xs shadow-md shadow-jumby-purple/30 cursor-default">
+                <Compass className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Explore</span>
+              </div>
+
+              {/* My Games */}
+              <Link
+                href="/create"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="hidden md:inline">My Games</span>
+              </Link>
+
+              {/* Community */}
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
+              >
+                <Users className="w-3.5 h-3.5 text-zinc-400" />
+                <span className="hidden lg:inline">Community</span>
+              </button>
+            </nav>
+          </div>
+
+          {/* Right Controls: Notifications, Coins, Profile */}
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* Jumby Coins Pill */}
+            {/* Bell Notification */}
+            <button
+              type="button"
+              className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
+
+            {/* Jumby Coins Pill with Plus */}
             <button
               onClick={openShop}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-jumby-lime/10 hover:bg-jumby-lime/20 border border-jumby-lime/30 text-jumby-lime font-heading font-black text-xs sm:text-sm active:scale-95 transition-all shadow-sm shadow-jumby-lime/10 cursor-pointer"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1b1935] hover:bg-[#25224a] border border-white/10 text-white font-heading font-black text-xs shadow-inner transition-all active:scale-95 cursor-pointer"
               title="Open Jumby Wallet"
             >
               <span className="text-sm">🪙</span>
-              <span>{coins}</span>
-              <span className="hidden sm:inline text-[11px] text-zinc-400 font-sans font-medium">Coins</span>
+              <span>{coins ? coins.toLocaleString() : '2,450'}</span>
+              <Plus className="w-3 h-3 text-zinc-400 stroke-[3]" />
             </button>
 
-            {/* Create Button */}
-            <Link
-              href="/create"
-              className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-jumby-lime hover:bg-lime-300 text-zinc-950 font-black text-xs sm:text-sm transition-all active:scale-95 shadow-md shadow-jumby-lime/20"
-            >
-              <Plus className="w-4 h-4 stroke-[3]" />
-              <span className="hidden xs:inline">Create</span>
-            </Link>
+            {/* User Avatar with Crown */}
+            <div className="flex items-center gap-1 pl-1 cursor-pointer group">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-jumby-purple to-jumby-lime p-0.5 shadow-md">
+                <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center overflow-hidden">
+                  <span className="text-sm">👑</span>
+                </div>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-white transition-colors" />
+            </div>
           </div>
         </div>
 
