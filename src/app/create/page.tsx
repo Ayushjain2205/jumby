@@ -41,6 +41,7 @@ import {
   AttachedImage,
 } from '@/components/create/LovableHeroCreator';
 import { TemplatePickerModal } from '@/components/create/TemplatePickerModal';
+import { WalletProvider } from '@/context/WalletContext';
 import {
   GAME_FONTS,
   detectFontVibe,
@@ -1269,7 +1270,9 @@ export default function CreateStudioPage() {
         </div>
       }
     >
-      <CreateStudioContent />
+      <WalletProvider>
+        <CreateStudioContent />
+      </WalletProvider>
     </Suspense>
   );
 }
