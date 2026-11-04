@@ -21,8 +21,6 @@ import {
   Play,
   Flame,
   ArrowRight,
-  Settings2,
-  Key,
   Loader2,
   X,
   ExternalLink,
@@ -182,10 +180,6 @@ function CreateStudioContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string | null>(null);
 
-  // API Key Settings Modal
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-
   // Publishing State
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
@@ -227,15 +221,6 @@ function CreateStudioContent() {
         timestamp: 'Just now',
       },
     ]);
-  };
-
-  const handleSaveApiKey = (key: string) => {
-    setApiKey(key);
-    try {
-      if (key) localStorage.setItem('jumby_api_key', key);
-      else localStorage.removeItem('jumby_api_key');
-    } catch (e) {}
-    setShowSettingsModal(false);
   };
 
   // Conversation History
@@ -331,10 +316,6 @@ function CreateStudioContent() {
 
   useEffect(() => {
     setMounted(true);
-    try {
-      const savedKey = localStorage.getItem('jumby_api_key');
-      if (savedKey) setApiKey(savedKey);
-    } catch (e) {}
     if (gameHtml) {
       setHistory([gameHtml]);
     }
@@ -398,7 +379,6 @@ function CreateStudioContent() {
           prompt: promptText,
           archetype: targetArchetype,
           baseCode: gameHtml,
-          apiKey: apiKey || undefined,
         }),
       });
 
@@ -631,19 +611,6 @@ function CreateStudioContent() {
 
         {/* Top Right Controls */}
         <div className="flex items-center gap-2">
-          {/* AI Engine Status Pill / Settings Trigger */}
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            title="Configure AI Generation Engine"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-xs font-heading font-bold text-zinc-300 transition-all active:scale-95"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-jumby-lime" />
-            <span className="hidden sm:inline">
-              {apiKey ? 'Custom LLM' : 'Smart Engine'}
-            </span>
-            <Settings2 className="w-3 h-3 text-zinc-400 ml-0.5" />
-          </button>
-
           {history.length > 1 && (
             <button
               onClick={handleUndo}
@@ -1166,80 +1133,6 @@ function CreateStudioContent() {
           )}
         </div>
       </div>
-
-      {/* API Key / Engine Settings Modal */}
-      {showSettingsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-jumby-ink/85 backdrop-blur-md p-4 animate-fade-in font-sans">
-          <div className="w-full max-w-md rounded-[32px] bg-zinc-900 border border-jumby-lavender/15 p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShowSettingsModal(false)}
-              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-zinc-400 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="w-12 h-12 rounded-2xl bg-jumby-purple/20 text-jumby-purple flex items-center justify-center mb-3">
-              <Sparkles className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-xl font-heading font-black text-white mb-1">
-              AI Generation Engine
-            </h3>
-            <p className="text-xs text-zinc-400 mb-4 font-sans leading-relaxed">
-              Jumby comes with an instant smart procedural micro-game synthesizer (0ms latency, zero API key needed). You can also plug in your own Google Gemini or OpenAI API key for frontier LLM generations.
-            </p>
-
-            <div className="space-y-4 mb-6">
-              <div className="p-3.5 rounded-2xl bg-jumby-ink border border-white/10">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-heading font-bold text-xs text-white">Smart Engine (Built-In)</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-jumby-lime/20 text-jumby-lime font-mono font-bold">
-                    Active (Default)
-                  </span>
-                </div>
-                <p className="text-[11px] text-zinc-400">
-                  Pre-wired with Rimsha micro-engine, Web Audio synthesizer, and canvas juice.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-heading font-bold text-zinc-300 mb-1.5 flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-jumby-lime" />
-                  <span>Custom Gemini / OpenAI API Key (Optional)</span>
-                </label>
-                <input
-                  type="password"
-                  placeholder="AIzaSy... or sk-proj-..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="w-full bg-zinc-950 border border-white/15 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-jumby-purple font-mono"
-                />
-                <span className="text-[10px] text-zinc-500 mt-1 block">
-                  Keys are stored locally in your browser and used only for your creation requests.
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleSaveApiKey(apiKey)}
-                className="flex-1 py-3 rounded-full bg-jumby-lime text-jumby-ink font-heading font-black text-xs hover:brightness-105 active:scale-95 transition-all shadow-md shadow-jumby-lime/20"
-              >
-                Save Settings
-              </button>
-              {apiKey && (
-                <button
-                  onClick={() => handleSaveApiKey('')}
-                  className="px-4 py-3 rounded-full bg-white/10 hover:bg-white/20 text-xs font-bold text-zinc-300 transition-all"
-                >
-                  Clear Key
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Publish Success Modal */}
       {publishedSlug && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-jumby-ink/85 backdrop-blur-md p-4 animate-fade-in font-sans">
