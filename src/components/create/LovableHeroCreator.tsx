@@ -115,9 +115,19 @@ export function LovableHeroCreator({
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-[#141227] via-[#191636] to-[#110f24] text-white flex flex-col font-sans relative overflow-hidden select-none">
-      {/* Background Stylized Puffy Clouds */}
-      <div className="absolute top-16 -left-12 w-64 h-40 bg-[#42367d]/35 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute top-28 -right-12 w-72 h-44 bg-[#4a3a8e]/30 rounded-full blur-2xl pointer-events-none" />
+      {/* Background Stylized 3D Puffy Clouds */}
+      <img
+        src="/images/landing-cloud.png"
+        alt=""
+        aria-hidden="true"
+        className="absolute top-12 -left-16 sm:top-16 sm:-left-20 w-64 sm:w-80 md:w-96 opacity-60 pointer-events-none select-none z-0"
+      />
+      <img
+        src="/images/landing-cloud.png"
+        alt=""
+        aria-hidden="true"
+        className="absolute top-8 -right-16 sm:top-12 sm:-right-20 w-72 sm:w-96 md:w-[420px] opacity-55 pointer-events-none select-none z-0"
+      />
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[550px] bg-[#7160FF]/15 rounded-full blur-[140px] pointer-events-none" />
 
       {/* Top Navbar */}
@@ -417,67 +427,22 @@ export function LovableHeroCreator({
         </div>
       </main>
 
-      {/* Left Character Illustration Slot (Sitting on grass voxel with crown & controller) */}
-      <div className="hidden lg:block absolute bottom-0 left-2 w-64 h-64 pointer-events-none select-none z-10">
-        <svg viewBox="0 0 200 200" fill="none" className="w-full h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
-          {/* Green Voxel Grass Island */}
-          <path d="M10 160 L140 160 L140 190 L10 190 Z" fill="#65A30D" />
-          <path d="M10 150 L140 150 L140 160 L10 160 Z" fill="#84CC16" />
-          <path d="M20 190 L130 190 L130 200 L20 200 Z" fill="#4D7C0F" />
-
-          {/* Purple Monster Mascot Body */}
-          <rect x="35" y="85" width="80" height="70" rx="28" fill="#7160FF" />
-          <rect x="42" y="92" width="66" height="56" rx="20" fill="#6050EE" />
-
-          {/* Golden Crown with sparkle */}
-          <path d="M52 85 L60 62 L75 75 L90 62 L98 85 Z" fill="#FACC15" />
-          <path d="M54 85 L60 65 L75 77 L90 65 L96 85 Z" fill="#EAB308" />
-
-          {/* Sparkles around crown */}
-          <circle cx="112" cy="72" r="3" fill="#FEF08A" />
-          <circle cx="120" cy="84" r="2" fill="#FEF08A" />
-
-          {/* Mascot Happy Face */}
-          <circle cx="60" cy="112" r="5" fill="#0F0F0F" />
-          <circle cx="90" cy="112" r="5" fill="#0F0F0F" />
-          <path d="M68 120 Q75 128 82 120" stroke="#0F0F0F" strokeWidth="3" strokeLinecap="round" fill="#DC2626" />
-
-          {/* Hands holding White Controller */}
-          <rect x="52" y="130" width="46" height="24" rx="8" fill="#FFFFFF" />
-          <circle cx="62" cy="142" r="3" fill="#7160FF" />
-          <circle cx="88" cy="142" r="3" fill="#D8FF43" />
-          <rect x="71" y="139" width="8" height="6" rx="2" fill="#D1D5DB" />
-        </svg>
+      {/* Left Character: Cute Purple Mascot on Grass Floating Island */}
+      <div className="hidden lg:block absolute -bottom-10 -left-6 sm:-bottom-12 sm:-left-8 w-[340px] xl:w-[400px] pointer-events-none select-none z-10 transition-all">
+        <img
+          src="/images/landing-left.png"
+          alt="Jumby Mascot"
+          className="w-full h-auto object-contain drop-shadow-[0_25px_50px_rgba(0,0,0,0.65)]"
+        />
       </div>
 
-      {/* Right Castle Illustration Slot (Voxel purple fairytale castle with pink flag) */}
-      <div className="hidden lg:block absolute bottom-0 right-2 w-64 h-64 pointer-events-none select-none z-10">
-        <svg viewBox="0 0 200 200" fill="none" className="w-full h-full drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">
-          {/* Green Voxel Island */}
-          <path d="M60 160 L190 160 L190 190 L60 190 Z" fill="#65A30D" />
-          <path d="M60 150 L190 150 L190 160 L60 160 Z" fill="#84CC16" />
-          <path d="M70 190 L180 190 L180 200 L70 200 Z" fill="#4D7C0F" />
-
-          {/* Castle Wall Base */}
-          <rect x="90" y="105" width="80" height="50" rx="4" fill="#9384FF" />
-          {/* Castle Battlement Crenellations */}
-          <rect x="90" y="95" width="16" height="12" fill="#7E6EF7" />
-          <rect x="122" y="95" width="16" height="12" fill="#7E6EF7" />
-          <rect x="154" y="95" width="16" height="12" fill="#7E6EF7" />
-
-          {/* Castle Tower Turret */}
-          <rect x="110" y="65" width="40" height="40" rx="4" fill="#8374FF" />
-          <rect x="110" y="58" width="10" height="8" fill="#6C5CE7" />
-          <rect x="125" y="58" width="10" height="8" fill="#6C5CE7" />
-          <rect x="140" y="58" width="10" height="8" fill="#6C5CE7" />
-
-          {/* Castle Golden Door */}
-          <path d="M120 155 L120 130 Q130 120 140 130 L140 155 Z" fill="#FACC15" />
-
-          {/* Castle Pink Flag */}
-          <line x1="130" y1="58" x2="130" y2="35" stroke="#E5E7EB" strokeWidth="2.5" />
-          <path d="M130 36 L155 44 L130 52 Z" fill="#EC4899" />
-        </svg>
+      {/* Right Castle: Fairytale Voxel Castle with Pink Flag on Floating Island */}
+      <div className="hidden lg:block absolute -bottom-10 -right-6 sm:-bottom-12 sm:-right-8 w-[340px] xl:w-[400px] pointer-events-none select-none z-10 transition-all">
+        <img
+          src="/images/landing-right.png"
+          alt="Jumby Castle"
+          className="w-full h-auto object-contain drop-shadow-[0_25px_50px_rgba(0,0,0,0.65)]"
+        />
       </div>
     </div>
   );
