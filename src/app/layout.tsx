@@ -1,18 +1,16 @@
 import type { Metadata, Viewport } from 'next';
-import { Poppins, Inter } from 'next/font/google';
+import { Sour_Gummy, Quicksand } from 'next/font/google';
 import './globals.css';
 
-const poppins = Poppins({
-  weight: ['500', '600', '700', '800', '900'],
+const sourGummy = Sour_Gummy({
   subsets: ['latin'],
-  variable: '--font-poppins',
+  variable: '--font-sour-gummy',
   display: 'swap',
 });
 
-const inter = Inter({
-  weight: ['400', '500', '600', '700'],
+const quicksand = Quicksand({
   subsets: ['latin'],
-  variable: '--font-inter',
+  variable: '--font-quicksand',
   display: 'swap',
 });
 
@@ -41,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`h-full ${poppins.variable} ${inter.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`h-full ${sourGummy.variable} ${quicksand.variable}`}>
       <body suppressHydrationWarning className="h-full w-full overflow-hidden bg-jumby-ink text-white antialiased font-sans">
         {children}
       </body>
