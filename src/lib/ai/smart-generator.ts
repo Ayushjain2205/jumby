@@ -689,19 +689,20 @@ function generateStackGame(opts: GameGenOptions) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>${opts.title}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="${opts.fontUrl}" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}; }
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; -webkit-user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}, sans-serif; }
     canvas { display: block; width: 100%; height: 100%; }
-    #ui { position: absolute; top: 20px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 56px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${opts.themeColor}; font-family: ${opts.fontFamily}; }
-    #hint { position: absolute; bottom: 25%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${opts.accentColor}; pointer-events: none; font-family: ${opts.fontFamily}; }
+    #ui { position: absolute; top: 24px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
+    .score { font-size: 58px; font-weight: 900; color: #fff; text-shadow: 0 4px 20px rgba(0,0,0,0.5); font-family: ${opts.fontFamily}; }
+    #hint { position: absolute; bottom: 22%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); pointer-events: none; font-family: ${opts.fontFamily}; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.97); } }
   </style>
 </head>
 <body>
@@ -725,30 +726,140 @@ function generateStackGame(opts: GameGenOptions) {
 
     Jumby.input.init(canvas);
 
-    let state = 'waiting';
-    let score = 0;
-    const blockHeight = 36;
-    let stack = [];
-    let activeBlock = { x: 0, y: 0, w: 180, speed: 4.5 * ${opts.speedMultiplier}, dir: 1 };
+    const PASTEL_PALETTE = [
+      '#FFB5E8', '#FF9CEE', '#B5B9FF', '#9BF6FF',
+      '#CAFFBF', '#FDFFB6', '#FFC6FF', '#C4C4FF',
+      '#FFCCF9', '#A0C4FF', '#BDB2FF'
+    ];
 
-    function startGame() {
+    let state = 'playing'; // 'playing' | 'gameover'
+    let score = 0;
+    const blockHeight = 38;
+    const initialWidth = Math.min(220, Math.max(160, width * 0.45));
+    let stack = [];
+    let activeBlock = null;
+    let fallingDebris = [];
+    let cameraY = 0;
+    let targetCameraY = 0;
+
+    function resetGame() {
       state = 'playing';
       score = 0;
-      stack = [
-        { x: (width - 200) / 2, y: height - 120, w: 200, color: '${opts.themeColor}' }
-      ];
-      activeBlock = {
-        x: 0,
-        y: height - 120 - blockHeight,
-        w: 200,
-        speed: 4.5 * ${opts.speedMultiplier},
-        dir: 1
-      };
+      cameraY = 0;
+      targetCameraY = 0;
+      fallingDebris = [];
       scoreEl.innerText = '0';
       hintEl.style.display = 'none';
+
+      const baseY = height - 160;
+      const baseW = Math.min(220, Math.max(160, width * 0.45));
+      const baseX = (width - baseW) / 2;
+
+      stack = [
+        {
+          x: baseX,
+          y: baseY,
+          w: baseW,
+          color: PASTEL_PALETTE[0]
+        }
+      ];
+
+      spawnActiveBlock();
       Jumby.setScore(0);
       Jumby.sound.jump();
       Jumby.sound.bgm.start('${opts.bgmVibe}');
+    }
+
+    function spawnActiveBlock() {
+      const top = stack[stack.length - 1];
+      const dir = stack.length % 2 === 0 ? 1 : -1;
+      const nextY = top.y - blockHeight;
+      const speed = (4.2 + Math.min(score * 0.12, 4.0)) * ${opts.speedMultiplier};
+
+      activeBlock = {
+        x: dir > 0 ? 0 : width - top.w,
+        y: nextY,
+        w: top.w,
+        speed: speed * dir,
+        color: PASTEL_PALETTE[stack.length % PASTEL_PALETTE.length]
+      };
+    }
+
+    function dropBlock() {
+      if (!activeBlock || state !== 'playing') return;
+
+      const top = stack[stack.length - 1];
+      const diff = activeBlock.x - top.x;
+      const absDiff = Math.abs(diff);
+
+      // 1. Total Miss
+      if (absDiff >= top.w) {
+        fallingDebris.push({
+          x: activeBlock.x,
+          y: activeBlock.y,
+          w: activeBlock.w,
+          h: blockHeight,
+          color: activeBlock.color,
+          vx: activeBlock.speed > 0 ? 3 : -3,
+          vy: 1,
+          rot: 0,
+          vRot: activeBlock.speed > 0 ? 0.07 : -0.07,
+          alpha: 1.0
+        });
+        activeBlock = null;
+        die();
+        return;
+      }
+
+      // 2. Perfect Placement (< 6px difference)
+      let newW = activeBlock.w - absDiff;
+      let newX = diff > 0 ? activeBlock.x : top.x;
+
+      if (absDiff < 6) {
+        newW = top.w;
+        newX = top.x;
+        Jumby.sound.coin();
+        Jumby.fx.particles(newX + newW / 2, activeBlock.y + blockHeight / 2, 24, '${opts.accentColor}');
+        Jumby.fx.addFloatingText('PERFECT! +50', newX + newW / 2, activeBlock.y - 12, '${opts.accentColor}', 24);
+        Jumby.awardCoins(1, { item: 'Perfect Slice', icon: '💎' });
+      } else {
+        // Slice Overhang with Tumbling Debris
+        Jumby.sound.score();
+        const debrisW = absDiff;
+        const debrisX = diff > 0 ? top.x + newW : activeBlock.x;
+
+        fallingDebris.push({
+          x: debrisX,
+          y: activeBlock.y,
+          w: debrisW,
+          h: blockHeight,
+          color: activeBlock.color,
+          vx: diff > 0 ? 3.5 : -3.5,
+          vy: -2,
+          rot: 0,
+          vRot: diff > 0 ? 0.08 : -0.08,
+          alpha: 1.0
+        });
+
+        Jumby.fx.particles(debrisX + debrisW / 2, activeBlock.y + blockHeight / 2, 12, activeBlock.color);
+        Jumby.fx.addFloatingText('+10', newX + newW / 2, activeBlock.y - 12, '#FFFFFF', 18);
+      }
+
+      stack.push({
+        x: newX,
+        y: activeBlock.y,
+        w: newW,
+        color: activeBlock.color
+      });
+
+      score++;
+      scoreEl.innerText = score;
+      Jumby.setScore(score);
+
+      // Smooth camera climbing upward
+      targetCameraY += blockHeight;
+
+      spawnActiveBlock();
     }
 
     function die() {
@@ -763,15 +874,29 @@ function generateStackGame(opts: GameGenOptions) {
 
     Jumby.on('REVIVE_GRANTED', () => {
       state = 'playing';
-      activeBlock.x = 0;
-      activeBlock.w = stack[stack.length - 1].w;
       hintEl.style.display = 'none';
+      spawnActiveBlock();
       Jumby.sound.powerup();
       Jumby.sound.bgm.start('${opts.bgmVibe}');
     });
 
+    // Initialize baseline stack
+    resetGame();
+
     function loop() {
       requestAnimationFrame(loop);
+
+      // Handle Input
+      if (Jumby.input.justPressed) {
+        if (state === 'gameover') {
+          resetGame();
+        } else if (state === 'playing') {
+          dropBlock();
+        }
+      }
+
+      // Smooth Camera Lerp
+      cameraY += (targetCameraY - cameraY) * 0.12;
 
       ctx.save();
       const grad = ctx.createLinearGradient(0, 0, 0, height);
@@ -780,96 +905,84 @@ function generateStackGame(opts: GameGenOptions) {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      // Handle Input
-      if (Jumby.input.justPressed) {
-        if (state === 'waiting' || state === 'gameover') {
-          startGame();
-        } else if (state === 'playing') {
-          const top = stack[stack.length - 1];
-          const diff = activeBlock.x - top.x;
+      ctx.save();
+      ctx.translate(0, cameraY);
 
-          if (Math.abs(diff) > activeBlock.w) {
-            die();
-          } else {
-            // Cut block
-            let newW = activeBlock.w - Math.abs(diff);
-            let newX = diff > 0 ? activeBlock.x : top.x;
+      // 1. Render Falling Sliced Debris
+      for (let i = fallingDebris.length - 1; i >= 0; i--) {
+        const d = fallingDebris[i];
+        d.x += d.vx;
+        d.y += d.vy;
+        d.vy += 0.55; // gravity
+        d.rot += d.vRot;
+        d.alpha -= 0.022;
 
-            if (Math.abs(diff) < 5) {
-              // Perfect placement
-              newW = activeBlock.w;
-              newX = top.x;
-              Jumby.sound.coin();
-              Jumby.fx.particles(newX + newW / 2, activeBlock.y, 22, '${opts.accentColor}');
-              Jumby.fx.addFloatingText('PERFECT! +50', newX + newW / 2, activeBlock.y - 15, '${opts.accentColor}', 24);
-            } else {
-              Jumby.sound.score();
-              Jumby.fx.particles(diff > 0 ? newX + newW : newX, activeBlock.y, 10, '${opts.themeColor}');
-              Jumby.fx.addFloatingText('+10', newX + newW / 2, activeBlock.y - 15, '#FFFFFF', 18);
-            }
-
-            stack.push({
-              x: newX,
-              y: activeBlock.y,
-              w: newW,
-              color: stack.length % 2 === 0 ? '${opts.themeColor}' : '${opts.accentColor}'
-            });
-
-            score++;
-            scoreEl.innerText = score;
-            Jumby.setScore(score);
-
-            activeBlock.w = newW;
-            activeBlock.x = 0;
-            activeBlock.dir = 1;
-            activeBlock.speed = Math.min(9, activeBlock.speed + 0.15);
-
-            // Scroll stack down if tall
-            if (activeBlock.y < height * 0.45) {
-              stack.forEach(b => b.y += blockHeight);
-            } else {
-              activeBlock.y -= blockHeight;
-            }
-          }
+        if (d.alpha <= 0 || d.y > height + 200) {
+          fallingDebris.splice(i, 1);
+          continue;
         }
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, d.alpha);
+        ctx.translate(d.x + d.w / 2, d.y + d.h / 2);
+        ctx.rotate(d.rot);
+        ctx.fillStyle = d.color;
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 8;
+        ctx.fillRect(-d.w / 2, -d.h / 2, d.w, d.h);
+        ctx.restore();
       }
 
-      if (state === 'playing') {
-        activeBlock.x += activeBlock.speed * activeBlock.dir;
-        if (activeBlock.x + activeBlock.w > width) {
-          activeBlock.x = width - activeBlock.w;
-          activeBlock.dir = -1;
-        } else if (activeBlock.x < 0) {
-          activeBlock.x = 0;
-          activeBlock.dir = 1;
-        }
-      }
-
-      // Draw Stack
-      stack.forEach((b, idx) => {
+      // 2. Render Stacked Blocks (with 3D highlights & shadows)
+      for (let i = 0; i < stack.length; i++) {
+        const b = stack[i];
         ctx.save();
         ctx.fillStyle = b.color;
-        ctx.shadowColor = b.color;
-        ctx.shadowBlur = 10;
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 6;
         ctx.fillRect(b.x, b.y, b.w, blockHeight - 2);
+
+        // Top glossy rim
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.fillRect(b.x, b.y, b.w, 5);
+
+        // Bottom shadow bevel
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.fillRect(b.x, b.y + blockHeight - 7, b.w, 5);
         ctx.restore();
 
-        // Draw mascot on top block
-        if (idx === stack.length - 1) {
-          Jumby.drawEmoji(ctx, '${opts.playerEmoji}', b.x + b.w / 2, b.y - 16, 26);
+        // Mascot perched on top block
+        if (i === stack.length - 1 && state === 'playing') {
+          Jumby.drawEmoji(ctx, '${opts.playerEmoji}', b.x + b.w / 2, b.y - 18, 28);
         }
-      });
+      }
 
-      // Draw Active Block
-      if (state === 'playing') {
+      // 3. Render Moving Active Block
+      if (state === 'playing' && activeBlock) {
+        activeBlock.x += activeBlock.speed;
+        if (activeBlock.x + activeBlock.w > width + 30) {
+          activeBlock.speed = -Math.abs(activeBlock.speed);
+        } else if (activeBlock.x < -30) {
+          activeBlock.speed = Math.abs(activeBlock.speed);
+        }
+
         ctx.save();
-        ctx.fillStyle = '#FFFFFF';
-        ctx.shadowColor = '${opts.accentColor}';
+        ctx.fillStyle = activeBlock.color;
+        ctx.shadowColor = activeBlock.color;
         ctx.shadowBlur = 18;
+        ctx.shadowOffsetY = 6;
         ctx.fillRect(activeBlock.x, activeBlock.y, activeBlock.w, blockHeight - 2);
+
+        // Highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.fillRect(activeBlock.x, activeBlock.y, activeBlock.w, 5);
         ctx.restore();
       }
 
+      ctx.restore(); // camera translate restore
+
+      // 4. Render FX & Juice
       Jumby.fx.updateAndRender(ctx, width, height);
       ctx.restore();
 

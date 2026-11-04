@@ -224,8 +224,16 @@ Pick the most intuitive, rock-solid mechanic based on the user's prompt:
   Player slides left/right or between lanes dodging oncoming hazards.
 - **Hopper / Flappy**: (e.g. "flappy bird", "jump over hurdles", "tap to jump").
   Player has gravity and taps to jump through obstacles.
-- **Stacker / Slicer**: (e.g. "stack tower", "slice blocks").
-  Blocks slide horizontally; tap to drop and slice overhang.
+- **Stacker / Slicer**: (e.g. "stack tower", "slice blocks", "pastel stacker").
+  * Rules & Architecture:
+    - Base block must be anchored and visible at the bottom immediately on load (never empty canvas).
+    - Active block slides horizontally back and forth smoothly across the screen above the stack.
+    - Tap or Space: drops active block onto the stack.
+    - Slicing Math: If active block overlaps top block, trim overhang and spawn falling debris piece with tumbling physics (gravity + rotation).
+    - Perfect Placement: If abs(active.x - top.x) < 6px, snap flush, play Jumby.sound.coin(), rainbow particles, and show floating "+50 PERFECT!" text.
+    - Total Miss: If abs(active.x - top.x) >= top.width, block falls, trigger Jumby.sound.hit(), Jumby.fx.shake(16), and Jumby.gameOver(score).
+    - Smooth Camera: Use lerped camera (targetCameraY += blockHeight) so tower climbs upward seamlessly.
+    - State & Restart: Start playing immediately. On gameover, tapping anywhere resets stack to base block and immediately starts playing.
 - **Paddle / Pong / Brick Bouncer**: (e.g. "brick breaker", "paddle bounce").
   Ball bounces at angles; player controls paddle at bottom to deflect.
 - **Orbit / Spinner**: (e.g. "orbital pulse", "circle defend").

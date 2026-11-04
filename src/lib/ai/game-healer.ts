@@ -151,9 +151,10 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
   if (!jsPatched.includes('addEventListener(\'resize\'') && !jsPatched.includes('addEventListener("resize"')) {
     const resizeHandler = `
     function __jumby_auto_resize() {
-      if (typeof canvas !== 'undefined' && canvas) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+      const c = document.querySelector('canvas');
+      if (c) {
+        c.width = window.innerWidth;
+        c.height = window.innerHeight;
       }
     }
     window.addEventListener('resize', __jumby_auto_resize);
@@ -166,8 +167,9 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
   // C. Unified Input Init Check
   if (!jsPatched.includes('Jumby.input.init(')) {
     const inputInit = `
-    if (typeof Jumby !== 'undefined' && Jumby.input && typeof canvas !== 'undefined' && canvas) {
-      Jumby.input.init(canvas);
+    if (typeof Jumby !== 'undefined' && Jumby.input) {
+      const c = document.querySelector('canvas');
+      if (c) Jumby.input.init(c);
     }
 `;
     jsPatched = inputInit + jsPatched;
@@ -207,11 +209,12 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
     }
   }
 
-  // F. Tap-to-Restart State Safeguard
-  if (!jsPatched.includes('REVIVE_GRANTED') || jsPatched.includes('gameover')) {
+  // F. Tap-to-Restart State Safeguard (only if no existing input listener is registered)
+  if (!jsPatched.includes('pointerdown') && !jsPatched.includes('justPressed') && !jsPatched.includes('isDown')) {
     const restartSafeguard = `
     window.addEventListener('pointerdown', function () {
       if (typeof state !== 'undefined' && (state === 'gameover' || state === 'waiting')) {
+        state = 'playing';
         if (typeof startGame === 'function') startGame();
         else if (typeof initGame === 'function') initGame();
         else if (typeof restartGame === 'function') restartGame();

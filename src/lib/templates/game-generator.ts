@@ -460,17 +460,19 @@ function generateStackHtml(config: GameTemplateConfig): string {
     const colors = ['${config.themeColor}', '${config.accentColor}', '#38bdf8', '#818cf8', '#c084fc', '#f43f5e', '#fb923c'];
     let stack = [];
     let currentBlock = null;
+    let debris = [];
+    let targetCameraY = 0;
 
     function initGame() {
-      state = 'waiting';
       score = 0;
       cameraY = 0;
+      targetCameraY = 0;
+      debris = [];
       scoreEl.textContent = '0';
-      hintEl.style.display = 'block';
-      hintEl.textContent = 'TAP TO PLACE BLOCK';
+      hintEl.style.display = 'none';
 
-      const baseWidth = Math.min(width * 0.6, 240);
-      stack = [{ x: (width - baseWidth) / 2, y: height - 120, w: baseWidth, color: colors[0] }];
+      const baseWidth = Math.min(width * 0.6, 220);
+      stack = [{ x: (width - baseWidth) / 2, y: height - 140, w: baseWidth, color: colors[0] }];
       spawnNext();
       if (window.Jumby) window.Jumby.setScore(0);
     }
@@ -478,11 +480,12 @@ function generateStackHtml(config: GameTemplateConfig): string {
     function spawnNext() {
       const prev = stack[stack.length - 1];
       const color = colors[stack.length % colors.length];
+      const dir = stack.length % 2 === 0 ? 1 : -1;
       currentBlock = {
-        x: 0,
+        x: dir > 0 ? 0 : width - prev.w,
         y: prev.y - blockHeight,
         w: prev.w,
-        vx: 3.5 * ${config.speedMultiplier},
+        vx: (3.8 + Math.min(score * 0.12, 3.5)) * ${config.speedMultiplier} * dir,
         color: color
       };
     }
@@ -491,51 +494,84 @@ function generateStackHtml(config: GameTemplateConfig): string {
       if (state === 'waiting') {
         state = 'playing';
         hintEl.style.display = 'none';
-        drop();
+        if (window.Jumby) window.Jumby.sound.jump();
       } else if (state === 'playing') {
         drop();
       } else if (state === 'dead') {
         initGame();
+        state = 'playing';
+        hintEl.style.display = 'none';
+        if (window.Jumby) window.Jumby.sound.jump();
       }
     }
 
     function drop() {
-      if (!currentBlock) return;
+      if (!currentBlock || state !== 'playing') return;
       const prev = stack[stack.length - 1];
       const diff = currentBlock.x - prev.x;
+      const absDiff = Math.abs(diff);
 
-      if (Math.abs(diff) < 4) {
+      if (absDiff < 6) {
+        // Perfect placement snap
         currentBlock.x = prev.x;
         stack.push({ ...currentBlock });
         score += 2;
         scoreEl.textContent = score;
         if (window.Jumby) {
           window.Jumby.setScore(score);
-          window.Jumby.sound.score();
+          window.Jumby.sound.coin();
         }
-      } else if (Math.abs(diff) >= currentBlock.w) {
+      } else if (absDiff >= currentBlock.w) {
+        // Complete miss!
+        debris.push({
+          x: currentBlock.x,
+          y: currentBlock.y,
+          w: currentBlock.w,
+          color: currentBlock.color,
+          vx: currentBlock.vx > 0 ? 3 : -3,
+          vy: 1,
+          rot: 0,
+          vRot: currentBlock.vx > 0 ? 0.08 : -0.08,
+          alpha: 1.0
+        });
+        currentBlock = null;
         die();
         return;
       } else {
-        const newW = currentBlock.w - Math.abs(diff);
+        // Slice overhang
+        const newW = currentBlock.w - absDiff;
         const newX = diff > 0 ? currentBlock.x : prev.x;
+        const debX = diff > 0 ? prev.x + newW : currentBlock.x;
+
+        debris.push({
+          x: debX,
+          y: currentBlock.y,
+          w: absDiff,
+          color: currentBlock.color,
+          vx: diff > 0 ? 3 : -3,
+          vy: -2,
+          rot: 0,
+          vRot: diff > 0 ? 0.08 : -0.08,
+          alpha: 1.0
+        });
+
         stack.push({ x: newX, y: currentBlock.y, w: newW, color: currentBlock.color });
         score++;
         scoreEl.textContent = score;
         if (window.Jumby) {
           window.Jumby.setScore(score);
-          window.Jumby.sound.jump();
+          window.Jumby.sound.score();
         }
       }
 
-      cameraY = Math.max(0, (stack.length - 8) * blockHeight);
+      targetCameraY += blockHeight;
       spawnNext();
     }
 
     function die() {
       state = 'dead';
       hintEl.style.display = 'block';
-      hintEl.textContent = 'TAP TO RESTART';
+      hintEl.textContent = 'MISSED! TAP TO RETRY';
       if (window.Jumby) {
         window.Jumby.sound.hit();
         window.Jumby.gameOver(score);
@@ -551,6 +587,7 @@ function generateStackHtml(config: GameTemplateConfig): string {
     });
 
     initGame();
+    state = 'playing';
 
     function loop() {
       requestAnimationFrame(loop);
@@ -558,28 +595,59 @@ function generateStackHtml(config: GameTemplateConfig): string {
       ctx.fillStyle = '${config.bgGradient[0]}';
       ctx.fillRect(0, 0, width, height);
 
+      cameraY += (targetCameraY - cameraY) * 0.12;
+
       ctx.save();
       ctx.translate(0, cameraY);
 
+      // Render Debris
+      for (let i = debris.length - 1; i >= 0; i--) {
+        const d = debris[i];
+        d.x += d.vx;
+        d.y += d.vy;
+        d.vy += 0.55;
+        d.rot += d.vRot;
+        d.alpha -= 0.025;
+        if (d.alpha <= 0 || d.y > height + 200) {
+          debris.splice(i, 1);
+          continue;
+        }
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, d.alpha);
+        ctx.translate(d.x + d.w / 2, d.y + blockHeight / 2);
+        ctx.rotate(d.rot);
+        ctx.fillStyle = d.color;
+        ctx.fillRect(-d.w / 2, -blockHeight / 2, d.w, blockHeight - 2);
+        ctx.restore();
+      }
+
       if (state === 'playing' && currentBlock) {
         currentBlock.x += currentBlock.vx;
-        if (currentBlock.x + currentBlock.w > width || currentBlock.x < 0) {
+        if (currentBlock.x + currentBlock.w > width + 20 || currentBlock.x < -20) {
           currentBlock.vx *= -1;
         }
       }
 
       for (const b of stack) {
         ctx.shadowBlur = 12;
-        ctx.shadowColor = b.color;
+        ctx.shadowColor = 'rgba(0,0,0,0.35)';
         ctx.fillStyle = b.color;
         ctx.fillRect(b.x, b.y, b.w, blockHeight - 2);
+
+        // Highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillRect(b.x, b.y, b.w, 4);
       }
 
-      if (currentBlock) {
+      if (currentBlock && state === 'playing') {
         ctx.shadowBlur = 18;
         ctx.shadowColor = currentBlock.color;
         ctx.fillStyle = currentBlock.color;
         ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, blockHeight - 2);
+
+        // Highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, 4);
       }
 
       ctx.restore();
