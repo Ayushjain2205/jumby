@@ -781,8 +781,12 @@ function CreateStudioContent() {
                       }`}
                     >
                       {m.sender === 'assistant' && (
-                        <div className="w-7 h-7 rounded-full bg-jumby-purple/30 border border-jumby-purple/50 flex items-center justify-center shrink-0">
-                          <JumbyMascot className="w-5 h-5" />
+                        <div className="w-7 h-7 rounded-full overflow-hidden border border-jumby-purple/50 shrink-0 shadow-sm bg-jumby-purple/20">
+                          <img
+                            src="/images/agent-avatar.jpg"
+                            alt="Jumby Assistant"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                       )}
                       <div

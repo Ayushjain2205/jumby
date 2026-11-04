@@ -200,14 +200,18 @@ export function LovableHeroCreator({
           </button>
 
           {/* User Avatar with Crown */}
-          <div className="flex items-center gap-1 pl-1 cursor-pointer group">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-jumby-purple to-jumby-lime p-0.5 shadow-md">
-              <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center overflow-hidden">
-                <span className="text-sm">👑</span>
+            <div className="flex items-center gap-1 pl-1 cursor-pointer group">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-jumby-purple to-jumby-lime p-0.5 shadow-md">
+                <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center overflow-hidden">
+                  <img
+                    src="/images/agent-avatar.jpg"
+                    alt="User Profile"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
               </div>
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-white transition-colors" />
             </div>
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-white transition-colors" />
-          </div>
         </div>
       </header>
 
