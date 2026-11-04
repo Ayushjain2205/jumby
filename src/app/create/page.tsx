@@ -585,6 +585,13 @@ function CreateStudioContent() {
   const handleApplyDifficultyConfig = (config: DifficultyConfig) => {
     setSpeedMultiplier(config.speedMultiplier);
 
+    if (config.customRule) {
+      handleApplyPrompt(
+        `Tune difficulty to ${config.preset} (${config.speedMultiplier.toFixed(1)}x speed, ${config.hazardDensity} hazard rate, ${config.progressionMode} mode) and apply custom rule: ${config.customRule}`
+      );
+      return;
+    }
+
     if (gameHtml && (gameHtml.includes('<canvas') || gameHtml.includes('<script'))) {
       const updated = applyPhysicsToHtml(gameHtml, config.speedMultiplier, gravity);
       setGameHtml(updated);

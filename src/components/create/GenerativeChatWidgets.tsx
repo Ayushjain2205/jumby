@@ -4,17 +4,10 @@ import React, { useState } from 'react';
 import {
   Zap,
   Sliders,
-  Shield,
   Sparkles,
-  Skull,
-  Trophy,
   Check,
-  Flame,
   Swords,
-  Magnet,
-  Hourglass,
-  Crosshair,
-  ArrowRight,
+  Plus,
 } from 'lucide-react';
 
 export type GenerativeWidgetType = 'difficulty' | 'boss' | 'powerups';
@@ -24,6 +17,7 @@ export interface DifficultyConfig {
   speedMultiplier: number;
   hazardDensity: 'relaxed' | 'moderate' | 'swarm';
   progressionMode: 'endless' | 'stages' | 'boss';
+  customRule?: string;
 }
 
 interface DifficultyWidgetProps {
@@ -49,6 +43,7 @@ export function GenerativeDifficultyWidget({
   const [progressionMode, setProgressionMode] = useState<'endless' | 'stages' | 'boss'>(
     initialConfig?.progressionMode || 'stages'
   );
+  const [customRule, setCustomRule] = useState('');
   const [applied, setApplied] = useState(false);
 
   const handleSelectPreset = (p: 'chill' | 'balanced' | 'chaos') => {
@@ -76,6 +71,7 @@ export function GenerativeDifficultyWidget({
       speedMultiplier,
       hazardDensity,
       progressionMode,
+      customRule: customRule.trim() || undefined,
     });
   };
 
@@ -87,7 +83,6 @@ export function GenerativeDifficultyWidget({
           <Sliders className="w-3.5 h-3.5" />
           <span>Interactive Pacing & Difficulty</span>
         </div>
-        <span className="text-[10px] font-mono text-zinc-400">Generative UI</span>
       </div>
 
       {/* Preset Selector */}
@@ -207,6 +202,23 @@ export function GenerativeDifficultyWidget({
         </div>
       </div>
 
+      {/* Custom Rule Input */}
+      <div className="pt-1">
+        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
+          Or Type Custom Rule / Mechanics
+        </label>
+        <input
+          type="text"
+          value={customRule}
+          onChange={(e) => {
+            setCustomRule(e.target.value);
+            setApplied(false);
+          }}
+          placeholder="e.g. Gravity flips every 10 seconds, double jump on tap..."
+          className="w-full px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-jumby-lime font-sans"
+        />
+      </div>
+
       {/* Apply Button */}
       <button
         type="button"
@@ -241,8 +253,8 @@ interface BossWidgetProps {
 
 export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidgetProps) {
   const [bossType, setBossType] = useState('🛸 Laser Mothership');
+  const [customBoss, setCustomBoss] = useState('');
   const [triggerScore, setTriggerScore] = useState(30);
-  const [applied, setApplied] = useState(false);
 
   const bosses = [
     { name: '🛸 Laser Mothership', desc: 'Fires sweeping laser beams and spawns mini drones' },
@@ -251,8 +263,8 @@ export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidg
   ];
 
   const handleApply = () => {
-    setApplied(true);
-    onApply(`Add a ${bossType} boss battle after reaching ${triggerScore} points with a health bar and warning alarm siren!`);
+    const effectiveBoss = customBoss.trim() || bossType;
+    onApply(`Add a ${effectiveBoss} boss battle after reaching ${triggerScore} points with a health bar and warning alarm siren!`);
   };
 
   return (
@@ -262,7 +274,6 @@ export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidg
           <Swords className="w-3.5 h-3.5" />
           <span>Boss Encounter Designer</span>
         </div>
-        <span className="text-[10px] font-mono text-zinc-400">Generative UI</span>
       </div>
 
       <div>
@@ -271,14 +282,14 @@ export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidg
         </label>
         <div className="space-y-1.5">
           {bosses.map((b) => {
-            const isSelected = bossType === b.name;
+            const isSelected = !customBoss.trim() && bossType === b.name;
             return (
               <button
                 key={b.name}
                 type="button"
                 onClick={() => {
                   setBossType(b.name);
-                  setApplied(false);
+                  setCustomBoss('');
                 }}
                 className={`w-full p-2 rounded-xl border text-left transition-all ${
                   isSelected
@@ -297,6 +308,20 @@ export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidg
         </div>
       </div>
 
+      {/* Custom Boss Input */}
+      <div>
+        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
+          Or Describe Your Own Boss
+        </label>
+        <input
+          type="text"
+          value={customBoss}
+          onChange={(e) => setCustomBoss(e.target.value)}
+          placeholder="e.g. Giant fire-breathing pixel dragon that swoops down..."
+          className="w-full px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-jumby-purple font-sans"
+        />
+      </div>
+
       <div>
         <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1.5">
           Spawn Trigger (Score Milestone)
@@ -306,10 +331,7 @@ export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidg
             <button
               key={score}
               type="button"
-              onClick={() => {
-                setTriggerScore(score);
-                setApplied(false);
-              }}
+              onClick={() => setTriggerScore(score)}
               className={`py-1.5 rounded-lg border text-xs font-heading font-bold transition-all ${
                 triggerScore === score
                   ? 'bg-jumby-lime/20 border-jumby-lime text-jumby-lime'
@@ -342,6 +364,7 @@ interface PowerupsWidgetProps {
 
 export function GenerativePowerupsWidget({ onApply, isGenerating = false }: PowerupsWidgetProps) {
   const [selected, setSelected] = useState<string[]>(['shield', 'magnet']);
+  const [customPowerup, setCustomPowerup] = useState('');
 
   const perks = [
     { id: 'shield', icon: '🛡️', name: 'Energy Shield', desc: 'Absorbs 1 collision before breaking' },
@@ -358,8 +381,13 @@ export function GenerativePowerupsWidget({ onApply, isGenerating = false }: Powe
 
   const handleApply = () => {
     const names = perks.filter((p) => selected.includes(p.id)).map((p) => p.name);
+    if (customPowerup.trim()) {
+      names.push(customPowerup.trim());
+    }
     onApply(`Inject collectible power-up drops into the game: ${names.join(', ')} with visual floating bubbles!`);
   };
+
+  const totalCount = selected.length + (customPowerup.trim() ? 1 : 0);
 
   return (
     <div className="w-full mt-2.5 rounded-2xl bg-[#161426] border border-jumby-purple/30 p-3.5 text-white shadow-xl shadow-jumby-purple/10 space-y-3 font-sans">
@@ -368,7 +396,6 @@ export function GenerativePowerupsWidget({ onApply, isGenerating = false }: Powe
           <Sparkles className="w-3.5 h-3.5" />
           <span>Collectible Power-ups</span>
         </div>
-        <span className="text-[10px] font-mono text-zinc-400">Generative UI</span>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -404,14 +431,28 @@ export function GenerativePowerupsWidget({ onApply, isGenerating = false }: Powe
         })}
       </div>
 
+      {/* Custom Power-up Input */}
+      <div>
+        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
+          Or Type Your Own Custom Perk
+        </label>
+        <input
+          type="text"
+          value={customPowerup}
+          onChange={(e) => setCustomPowerup(e.target.value)}
+          placeholder="e.g. Double jump, Freeze enemies, Coin magnet..."
+          className="w-full px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-jumby-sky font-sans"
+        />
+      </div>
+
       <button
         type="button"
         onClick={handleApply}
-        disabled={isGenerating || selected.length === 0}
+        disabled={isGenerating || totalCount === 0}
         className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-jumby-purple to-[#8a7bff] text-white font-heading font-black text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-jumby-purple/30 cursor-pointer disabled:opacity-50"
       >
         <Sparkles className="w-3.5 h-3.5" />
-        <span>Add ({selected.length}) Power-ups to Game</span>
+        <span>Add ({totalCount}) Power-ups to Game</span>
       </button>
     </div>
   );
