@@ -21,6 +21,33 @@ interface RunSummary {
   totalReward: number;
 }
 
+export function isImageUrl(val?: string): boolean {
+  if (!val) return false;
+  return (
+    val.startsWith('/') ||
+    val.startsWith('http://') ||
+    val.startsWith('https://') ||
+    val.startsWith('data:image/') ||
+    val.endsWith('.svg') ||
+    val.endsWith('.png') ||
+    val.endsWith('.webp')
+  );
+}
+
+export function ItemIcon({
+  icon,
+  className = 'w-3.5 h-3.5',
+}: {
+  icon?: string;
+  className?: string;
+}) {
+  if (!icon) return null;
+  if (isImageUrl(icon)) {
+    return <img src={icon} alt="item" className={`${className} object-contain inline-block shrink-0`} />;
+  }
+  return <span className="inline-block leading-none">{icon}</span>;
+}
+
 export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
   const { coins, addCoins, openShop } = useWallet();
 
@@ -36,7 +63,7 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
 
   const [sessionPickups, setSessionPickups] = useState(0);
   const [customItem, setCustomItem] = useState<{ name: string; icon: string } | null>(null);
-  const [floatingCoin, setFloatingCoin] = useState<string | null>(null);
+  const [floatingCoin, setFloatingCoin] = useState<{ amount: number; icon?: string; label?: string } | null>(null);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -92,8 +119,7 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
         setSessionPickups((prev) => prev + amount);
 
         // Show floating toast with custom item icon or name
-        const displayLabel = itemIcon ? `+${amount} ${itemIcon}` : `+${amount} ${itemName}`;
-        setFloatingCoin(displayLabel);
+        setFloatingCoin({ amount, icon: itemIcon, label: itemName });
         setTimeout(() => setFloatingCoin(null), 1500);
         playRewardSound(false);
       }
@@ -211,10 +237,11 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
             title="Your Jumby Coins"
           >
             <span>🪙</span>
-            <span>{coins}</span>
             {floatingCoin && (
-              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-jumby-lime text-zinc-950 text-[10px] font-black shadow-md animate-bounce">
-                {floatingCoin}
+              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-jumby-lime text-zinc-950 text-[10px] font-black shadow-md animate-bounce flex items-center gap-1 whitespace-nowrap">
+                <span>+{floatingCoin.amount}</span>
+                <ItemIcon icon={floatingCoin.icon} className="w-3 h-3" />
+                {!floatingCoin.icon && <span>{floatingCoin.label || '🪙'}</span>}
               </span>
             )}
           </button>
@@ -302,9 +329,11 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
                 )}
                 {runSummary.pickupReward > 0 && (
                   <div className="flex justify-between items-center text-amber-400">
-                    <span>
-                      {runSummary.pickupItemIcon ? `${runSummary.pickupItemIcon} ` : ''}
-                      {runSummary.pickupItemName || 'Pickups'} (x{runSummary.pickupReward})
+                    <span className="flex items-center gap-1.5">
+                      <ItemIcon icon={runSummary.pickupItemIcon} className="w-3.5 h-3.5" />
+                      <span>
+                        {runSummary.pickupItemName || 'Pickups'} (x{runSummary.pickupReward})
+                      </span>
                     </span>
                     <span className="font-mono font-bold">+{runSummary.pickupReward} 🪙</span>
                   </div>
