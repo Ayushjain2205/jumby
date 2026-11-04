@@ -16,15 +16,19 @@
 
   // 1. Platform postMessage Bridge
   function sendToParent(type, payload = {}) {
-    if (global.parent && global.parent !== global) {
-      global.parent.postMessage(
-        {
-          source: 'JUMBY_GAME',
-          type: type,
-          ...payload,
-        },
-        '*'
-      );
+    try {
+      if (global.parent && global.parent !== global) {
+        global.parent.postMessage(
+          {
+            source: 'JUMBY_GAME',
+            type: type,
+            ...payload,
+          },
+          '*'
+        );
+      }
+    } catch (e) {
+      // Ignore cross-origin parent access restrictions
     }
   }
 
@@ -331,16 +335,18 @@
 
   // Auto-unlock AudioContext on user interaction
   function unlockAudio() {
-    const ctx = getAudioCtx();
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume().then(() => {
-        if (Bgm.autoStartPending) {
-          Bgm.start(Bgm.currentVibe);
-        }
-      });
-    } else if (Bgm.autoStartPending) {
-      Bgm.start(Bgm.currentVibe);
-    }
+    try {
+      const ctx = getAudioCtx();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().then(() => {
+          if (Bgm.autoStartPending) {
+            Bgm.start(Bgm.currentVibe);
+          }
+        }).catch(() => {});
+      } else if (Bgm.autoStartPending) {
+        Bgm.start(Bgm.currentVibe);
+      }
+    } catch (e) {}
   }
   global.addEventListener('pointerdown', unlockAudio, { passive: true });
   global.addEventListener('touchstart', unlockAudio, { passive: true });
@@ -940,7 +946,6 @@
       col: e.colno,
       filename: e.filename,
     });
-    showRecoveryToast(e.message);
   });
 
   global.addEventListener('unhandledrejection', function (e) {
@@ -950,25 +955,6 @@
       message: reason,
     });
   });
-
-  function showRecoveryToast(msg) {
-    if (document.getElementById('jumby-recovery-shield')) return;
-    const toast = document.createElement('div');
-    toast.id = 'jumby-recovery-shield';
-    toast.style.cssText = 'position:fixed;bottom:16px;left:16px;right:16px;background:rgba(20,20,28,0.92);backdrop-filter:blur(8px);border:1px solid rgba(255,100,100,0.4);border-radius:14px;padding:12px 14px;color:#fff;font-family:-apple-system,sans-serif;font-size:12px;z-index:999999;box-shadow:0 10px 25px rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:space-between;gap:8px;';
-    toast.innerHTML = '<span style="display:flex;align-items:center;gap:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="color:#FF7657;">⚠️</span> <span>Glitch recovered: ' + (msg ? msg.substring(0, 40) : 'Recovered') + '</span></span><button id="jumby-recover-btn" style="background:#7160FF;color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;">Restart</button>';
-    document.body.appendChild(toast);
-    const btn = document.getElementById('jumby-recover-btn');
-    if (btn) {
-      btn.onclick = function () {
-        toast.remove();
-        global.location.reload();
-      };
-    }
-    setTimeout(function () {
-      if (toast && toast.parentNode) toast.remove();
-    }, 6000);
-  }
 
   // 7. Auto-Bind Canvas & Fallback Resize
   global.addEventListener('load', function () {

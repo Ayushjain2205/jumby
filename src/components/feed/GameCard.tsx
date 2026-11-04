@@ -209,7 +209,7 @@ export function GameCard({ game, isActive }: GameCardProps) {
           ref={iframeRef}
           src={game.bundleUrl}
           title={game.title}
-          sandbox="allow-scripts allow-pointer-lock"
+          sandbox="allow-scripts allow-same-origin allow-pointer-lock"
           className="w-full h-full border-0 block"
         />
 

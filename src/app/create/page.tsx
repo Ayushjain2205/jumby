@@ -1070,7 +1070,7 @@ function CreateStudioContent() {
                     ref={iframeRef}
                     srcDoc={gameHtml}
                     title="Live Preview"
-                    sandbox="allow-scripts allow-pointer-lock"
+                    sandbox="allow-scripts allow-same-origin allow-pointer-lock"
                     className="w-full h-full border-none bg-black flex-1"
                   />
                 ) : (

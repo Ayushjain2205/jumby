@@ -11,14 +11,18 @@
   const listeners = new Map();
 
   function sendToParent(type, payload = {}) {
-    window.parent.postMessage(
-      {
-        source: 'JUMBY_GAME',
-        type: type,
-        ...payload,
-      },
-      '*'
-    );
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(
+          {
+            source: 'JUMBY_GAME',
+            type: type,
+            ...payload,
+          },
+          '*'
+        );
+      }
+    } catch (e) {}
   }
 
   window.addEventListener('message', function (event) {
