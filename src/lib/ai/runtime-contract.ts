@@ -224,16 +224,16 @@ Pick the most intuitive, rock-solid mechanic based on the user's prompt:
   Player slides left/right or between lanes dodging oncoming hazards.
 - **Hopper / Flappy**: (e.g. "flappy bird", "jump over hurdles", "tap to jump").
   Player has gravity and taps to jump through obstacles.
-- **Stacker / Slicer**: (e.g. "stack tower", "slice blocks", "pastel stacker").
+- **Stacker / Slicer (Ketchapp Stack style)**: (e.g. "stack tower", "slice blocks", "pastel stacker").
   * Rules & Architecture:
-    - Base block must be anchored and visible at the bottom immediately on load (never empty canvas).
-    - Active block slides horizontally back and forth smoothly across the screen above the stack.
-    - Tap or Space: drops active block onto the stack.
-    - Slicing Math: If active block overlaps top block, trim overhang and spawn falling debris piece with tumbling physics (gravity + rotation).
-    - Perfect Placement: If abs(active.x - top.x) < 6px, snap flush, play Jumby.sound.coin(), rainbow particles, and show floating "+50 PERFECT!" text.
-    - Total Miss: If abs(active.x - top.x) >= top.width, block falls, trigger Jumby.sound.hit(), Jumby.fx.shake(16), and Jumby.gameOver(score).
-    - Smooth Camera: Use lerped camera (targetCameraY += blockHeight) so tower climbs upward seamlessly.
-    - State & Restart: Start playing immediately. On gameover, tapping anywhere resets stack to base block and immediately starts playing.
+    - TRUE 3D ISOMETRIC PROJECTION ONLY. Never draw flat 2D squares with offset borders!
+    - Isometric 30° projection math: toScreen(x, y, z): { x: originX + (x - z) * Math.cos(Math.PI/6), y: originY + (x + z) * Math.sin(Math.PI/6) - y }.
+    - Each block has 3 isometric faces: Top diamond face (bright pastel), Front-Left face (medium shade), Front-Right face (dark shadow).
+    - Alternate sliding axis: Block N sweeps along the X axis, Block N+1 sweeps along the Z axis!
+    - Slicing: Trim overhang and spawn a falling 3D debris slab with gravity (vy += 0.8) and alpha fade.
+    - Perfect Match: If abs(diff) < 5px, snap flush with "+50 PERFECT!" and coin sound.
+    - Smooth vertical camera lerp (cameraY += (targetCameraY - cameraY) * 0.1) so the tower climbs upward.
+    - Start playing immediately. Tap anywhere on gameover resets and immediately starts playing.
 - **Paddle / Pong / Brick Bouncer**: (e.g. "brick breaker", "paddle bounce").
   Ball bounces at angles; player controls paddle at bottom to deflect.
 - **Orbit / Spinner**: (e.g. "orbital pulse", "circle defend").

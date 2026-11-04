@@ -699,8 +699,8 @@ function generateStackGame(opts: GameGenOptions) {
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; -webkit-user-select: none; }
     html, body { width: 100%; height: 100%; overflow: hidden; background: ${opts.bgTop}; font-family: ${opts.fontFamily}, sans-serif; }
     canvas { display: block; width: 100%; height: 100%; }
-    #ui { position: absolute; top: 24px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 58px; font-weight: 900; color: #fff; text-shadow: 0 4px 20px rgba(0,0,0,0.5); font-family: ${opts.fontFamily}; }
+    #ui { position: absolute; top: 28px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
+    .score { font-size: 64px; font-weight: 900; color: #fff; text-shadow: 0 4px 25px rgba(0,0,0,0.5); font-family: ${opts.fontFamily}; }
     #hint { position: absolute; bottom: 22%; left: 0; right: 0; text-align: center; color: ${opts.accentColor}; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); pointer-events: none; font-family: ${opts.fontFamily}; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.97); } }
   </style>
@@ -726,16 +726,43 @@ function generateStackGame(opts: GameGenOptions) {
 
     Jumby.input.init(canvas);
 
-    const PASTEL_PALETTE = [
-      '#FFB5E8', '#FF9CEE', '#B5B9FF', '#9BF6FF',
-      '#CAFFBF', '#FDFFB6', '#FFC6FF', '#C4C4FF',
-      '#FFCCF9', '#A0C4FF', '#BDB2FF'
-    ];
+    // Isometric 3D Projection Constants (30 degree tilt)
+    const ISO_ANGLE = Math.PI / 6;
+    const COS_A = Math.cos(ISO_ANGLE);
+    const SIN_A = Math.sin(ISO_ANGLE);
 
-    let state = 'playing'; // 'playing' | 'gameover'
+    function toScreen(x, y, z, originX, originY) {
+      return {
+        x: originX + (x - z) * COS_A,
+        y: originY + (x + z) * SIN_A - y
+      };
+    }
+
+    function shade(col, p) {
+      let num = parseInt(col.slice(1), 16);
+      let amt = Math.round(2.55 * p);
+      let R = (num >> 16) + amt;
+      let G = (num >> 8 & 0x00FF) + amt;
+      let B = (num & 0x0000FF) + amt;
+      return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
+    }
+
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return "#" + f(0) + f(8) + f(4);
+    }
+
+    const BLOCK_HEIGHT = 22;
+    const INITIAL_SIZE = 140;
+
+    let state = 'playing'; // 'playing' | 'dead'
     let score = 0;
-    const blockHeight = 38;
-    const initialWidth = Math.min(220, Math.max(160, width * 0.45));
     let stack = [];
     let activeBlock = null;
     let fallingDebris = [];
@@ -751,241 +778,353 @@ function generateStackGame(opts: GameGenOptions) {
       scoreEl.innerText = '0';
       hintEl.style.display = 'none';
 
-      const baseY = height - 160;
-      const baseW = Math.min(220, Math.max(160, width * 0.45));
-      const baseX = (width - baseW) / 2;
-
+      const baseHex = hslToHex(210, 78, 68);
       stack = [
         {
-          x: baseX,
-          y: baseY,
-          w: baseW,
-          color: PASTEL_PALETTE[0]
+          x: -INITIAL_SIZE / 2,
+          y: 0,
+          z: -INITIAL_SIZE / 2,
+          w: INITIAL_SIZE,
+          d: INITIAL_SIZE,
+          h: BLOCK_HEIGHT,
+          color: baseHex
         }
       ];
 
-      spawnActiveBlock();
+      spawnNextBlock();
       Jumby.setScore(0);
       Jumby.sound.jump();
       Jumby.sound.bgm.start('${opts.bgmVibe}');
     }
 
-    function spawnActiveBlock() {
+    function spawnNextBlock() {
       const top = stack[stack.length - 1];
-      const dir = stack.length % 2 === 0 ? 1 : -1;
-      const nextY = top.y - blockHeight;
-      const speed = (4.2 + Math.min(score * 0.12, 4.0)) * ${opts.speedMultiplier};
+      const axis = stack.length % 2 === 1 ? 'x' : 'z'; // Alternate X and Z
+      const nextHex = hslToHex((210 + stack.length * 14) % 360, 78, 68);
+      const limit = INITIAL_SIZE * 1.8;
+      const speed = (3.8 + Math.min(score * 0.08, 3.2)) * ${opts.speedMultiplier};
 
       activeBlock = {
-        x: dir > 0 ? 0 : width - top.w,
-        y: nextY,
+        axis: axis,
+        x: axis === 'x' ? -limit : top.x,
+        y: top.y + BLOCK_HEIGHT,
+        z: axis === 'z' ? -limit : top.z,
         w: top.w,
-        speed: speed * dir,
-        color: PASTEL_PALETTE[stack.length % PASTEL_PALETTE.length]
+        d: top.d,
+        h: BLOCK_HEIGHT,
+        speed: speed,
+        dir: 1,
+        limit: limit,
+        color: nextHex
       };
     }
 
-    function dropBlock() {
+    function drop() {
       if (!activeBlock || state !== 'playing') return;
 
       const top = stack[stack.length - 1];
-      const diff = activeBlock.x - top.x;
-      const absDiff = Math.abs(diff);
+      const axis = activeBlock.axis;
 
-      // 1. Total Miss
-      if (absDiff >= top.w) {
-        fallingDebris.push({
-          x: activeBlock.x,
-          y: activeBlock.y,
-          w: activeBlock.w,
-          h: blockHeight,
-          color: activeBlock.color,
-          vx: activeBlock.speed > 0 ? 3 : -3,
-          vy: 1,
-          rot: 0,
-          vRot: activeBlock.speed > 0 ? 0.07 : -0.07,
-          alpha: 1.0
-        });
-        activeBlock = null;
-        die();
-        return;
-      }
+      if (axis === 'x') {
+        const diff = activeBlock.x - top.x;
+        const absDiff = Math.abs(diff);
 
-      // 2. Perfect Placement (< 6px difference)
-      let newW = activeBlock.w - absDiff;
-      let newX = diff > 0 ? activeBlock.x : top.x;
+        // 1. Total Miss
+        if (absDiff >= activeBlock.w) {
+          fallingDebris.push({
+            ...activeBlock,
+            vy: 0,
+            rotX: 0,
+            rotZ: activeBlock.dir * 0.06,
+            alpha: 1.0
+          });
+          activeBlock = null;
+          die();
+          return;
+        }
 
-      if (absDiff < 6) {
-        newW = top.w;
-        newX = top.x;
-        Jumby.sound.coin();
-        Jumby.fx.particles(newX + newW / 2, activeBlock.y + blockHeight / 2, 24, '${opts.accentColor}');
-        Jumby.fx.addFloatingText('PERFECT! +50', newX + newW / 2, activeBlock.y - 12, '${opts.accentColor}', 24);
-        Jumby.awardCoins(1, { item: 'Perfect Slice', icon: '💎' });
+        // 2. Perfect Placement (< 5px)
+        if (absDiff < 5) {
+          activeBlock.x = top.x;
+          stack.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: top.z,
+            w: top.w,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+          Jumby.sound.coin();
+          Jumby.awardCoins(1, { item: 'Perfect Slice', icon: '💎' });
+          const scr = toScreen(top.x + top.w / 2, activeBlock.y + BLOCK_HEIGHT, top.z + top.d / 2, width / 2, height * 0.68 + cameraY);
+          Jumby.fx.particles(scr.x, scr.y, 22, '${opts.accentColor}');
+          Jumby.fx.addFloatingText('PERFECT! +50', scr.x, scr.y - 15, '${opts.accentColor}', 24);
+        } else {
+          // Slice overhang
+          const newW = activeBlock.w - absDiff;
+          const newX = diff > 0 ? activeBlock.x : top.x;
+          const debrisW = absDiff;
+          const debrisX = diff > 0 ? top.x + newW : activeBlock.x;
+
+          stack.push({
+            x: newX,
+            y: activeBlock.y,
+            z: top.z,
+            w: newW,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+
+          fallingDebris.push({
+            x: debrisX,
+            y: activeBlock.y,
+            z: top.z,
+            w: debrisW,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color,
+            vy: 0,
+            rotX: 0,
+            rotZ: diff > 0 ? 0.07 : -0.07,
+            alpha: 1.0
+          });
+
+          Jumby.sound.score();
+        }
       } else {
-        // Slice Overhang with Tumbling Debris
-        Jumby.sound.score();
-        const debrisW = absDiff;
-        const debrisX = diff > 0 ? top.x + newW : activeBlock.x;
+        // Z Axis Slicing
+        const diff = activeBlock.z - top.z;
+        const absDiff = Math.abs(diff);
 
-        fallingDebris.push({
-          x: debrisX,
-          y: activeBlock.y,
-          w: debrisW,
-          h: blockHeight,
-          color: activeBlock.color,
-          vx: diff > 0 ? 3.5 : -3.5,
-          vy: -2,
-          rot: 0,
-          vRot: diff > 0 ? 0.08 : -0.08,
-          alpha: 1.0
-        });
+        // 1. Total Miss
+        if (absDiff >= activeBlock.d) {
+          fallingDebris.push({
+            ...activeBlock,
+            vy: 0,
+            rotX: activeBlock.dir * 0.06,
+            rotZ: 0,
+            alpha: 1.0
+          });
+          activeBlock = null;
+          die();
+          return;
+        }
 
-        Jumby.fx.particles(debrisX + debrisW / 2, activeBlock.y + blockHeight / 2, 12, activeBlock.color);
-        Jumby.fx.addFloatingText('+10', newX + newW / 2, activeBlock.y - 12, '#FFFFFF', 18);
+        // 2. Perfect Placement (< 5px)
+        if (absDiff < 5) {
+          activeBlock.z = top.z;
+          stack.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: top.z,
+            w: top.w,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+          Jumby.sound.coin();
+          Jumby.awardCoins(1, { item: 'Perfect Slice', icon: '💎' });
+          const scr = toScreen(top.x + top.w / 2, activeBlock.y + BLOCK_HEIGHT, top.z + top.d / 2, width / 2, height * 0.68 + cameraY);
+          Jumby.fx.particles(scr.x, scr.y, 22, '${opts.accentColor}');
+          Jumby.fx.addFloatingText('PERFECT! +50', scr.x, scr.y - 15, '${opts.accentColor}', 24);
+        } else {
+          // Slice overhang along Z
+          const newD = activeBlock.d - absDiff;
+          const newZ = diff > 0 ? activeBlock.z : top.z;
+          const debrisD = absDiff;
+          const debrisZ = diff > 0 ? top.z + newD : activeBlock.z;
+
+          stack.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: newZ,
+            w: top.w,
+            d: newD,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+
+          fallingDebris.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: debrisZ,
+            w: top.w,
+            d: debrisD,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color,
+            vy: 0,
+            rotX: diff > 0 ? 0.07 : -0.07,
+            rotZ: 0,
+            alpha: 1.0
+          });
+
+          Jumby.sound.score();
+        }
       }
-
-      stack.push({
-        x: newX,
-        y: activeBlock.y,
-        w: newW,
-        color: activeBlock.color
-      });
 
       score++;
       scoreEl.innerText = score;
       Jumby.setScore(score);
 
-      // Smooth camera climbing upward
-      targetCameraY += blockHeight;
-
-      spawnActiveBlock();
+      targetCameraY += BLOCK_HEIGHT;
+      spawnNextBlock();
     }
 
     function die() {
-      state = 'gameover';
+      state = 'dead';
+      hintEl.style.display = 'block';
+      hintEl.innerText = 'MISSED! TAP TO RETRY';
       Jumby.sound.hit();
       Jumby.sound.bgm.stop();
       Jumby.fx.shake(16);
-      hintEl.style.display = 'block';
-      hintEl.innerText = 'MISSED! TAP TO RETRY';
       Jumby.gameOver(score, { coins: Math.floor(score / 5) });
     }
 
     Jumby.on('REVIVE_GRANTED', () => {
       state = 'playing';
       hintEl.style.display = 'none';
-      spawnActiveBlock();
+      spawnNextBlock();
       Jumby.sound.powerup();
       Jumby.sound.bgm.start('${opts.bgmVibe}');
     });
 
-    // Initialize baseline stack
+    function handleAction() {
+      if (state === 'dead') {
+        resetGame();
+      } else if (state === 'playing') {
+        drop();
+      }
+    }
+
+    function drawIsoBlock(b, originX, originY) {
+      const x = b.x;
+      const y = b.y;
+      const z = b.z;
+      const w = b.w;
+      const d = b.d;
+      const h = b.h;
+
+      // 8 Isometric Vertices
+      const p1 = toScreen(x, y + h, z, originX, originY);
+      const p2 = toScreen(x + w, y + h, z, originX, originY);
+      const p3 = toScreen(x + w, y + h, z + d, originX, originY);
+      const p4 = toScreen(x, y + h, z + d, originX, originY);
+
+      const p5 = toScreen(x, y, z + d, originX, originY);
+      const p6 = toScreen(x + w, y, z + d, originX, originY);
+      const p7 = toScreen(x + w, y, z, originX, originY);
+
+      // 1. Front-Left Face (medium shade)
+      ctx.fillStyle = shade(b.color, -16);
+      ctx.beginPath();
+      ctx.moveTo(p4.x, p4.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.lineTo(p6.x, p6.y);
+      ctx.lineTo(p5.x, p5.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2. Front-Right Face (darker shadow)
+      ctx.fillStyle = shade(b.color, -32);
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.lineTo(p6.x, p6.y);
+      ctx.lineTo(p7.x, p7.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3. Top Face (bright pastel)
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.lineTo(p4.x, p4.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Subtle top rim highlight
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
     resetGame();
 
     function loop() {
       requestAnimationFrame(loop);
 
-      // Handle Input
       if (Jumby.input.justPressed) {
-        if (state === 'gameover') {
-          resetGame();
-        } else if (state === 'playing') {
-          dropBlock();
-        }
+        handleAction();
       }
 
-      // Smooth Camera Lerp
-      cameraY += (targetCameraY - cameraY) * 0.12;
-
-      ctx.save();
+      // Background Gradient
       const grad = ctx.createLinearGradient(0, 0, 0, height);
       grad.addColorStop(0, '${opts.bgTop}');
       grad.addColorStop(1, '${opts.bgBottom}');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      ctx.save();
-      ctx.translate(0, cameraY);
+      // Smooth Camera Lerp
+      cameraY += (targetCameraY - cameraY) * 0.1;
+      const originX = width / 2;
+      const originY = height * 0.68 + cameraY;
 
-      // 1. Render Falling Sliced Debris
+      // Update Moving Active Block
+      if (state === 'playing' && activeBlock) {
+        if (activeBlock.axis === 'x') {
+          activeBlock.x += activeBlock.speed * activeBlock.dir;
+          if (activeBlock.x > activeBlock.limit) {
+            activeBlock.x = activeBlock.limit;
+            activeBlock.dir = -1;
+          } else if (activeBlock.x < -activeBlock.limit) {
+            activeBlock.x = -activeBlock.limit;
+            activeBlock.dir = 1;
+          }
+        } else {
+          activeBlock.z += activeBlock.speed * activeBlock.dir;
+          if (activeBlock.z > activeBlock.limit) {
+            activeBlock.z = activeBlock.limit;
+            activeBlock.dir = -1;
+          } else if (activeBlock.z < -activeBlock.limit) {
+            activeBlock.z = -activeBlock.limit;
+            activeBlock.dir = 1;
+          }
+        }
+      }
+
+      // 1. Draw Static Stacked Blocks (rendered from base up)
+      for (let i = 0; i < stack.length; i++) {
+        drawIsoBlock(stack[i], originX, originY);
+      }
+
+      // 2. Draw Moving Active Block
+      if (state === 'playing' && activeBlock) {
+        drawIsoBlock(activeBlock, originX, originY);
+      }
+
+      // 3. Render Falling Debris with Gravity Physics
       for (let i = fallingDebris.length - 1; i >= 0; i--) {
         const d = fallingDebris[i];
-        d.x += d.vx;
-        d.y += d.vy;
-        d.vy += 0.55; // gravity
-        d.rot += d.vRot;
-        d.alpha -= 0.022;
+        d.y -= d.vy;
+        d.vy += 0.8; // gravity
+        d.alpha -= 0.02;
 
-        if (d.alpha <= 0 || d.y > height + 200) {
+        if (d.alpha <= 0 || d.y < -300) {
           fallingDebris.splice(i, 1);
           continue;
         }
 
         ctx.save();
         ctx.globalAlpha = Math.max(0, d.alpha);
-        ctx.translate(d.x + d.w / 2, d.y + d.h / 2);
-        ctx.rotate(d.rot);
-        ctx.fillStyle = d.color;
-        ctx.shadowColor = 'rgba(0,0,0,0.3)';
-        ctx.shadowBlur = 8;
-        ctx.fillRect(-d.w / 2, -d.h / 2, d.w, d.h);
+        drawIsoBlock(d, originX, originY);
         ctx.restore();
       }
 
-      // 2. Render Stacked Blocks (with 3D highlights & shadows)
-      for (let i = 0; i < stack.length; i++) {
-        const b = stack[i];
-        ctx.save();
-        ctx.fillStyle = b.color;
-        ctx.shadowColor = 'rgba(0,0,0,0.35)';
-        ctx.shadowBlur = 12;
-        ctx.shadowOffsetY = 6;
-        ctx.fillRect(b.x, b.y, b.w, blockHeight - 2);
-
-        // Top glossy rim
-        ctx.fillStyle = 'rgba(255,255,255,0.35)';
-        ctx.fillRect(b.x, b.y, b.w, 5);
-
-        // Bottom shadow bevel
-        ctx.fillStyle = 'rgba(0,0,0,0.18)';
-        ctx.fillRect(b.x, b.y + blockHeight - 7, b.w, 5);
-        ctx.restore();
-
-        // Mascot perched on top block
-        if (i === stack.length - 1 && state === 'playing') {
-          Jumby.drawEmoji(ctx, '${opts.playerEmoji}', b.x + b.w / 2, b.y - 18, 28);
-        }
-      }
-
-      // 3. Render Moving Active Block
-      if (state === 'playing' && activeBlock) {
-        activeBlock.x += activeBlock.speed;
-        if (activeBlock.x + activeBlock.w > width + 30) {
-          activeBlock.speed = -Math.abs(activeBlock.speed);
-        } else if (activeBlock.x < -30) {
-          activeBlock.speed = Math.abs(activeBlock.speed);
-        }
-
-        ctx.save();
-        ctx.fillStyle = activeBlock.color;
-        ctx.shadowColor = activeBlock.color;
-        ctx.shadowBlur = 18;
-        ctx.shadowOffsetY = 6;
-        ctx.fillRect(activeBlock.x, activeBlock.y, activeBlock.w, blockHeight - 2);
-
-        // Highlight
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.fillRect(activeBlock.x, activeBlock.y, activeBlock.w, 5);
-        ctx.restore();
-      }
-
-      ctx.restore(); // camera translate restore
-
-      // 4. Render FX & Juice
       Jumby.fx.updateAndRender(ctx, width, height);
-      ctx.restore();
-
       Jumby.input.endFrame();
     }
 

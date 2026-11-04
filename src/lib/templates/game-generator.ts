@@ -415,27 +415,28 @@ function generateOrbitHtml(config: GameTemplateConfig): string {
 </html>`;
 }
 
-// 3. STACK SLICE ARCHETYPE
+// 3. TRUE 3D ISOMETRIC STACK ARCHETYPE (Ketchapp Stack style)
 function generateStackHtml(config: GameTemplateConfig): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>${config.title}</title>
   <script src="/jumby-sdk.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: ${config.bgGradient[0]}; font-family: -apple-system, sans-serif; }
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; user-select: none; -webkit-user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #12101F; font-family: -apple-system, sans-serif; }
     canvas { display: block; width: 100%; height: 100%; }
-    #ui { position: absolute; top: 24px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
-    .score { font-size: 52px; font-weight: 900; color: #fff; text-shadow: 0 0 20px ${config.themeColor}; }
-    #hint { position: absolute; bottom: 20%; left: 0; right: 0; text-align: center; color: ${config.accentColor}; font-size: 16px; font-weight: 800; text-shadow: 0 0 10px ${config.accentColor}; pointer-events: none; }
+    #ui { position: absolute; top: 28px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 10; }
+    .score { font-size: 64px; font-weight: 900; color: #ffffff; text-shadow: 0 4px 25px rgba(0,0,0,0.5); }
+    #hint { position: absolute; bottom: 22%; left: 0; right: 0; text-align: center; color: #D8FF43; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); pointer-events: none; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.97); } }
   </style>
 </head>
 <body>
   <div id="ui"><div id="score" class="score">0</div></div>
-  <div id="hint">TAP TO PLACE BLOCK</div>
+  <div id="hint">TAP TO SLICE & STACK</div>
   <canvas id="canvas"></canvas>
 
   <script>
@@ -452,120 +453,267 @@ function generateStackHtml(config: GameTemplateConfig): string {
     window.addEventListener('resize', resize);
     resize();
 
-    let state = 'waiting';
-    let score = 0;
-    let cameraY = 0;
-    const blockHeight = 24;
+    // Isometric 3D Projection Constants (30 degree tilt)
+    const ISO_ANGLE = Math.PI / 6;
+    const COS_A = Math.cos(ISO_ANGLE);
+    const SIN_A = Math.sin(ISO_ANGLE);
 
-    const colors = ['${config.themeColor}', '${config.accentColor}', '#38bdf8', '#818cf8', '#c084fc', '#f43f5e', '#fb923c'];
-    let stack = [];
-    let currentBlock = null;
-    let debris = [];
-    let targetCameraY = 0;
-
-    function initGame() {
-      score = 0;
-      cameraY = 0;
-      targetCameraY = 0;
-      debris = [];
-      scoreEl.textContent = '0';
-      hintEl.style.display = 'none';
-
-      const baseWidth = Math.min(width * 0.6, 220);
-      stack = [{ x: (width - baseWidth) / 2, y: height - 140, w: baseWidth, color: colors[0] }];
-      spawnNext();
-      if (window.Jumby) window.Jumby.setScore(0);
-    }
-
-    function spawnNext() {
-      const prev = stack[stack.length - 1];
-      const color = colors[stack.length % colors.length];
-      const dir = stack.length % 2 === 0 ? 1 : -1;
-      currentBlock = {
-        x: dir > 0 ? 0 : width - prev.w,
-        y: prev.y - blockHeight,
-        w: prev.w,
-        vx: (3.8 + Math.min(score * 0.12, 3.5)) * ${config.speedMultiplier} * dir,
-        color: color
+    function toScreen(x, y, z, originX, originY) {
+      return {
+        x: originX + (x - z) * COS_A,
+        y: originY + (x + z) * SIN_A - y
       };
     }
 
-    function handleAction() {
-      if (state === 'waiting') {
-        state = 'playing';
-        hintEl.style.display = 'none';
-        if (window.Jumby) window.Jumby.sound.jump();
-      } else if (state === 'playing') {
-        drop();
-      } else if (state === 'dead') {
-        initGame();
-        state = 'playing';
-        hintEl.style.display = 'none';
-        if (window.Jumby) window.Jumby.sound.jump();
+    function shade(col, p) {
+      let num = parseInt(col.slice(1), 16);
+      let amt = Math.round(2.55 * p);
+      let R = (num >> 16) + amt;
+      let G = (num >> 8 & 0x00FF) + amt;
+      let B = (num & 0x0000FF) + amt;
+      return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
+    }
+
+    function getPastelColor(index) {
+      const hue = (210 + index * 14) % 360;
+      return "hsl(" + hue + ", 78%, 68%)";
+    }
+
+    // Convert hsl to hex for shading helper
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return "#" + f(0) + f(8) + f(4);
+    }
+
+    const BLOCK_HEIGHT = 22;
+    const INITIAL_SIZE = 140;
+
+    let state = 'playing'; // 'playing' | 'dead'
+    let score = 0;
+    let stack = [];
+    let activeBlock = null;
+    let fallingDebris = [];
+    let cameraY = 0;
+    let targetCameraY = 0;
+
+    function resetGame() {
+      state = 'playing';
+      score = 0;
+      cameraY = 0;
+      targetCameraY = 0;
+      fallingDebris = [];
+      scoreEl.textContent = '0';
+      hintEl.style.display = 'none';
+
+      const baseHex = hslToHex(210, 78, 68);
+      stack = [
+        {
+          x: -INITIAL_SIZE / 2,
+          y: 0,
+          z: -INITIAL_SIZE / 2,
+          w: INITIAL_SIZE,
+          d: INITIAL_SIZE,
+          h: BLOCK_HEIGHT,
+          color: baseHex
+        }
+      ];
+
+      spawnNextBlock();
+      if (window.Jumby) {
+        window.Jumby.setScore(0);
+        if (window.Jumby.sound) window.Jumby.sound.jump();
       }
     }
 
+    function spawnNextBlock() {
+      const top = stack[stack.length - 1];
+      const axis = stack.length % 2 === 1 ? 'x' : 'z'; // Alternate X and Z
+      const nextHex = hslToHex((210 + stack.length * 14) % 360, 78, 68);
+      const limit = INITIAL_SIZE * 1.8;
+      const speed = (3.8 + Math.min(score * 0.08, 3.2)) * ${config.speedMultiplier};
+
+      activeBlock = {
+        axis: axis,
+        x: axis === 'x' ? -limit : top.x,
+        y: top.y + BLOCK_HEIGHT,
+        z: axis === 'z' ? -limit : top.z,
+        w: top.w,
+        d: top.d,
+        h: BLOCK_HEIGHT,
+        speed: speed,
+        dir: 1,
+        limit: limit,
+        color: nextHex
+      };
+    }
+
     function drop() {
-      if (!currentBlock || state !== 'playing') return;
-      const prev = stack[stack.length - 1];
-      const diff = currentBlock.x - prev.x;
-      const absDiff = Math.abs(diff);
+      if (!activeBlock || state !== 'playing') return;
 
-      if (absDiff < 6) {
-        // Perfect placement snap
-        currentBlock.x = prev.x;
-        stack.push({ ...currentBlock });
-        score += 2;
-        scoreEl.textContent = score;
-        if (window.Jumby) {
-          window.Jumby.setScore(score);
-          window.Jumby.sound.coin();
+      const top = stack[stack.length - 1];
+      const axis = activeBlock.axis;
+
+      if (axis === 'x') {
+        const diff = activeBlock.x - top.x;
+        const absDiff = Math.abs(diff);
+
+        // 1. Total Miss
+        if (absDiff >= activeBlock.w) {
+          fallingDebris.push({
+            ...activeBlock,
+            vy: 0,
+            rotX: 0,
+            rotZ: activeBlock.dir * 0.06,
+            alpha: 1.0
+          });
+          activeBlock = null;
+          die();
+          return;
         }
-      } else if (absDiff >= currentBlock.w) {
-        // Complete miss!
-        debris.push({
-          x: currentBlock.x,
-          y: currentBlock.y,
-          w: currentBlock.w,
-          color: currentBlock.color,
-          vx: currentBlock.vx > 0 ? 3 : -3,
-          vy: 1,
-          rot: 0,
-          vRot: currentBlock.vx > 0 ? 0.08 : -0.08,
-          alpha: 1.0
-        });
-        currentBlock = null;
-        die();
-        return;
+
+        // 2. Perfect Placement (< 5px)
+        if (absDiff < 5) {
+          activeBlock.x = top.x;
+          stack.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: top.z,
+            w: top.w,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+          if (window.Jumby) {
+            if (window.Jumby.sound) window.Jumby.sound.coin();
+            if (window.Jumby.fx) {
+              const scr = toScreen(top.x + top.w / 2, activeBlock.y + BLOCK_HEIGHT, top.z + top.d / 2, width / 2, height * 0.68 + cameraY);
+              window.Jumby.fx.particles(scr.x, scr.y, 22, '#D8FF43');
+              window.Jumby.fx.addFloatingText('PERFECT! +50', scr.x, scr.y - 15, '#D8FF43', 24);
+            }
+          }
+        } else {
+          // Slice overhang
+          const newW = activeBlock.w - absDiff;
+          const newX = diff > 0 ? activeBlock.x : top.x;
+          const debrisW = absDiff;
+          const debrisX = diff > 0 ? top.x + newW : activeBlock.x;
+
+          stack.push({
+            x: newX,
+            y: activeBlock.y,
+            z: top.z,
+            w: newW,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+
+          fallingDebris.push({
+            x: debrisX,
+            y: activeBlock.y,
+            z: top.z,
+            w: debrisW,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color,
+            vy: 0,
+            rotX: 0,
+            rotZ: diff > 0 ? 0.07 : -0.07,
+            alpha: 1.0
+          });
+
+          if (window.Jumby) {
+            if (window.Jumby.sound) window.Jumby.sound.score();
+          }
+        }
       } else {
-        // Slice overhang
-        const newW = currentBlock.w - absDiff;
-        const newX = diff > 0 ? currentBlock.x : prev.x;
-        const debX = diff > 0 ? prev.x + newW : currentBlock.x;
+        // Z Axis Slicing
+        const diff = activeBlock.z - top.z;
+        const absDiff = Math.abs(diff);
 
-        debris.push({
-          x: debX,
-          y: currentBlock.y,
-          w: absDiff,
-          color: currentBlock.color,
-          vx: diff > 0 ? 3 : -3,
-          vy: -2,
-          rot: 0,
-          vRot: diff > 0 ? 0.08 : -0.08,
-          alpha: 1.0
-        });
+        // 1. Total Miss
+        if (absDiff >= activeBlock.d) {
+          fallingDebris.push({
+            ...activeBlock,
+            vy: 0,
+            rotX: activeBlock.dir * 0.06,
+            rotZ: 0,
+            alpha: 1.0
+          });
+          activeBlock = null;
+          die();
+          return;
+        }
 
-        stack.push({ x: newX, y: currentBlock.y, w: newW, color: currentBlock.color });
-        score++;
-        scoreEl.textContent = score;
-        if (window.Jumby) {
-          window.Jumby.setScore(score);
-          window.Jumby.sound.score();
+        // 2. Perfect Placement (< 5px)
+        if (absDiff < 5) {
+          activeBlock.z = top.z;
+          stack.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: top.z,
+            w: top.w,
+            d: top.d,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+          if (window.Jumby) {
+            if (window.Jumby.sound) window.Jumby.sound.coin();
+            if (window.Jumby.fx) {
+              const scr = toScreen(top.x + top.w / 2, activeBlock.y + BLOCK_HEIGHT, top.z + top.d / 2, width / 2, height * 0.68 + cameraY);
+              window.Jumby.fx.particles(scr.x, scr.y, 22, '#D8FF43');
+              window.Jumby.fx.addFloatingText('PERFECT! +50', scr.x, scr.y - 15, '#D8FF43', 24);
+            }
+          }
+        } else {
+          // Slice overhang along Z
+          const newD = activeBlock.d - absDiff;
+          const newZ = diff > 0 ? activeBlock.z : top.z;
+          const debrisD = absDiff;
+          const debrisZ = diff > 0 ? top.z + newD : activeBlock.z;
+
+          stack.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: newZ,
+            w: top.w,
+            d: newD,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color
+          });
+
+          fallingDebris.push({
+            x: top.x,
+            y: activeBlock.y,
+            z: debrisZ,
+            w: top.w,
+            d: debrisD,
+            h: BLOCK_HEIGHT,
+            color: activeBlock.color,
+            vy: 0,
+            rotX: diff > 0 ? 0.07 : -0.07,
+            rotZ: 0,
+            alpha: 1.0
+          });
+
+          if (window.Jumby) {
+            if (window.Jumby.sound) window.Jumby.sound.score();
+          }
         }
       }
 
-      targetCameraY += blockHeight;
-      spawnNext();
+      score++;
+      scoreEl.textContent = score;
+      if (window.Jumby) window.Jumby.setScore(score);
+
+      targetCameraY += BLOCK_HEIGHT;
+      spawnNextBlock();
     }
 
     function die() {
@@ -573,8 +721,17 @@ function generateStackHtml(config: GameTemplateConfig): string {
       hintEl.style.display = 'block';
       hintEl.textContent = 'MISSED! TAP TO RETRY';
       if (window.Jumby) {
-        window.Jumby.sound.hit();
+        if (window.Jumby.sound) window.Jumby.sound.hit();
+        if (window.Jumby.fx) window.Jumby.fx.shake(16);
         window.Jumby.gameOver(score);
+      }
+    }
+
+    function handleAction() {
+      if (state === 'dead') {
+        resetGame();
+      } else if (state === 'playing') {
+        drop();
       }
     }
 
@@ -586,71 +743,131 @@ function generateStackHtml(config: GameTemplateConfig): string {
       }
     });
 
-    initGame();
-    state = 'playing';
+    function drawIsoBlock(b, originX, originY) {
+      const x = b.x;
+      const y = b.y;
+      const z = b.z;
+      const w = b.w;
+      const d = b.d;
+      const h = b.h;
+
+      // 8 Isometric Vertices
+      const p1 = toScreen(x, y + h, z, originX, originY);
+      const p2 = toScreen(x + w, y + h, z, originX, originY);
+      const p3 = toScreen(x + w, y + h, z + d, originX, originY);
+      const p4 = toScreen(x, y + h, z + d, originX, originY);
+
+      const p5 = toScreen(x, y, z + d, originX, originY);
+      const p6 = toScreen(x + w, y, z + d, originX, originY);
+      const p7 = toScreen(x + w, y, z, originX, originY);
+
+      // 1. Front-Left Face (medium shade)
+      ctx.fillStyle = shade(b.color, -16);
+      ctx.beginPath();
+      ctx.moveTo(p4.x, p4.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.lineTo(p6.x, p6.y);
+      ctx.lineTo(p5.x, p5.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2. Front-Right Face (darker shadow)
+      ctx.fillStyle = shade(b.color, -32);
+      ctx.beginPath();
+      ctx.moveTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.lineTo(p6.x, p6.y);
+      ctx.lineTo(p7.x, p7.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3. Top Face (bright pastel)
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.lineTo(p4.x, p4.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Subtle top rim highlight
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    resetGame();
 
     function loop() {
       requestAnimationFrame(loop);
 
-      ctx.fillStyle = '${config.bgGradient[0]}';
+      // Background Gradient
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, '#1E1A34');
+      grad.addColorStop(1, '#0F0D1B');
+      ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      cameraY += (targetCameraY - cameraY) * 0.12;
+      // Smooth Camera Lerp
+      cameraY += (targetCameraY - cameraY) * 0.1;
+      const originX = width / 2;
+      const originY = height * 0.68 + cameraY;
 
-      ctx.save();
-      ctx.translate(0, cameraY);
+      // Update Moving Active Block
+      if (state === 'playing' && activeBlock) {
+        if (activeBlock.axis === 'x') {
+          activeBlock.x += activeBlock.speed * activeBlock.dir;
+          if (activeBlock.x > activeBlock.limit) {
+            activeBlock.x = activeBlock.limit;
+            activeBlock.dir = -1;
+          } else if (activeBlock.x < -activeBlock.limit) {
+            activeBlock.x = -activeBlock.limit;
+            activeBlock.dir = 1;
+          }
+        } else {
+          activeBlock.z += activeBlock.speed * activeBlock.dir;
+          if (activeBlock.z > activeBlock.limit) {
+            activeBlock.z = activeBlock.limit;
+            activeBlock.dir = -1;
+          } else if (activeBlock.z < -activeBlock.limit) {
+            activeBlock.z = -activeBlock.limit;
+            activeBlock.dir = 1;
+          }
+        }
+      }
 
-      // Render Debris
-      for (let i = debris.length - 1; i >= 0; i--) {
-        const d = debris[i];
-        d.x += d.vx;
-        d.y += d.vy;
-        d.vy += 0.55;
-        d.rot += d.vRot;
-        d.alpha -= 0.025;
-        if (d.alpha <= 0 || d.y > height + 200) {
-          debris.splice(i, 1);
+      // 1. Draw Static Stacked Blocks (rendered from base up)
+      for (let i = 0; i < stack.length; i++) {
+        drawIsoBlock(stack[i], originX, originY);
+      }
+
+      // 2. Draw Moving Active Block
+      if (state === 'playing' && activeBlock) {
+        drawIsoBlock(activeBlock, originX, originY);
+      }
+
+      // 3. Render Falling Debris with Gravity Physics
+      for (let i = fallingDebris.length - 1; i >= 0; i--) {
+        const d = fallingDebris[i];
+        d.y -= d.vy;
+        d.vy += 0.8; // gravity
+        d.alpha -= 0.02;
+
+        if (d.alpha <= 0 || d.y < -300) {
+          fallingDebris.splice(i, 1);
           continue;
         }
+
         ctx.save();
         ctx.globalAlpha = Math.max(0, d.alpha);
-        ctx.translate(d.x + d.w / 2, d.y + blockHeight / 2);
-        ctx.rotate(d.rot);
-        ctx.fillStyle = d.color;
-        ctx.fillRect(-d.w / 2, -blockHeight / 2, d.w, blockHeight - 2);
+        drawIsoBlock(d, originX, originY);
         ctx.restore();
       }
 
-      if (state === 'playing' && currentBlock) {
-        currentBlock.x += currentBlock.vx;
-        if (currentBlock.x + currentBlock.w > width + 20 || currentBlock.x < -20) {
-          currentBlock.vx *= -1;
-        }
+      if (window.Jumby && window.Jumby.fx) {
+        window.Jumby.fx.updateAndRender(ctx, width, height);
       }
-
-      for (const b of stack) {
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = 'rgba(0,0,0,0.35)';
-        ctx.fillStyle = b.color;
-        ctx.fillRect(b.x, b.y, b.w, blockHeight - 2);
-
-        // Highlight
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.fillRect(b.x, b.y, b.w, 4);
-      }
-
-      if (currentBlock && state === 'playing') {
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = currentBlock.color;
-        ctx.fillStyle = currentBlock.color;
-        ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, blockHeight - 2);
-
-        // Highlight
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fillRect(currentBlock.x, currentBlock.y, currentBlock.w, 4);
-      }
-
-      ctx.restore();
     }
 
     loop();
