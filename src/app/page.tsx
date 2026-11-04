@@ -1,13 +1,8 @@
-import { GameFeed } from '@/components/feed/GameFeed';
-import { MobileShell } from '@/components/layout/MobileShell';
+import { ExploreGrid } from '@/components/explore/ExploreGrid';
 import { getAllGames } from '@/lib/games/game-registry';
-
 
 export default function HomePage() {
   const games = getAllGames();
-  return (
-    <MobileShell>
-      <GameFeed games={games} />
-    </MobileShell>
-  );
+  return <ExploreGrid games={games} />;
 }
+

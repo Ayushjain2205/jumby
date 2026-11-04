@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { GameFeed } from '@/components/feed/GameFeed';
+import { DedicatedGamePlayer } from '@/components/game/DedicatedGamePlayer';
 import { MobileShell } from '@/components/layout/MobileShell';
 import { getAllGames, getGameBySlug } from '@/lib/games/game-registry';
 
@@ -59,14 +59,7 @@ async function GamePageContent({ params }: GamePageProps) {
     notFound();
   }
 
-  const allGames = getAllGames();
-  // Reorder so the requested game is first, followed by the rest of the recommendation feed
-  const orderedGames = [
-    game,
-    ...allGames.filter((g) => g.slug !== slug),
-  ];
-
-  return <GameFeed games={orderedGames} initialSlug={slug} />;
+  return <DedicatedGamePlayer game={game} />;
 }
 
 export default function GamePermalinkPage({ params }: GamePageProps) {

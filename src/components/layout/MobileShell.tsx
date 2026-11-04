@@ -1,7 +1,6 @@
 'use client';
 
-import React from 'react';
-import { ArrowUp, ArrowDown, Space, Sparkles } from 'lucide-react';
+import { Space } from 'lucide-react';
 import { WalletProvider } from '@/context/WalletContext';
 import { PaymentModal } from '@/components/modals/PaymentModal';
 import { RewardedAdModal } from '@/components/modals/RewardedAdModal';
@@ -56,22 +55,10 @@ export function MobileShell({ children }: MobileShellProps) {
               Quick Controls
             </div>
             <div className="flex items-center gap-2 text-xs text-zinc-300">
-              <div className="flex gap-1">
-                <kbd className="px-1.5 py-0.5 rounded-lg bg-zinc-800 border border-zinc-700 font-mono text-[10px] text-zinc-200">
-                  <ArrowUp className="w-3 h-3 inline" />
-                </kbd>
-                <kbd className="px-1.5 py-0.5 rounded-lg bg-zinc-800 border border-zinc-700 font-mono text-[10px] text-zinc-200">
-                  <ArrowDown className="w-3 h-3 inline" />
-                </kbd>
-              </div>
-              <span>Swipe Games</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-zinc-300">
               <kbd className="px-2 py-0.5 rounded-lg bg-zinc-800 border border-zinc-700 font-mono text-[10px] text-zinc-200 flex items-center gap-1">
-                <Space className="w-3 h-3" /> Space
+                <Space className="w-3 h-3" /> Space / Click
               </kbd>
-              <span>Tap / Jump / Action</span>
+              <span>Tap & Play</span>
             </div>
           </div>
         </div>
