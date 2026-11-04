@@ -22,7 +22,11 @@ import {
   Loader2,
   X,
   ExternalLink,
+  Smartphone,
+  Monitor,
+  Layers,
 } from 'lucide-react';
+import { Game } from '@/types/game';
 import { SEED_GAMES } from '@/data/seed-games';
 import {
   generateGameHtml,
@@ -31,6 +35,12 @@ import {
 } from '@/lib/templates/game-generator';
 import { validateAndHealGameHtml } from '@/lib/ai/game-healer';
 import { JumbyMascot } from '@/components/brand/JumbyMascot';
+import {
+  LovableHeroCreator,
+  TargetDevice,
+  AttachedImage,
+} from '@/components/create/LovableHeroCreator';
+import { TemplatePickerModal } from '@/components/create/TemplatePickerModal';
 import {
   GAME_FONTS,
   detectFontVibe,
@@ -166,6 +176,30 @@ function CreateStudioContent() {
   const [activeFontVibe, setActiveFontVibe] = useState<string>('cartoon');
   const [speedMultiplier, setSpeedMultiplier] = useState(1.2);
   const [gravity, setGravity] = useState(0.38);
+
+  // Target & Preview Device ('mobile' | 'desktop' | 'responsive')
+  const [targetDevice, setTargetDevice] = useState<TargetDevice>('mobile');
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
+
+  // Attached Reference Images & Template Picker
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Game | null>(parentGame || null);
+
+  const handleTargetDeviceChange = (dev: TargetDevice) => {
+    setTargetDevice(dev);
+    if (dev === 'desktop') setPreviewDevice('desktop');
+    else setPreviewDevice('mobile');
+  };
+
+  const handleSelectTemplate = (template: Game) => {
+    setSelectedTemplate(template);
+    setTitle(`${template.title} (Remix)`);
+    if (template.tags.some((t) => t.toLowerCase().includes('stack'))) setArchetype('stack');
+    else if (template.tags.some((t) => t.toLowerCase().includes('orbit') || t.toLowerCase().includes('dodge'))) setArchetype('orbit');
+    else setArchetype('flappy');
+    setInputPrompt(`A remix of ${template.title} with faster speed and neon colors`);
+  };
 
   // Left Studio Panel Tabs: 'chat' | 'tune'
   const [panelTab, setPanelTab] = useState<'chat' | 'tune'>('chat');
@@ -374,6 +408,8 @@ function CreateStudioContent() {
           prompt: promptText,
           archetype: targetArchetype,
           baseCode: gameHtml,
+          targetDevice,
+          referenceImages: attachedImages.map((img) => ({ name: img.name, dataUrl: img.dataUrl })),
         }),
       });
 
@@ -571,6 +607,38 @@ function CreateStudioContent() {
     osc.stop(ctx.currentTime + 0.15);
   };
 
+  const isHeroState = !gameHtml && !isGenerating && messages.length <= 1;
+
+  if (isHeroState) {
+    return (
+      <div className="h-screen w-screen bg-jumby-ink text-white overflow-hidden font-sans">
+        <LovableHeroCreator
+          prompt={inputPrompt}
+          onPromptChange={setInputPrompt}
+          onSubmit={() => handleApplyPrompt(inputPrompt)}
+          isGenerating={isGenerating}
+          selectedTemplate={selectedTemplate}
+          onOpenTemplatePicker={() => setIsTemplatePickerOpen(true)}
+          onClearTemplate={() => setSelectedTemplate(null)}
+          targetDevice={targetDevice}
+          onTargetDeviceChange={handleTargetDeviceChange}
+          attachedImages={attachedImages}
+          onAddImages={(newImgs) => setAttachedImages((prev) => [...prev, ...newImgs])}
+          onRemoveImage={(id) => setAttachedImages((prev) => prev.filter((img) => img.id !== id))}
+          onSelectSuggestion={(sugg) => {
+            setInputPrompt(sugg);
+            handleApplyPrompt(sugg);
+          }}
+        />
+        <TemplatePickerModal
+          isOpen={isTemplatePickerOpen}
+          onClose={() => setIsTemplatePickerOpen(false)}
+          onSelectTemplate={handleSelectTemplate}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen bg-jumby-ink text-white overflow-hidden font-sans">
       {/* Top Studio Navbar */}
@@ -602,6 +670,36 @@ function CreateStudioContent() {
               Jumby Studio • Rimsha Micro-Engine Runtime
             </div>
           </div>
+        </div>
+
+        {/* Device Preview Toggle */}
+        <div className="flex items-center bg-zinc-900 border border-white/10 rounded-full p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => setPreviewDevice('mobile')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-heading font-bold transition-all ${
+              previewDevice === 'mobile'
+                ? 'bg-jumby-purple text-white shadow-xs'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            title="Mobile Portrait Simulator (9:16)"
+          >
+            <Smartphone className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Mobile</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewDevice('desktop')}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-heading font-bold transition-all ${
+              previewDevice === 'desktop'
+                ? 'bg-jumby-purple text-white shadow-xs'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            title="Desktop 16:9 Monitor View"
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Desktop</span>
+          </button>
         </div>
 
         {/* Top Right Controls */}
@@ -1025,11 +1123,32 @@ function CreateStudioContent() {
           </div>
         </div>
 
-        {/* Right Side: Live Interactive Phone Simulator */}
+        {/* Right Side: Live Interactive Phone / Desktop Simulator */}
         <div className="flex-1 bg-black flex flex-col items-center justify-center p-2 sm:p-4 relative overflow-hidden">
           <div className="w-full h-full flex flex-col items-center justify-center">
-            {/* Phone Frame Mockup for Realistic Portrait Feel */}
-            <div className="relative w-full max-w-[390px] h-full max-h-[800px] rounded-[36px] overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col">
+            {/* Frame Mockup: Mobile (390px portrait) vs Desktop (16:9 widescreen) */}
+            <div
+              className={`relative overflow-hidden border-4 border-zinc-800 bg-black shadow-2xl flex flex-col transition-all duration-300 ${
+                previewDevice === 'desktop'
+                  ? 'w-full max-w-[860px] aspect-[16/9] max-h-[520px] rounded-[24px]'
+                  : 'w-full max-w-[390px] h-full max-h-[800px] rounded-[36px]'
+              }`}
+            >
+              {/* Desktop Monitor Header Bar */}
+              {previewDevice === 'desktop' && (
+                <div className="h-7 bg-zinc-900 border-b border-white/10 px-3 flex items-center justify-between shrink-0 select-none">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
+                  </div>
+                  <div className="text-[10px] font-mono text-zinc-400 truncate max-w-[200px]">
+                    {title} • 16:9 Desktop Monitor
+                  </div>
+                  <div className="w-10" />
+                </div>
+              )}
+
               {/* Generation Overlay while cooking */}
               {isGenerating && (
                 <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
@@ -1093,6 +1212,13 @@ function CreateStudioContent() {
           </div>
         </div>
       </div>
+      {/* Template Picker Modal */}
+      <TemplatePickerModal
+        isOpen={isTemplatePickerOpen}
+        onClose={() => setIsTemplatePickerOpen(false)}
+        onSelectTemplate={handleSelectTemplate}
+      />
+
       {/* Publish Success Modal */}
       {publishedSlug && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-jumby-ink/85 backdrop-blur-md p-4 animate-fade-in font-sans">

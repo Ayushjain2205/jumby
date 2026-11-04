@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
       archetype = 'flappy',
       apiKey: clientApiKey,
       provider = 'auto',
+      targetDevice = 'mobile',
+      referenceImages = [],
     } = body;
 
     if (!prompt || typeof prompt !== 'string') {
@@ -40,7 +42,9 @@ export async function POST(req: NextRequest) {
           cliProxyModel,
           prompt,
           archetype,
-          effectiveBaseCode
+          effectiveBaseCode,
+          targetDevice,
+          referenceImages
         );
         if (proxyStream) {
           return proxyStream;
@@ -55,9 +59,9 @@ export async function POST(req: NextRequest) {
     const useOpenAI = provider === 'openai' || (provider === 'auto' && openaiKey && !geminiKey);
 
     if (useGemini && geminiKey) {
-      return streamFromGemini(geminiKey, prompt, archetype, effectiveBaseCode);
+      return streamFromGemini(geminiKey, prompt, archetype, effectiveBaseCode, targetDevice, referenceImages);
     } else if (useOpenAI && openaiKey) {
-      return streamFromOpenAI(openaiKey, prompt, archetype, effectiveBaseCode);
+      return streamFromOpenAI(openaiKey, prompt, archetype, effectiveBaseCode, targetDevice, referenceImages);
     }
 
     // 3. Fallback: High-fidelity procedural dynamic generation with SSE streaming
@@ -80,9 +84,11 @@ async function streamFromCliProxy(
   model: string,
   prompt: string,
   archetype?: string,
-  baseCode?: string
+  baseCode?: string,
+  targetDevice?: 'mobile' | 'desktop' | 'responsive',
+  referenceImages?: { name: string; dataUrl?: string }[]
 ): Promise<Response | null> {
-  const systemPrompt = buildSystemPrompt({ archetype, baseCode });
+  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages });
   const endpoint = `${proxyUrl.replace(/\/+$/, '')}/v1/chat/completions`;
 
   const controller = new AbortController();
@@ -248,8 +254,15 @@ function streamProceduralGame(prompt: string, archetype: any, baseCode?: string)
 /**
  * Live Google Gemini 2.5 Flash Streaming
  */
-async function streamFromGemini(apiKey: string, prompt: string, archetype?: string, baseCode?: string) {
-  const systemPrompt = buildSystemPrompt({ archetype, baseCode });
+async function streamFromGemini(
+  apiKey: string,
+  prompt: string,
+  archetype?: string,
+  baseCode?: string,
+  targetDevice?: 'mobile' | 'desktop' | 'responsive',
+  referenceImages?: { name: string; dataUrl?: string }[]
+) {
+  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages });
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const geminiPayload = {
@@ -328,8 +341,15 @@ async function streamFromGemini(apiKey: string, prompt: string, archetype?: stri
 /**
  * Live OpenAI GPT-4o / GPT-4o-mini Streaming
  */
-async function streamFromOpenAI(apiKey: string, prompt: string, archetype?: string, baseCode?: string) {
-  const systemPrompt = buildSystemPrompt({ archetype, baseCode });
+async function streamFromOpenAI(
+  apiKey: string,
+  prompt: string,
+  archetype?: string,
+  baseCode?: string,
+  targetDevice?: 'mobile' | 'desktop' | 'responsive',
+  referenceImages?: { name: string; dataUrl?: string }[]
+) {
+  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages });
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {

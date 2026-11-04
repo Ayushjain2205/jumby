@@ -113,9 +113,29 @@ export const JUMBY_BRAND_PALETTE = {
   darkCard: '#181824',
 };
 
-export function buildSystemPrompt(options?: { archetype?: string; baseCode?: string }): string {
-  return `You are the world's best Micro-Game AI Engineer for "Jumby" — the TikTok of instant mobile games.
-You generate hyper-engaging, addictive, single-tap or simple-control HTML5 canvas games that run inside responsive portrait mobile screens (390x844 aspect or full window).
+export function buildSystemPrompt(options?: {
+  archetype?: string;
+  baseCode?: string;
+  targetDevice?: 'mobile' | 'desktop' | 'responsive';
+  referenceImages?: { name: string; dataUrl?: string }[];
+}): string {
+  const deviceSpecs =
+    options?.targetDevice === 'desktop'
+      ? 'TARGET DEVICE: Desktop Widescreen (16:9 landscape aspect ratio, e.g. 800x450 or full canvas). Must support keyboard controls (Arrow Keys, WASD, Spacebar) in addition to mouse click/drag.'
+      : options?.targetDevice === 'responsive'
+      ? 'TARGET DEVICE: Responsive Universal (Runs cleanly on both Mobile 9:16 Portrait and Desktop 16:9 Landscape with responsive canvas scaling and touch + keyboard/mouse controls).'
+      : 'TARGET DEVICE: Mobile Portrait (9:16 aspect ratio, 390x844 or full window touch screen). Responsive 1-tap/touch control loop.';
+
+  const referenceNotice =
+    options?.referenceImages && options.referenceImages.length > 0
+      ? `\n### USER ATTACHED REFERENCE IMAGES/SKETCHES:\nThe user attached visual reference files: [${options.referenceImages.map((img) => img.name).join(', ')}]. Honor the visual style, characters, collectible items, and color themes suggested by these references.\n`
+      : '';
+
+  return `You are the world's best Micro-Game AI Engineer for "Jumby" — the platform for instant micro-games.
+You generate hyper-engaging, addictive HTML5 canvas games that run inside responsive web screens.
+
+${deviceSpecs}
+${referenceNotice}
 
 ### CRITICAL RULES & CONSTRAINTS (RIMSHA'S ENGINE PATTERN):
 1. **NEVER WRITE PHYSICS OR AUDIO ENGINES FROM SCRATCH**:
