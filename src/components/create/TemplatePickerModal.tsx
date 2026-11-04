@@ -3,13 +3,41 @@
 import React from 'react';
 import { Game } from '@/types/game';
 import { SEED_GAMES } from '@/data/seed-games';
-import { X, Sparkles, Gamepad2, ArrowRight } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface TemplatePickerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectTemplate: (game: Game) => void;
 }
+
+const TILE_GRADIENTS = [
+  'from-violet-600 via-purple-700 to-indigo-950',
+  'from-emerald-500 via-teal-600 to-cyan-950',
+  'from-rose-500 via-pink-600 to-purple-950',
+  'from-amber-500 via-orange-600 to-red-950',
+  'from-cyan-500 via-blue-600 to-slate-950',
+  'from-fuchsia-600 via-pink-600 to-rose-950',
+  'from-lime-500 via-emerald-600 to-teal-950',
+  'from-sky-500 via-indigo-600 to-violet-950',
+  'from-yellow-500 via-amber-600 to-orange-950',
+  'from-red-600 via-rose-700 to-pink-950',
+];
+
+const GAME_EMOJIS: Record<string, string> = {
+  'sky-islands': '🏝️',
+  'flappy-neon': '⚡',
+  'build-and-chill': '🧱',
+  'laser-dodge': '🎯',
+  'cyberdrift-ad': '🏎️',
+  'chroma-jump': '🌈',
+  'pixel-dash': '🏃',
+  'tower-slice': '🏛️',
+  'orbit-clash': '🪐',
+  'space-blast': '🚀',
+  'gravity-flip': '🔄',
+  'make-a-tik-cvfv': '✨',
+};
 
 export function TemplatePickerModal({
   isOpen,
@@ -20,76 +48,61 @@ export function TemplatePickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150 font-sans">
-      <div className="relative w-full max-w-2xl max-h-[85vh] bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-jumby-purple/20 border border-jumby-purple/40 flex items-center justify-center text-jumby-purple">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-base font-heading font-black text-white">Inspired by Template</h3>
-              <p className="text-xs text-zinc-400">Choose a game archetype or mechanic to start from</p>
-            </div>
-          </div>
-
+      <div className="relative w-full max-w-3xl max-h-[85vh] bg-zinc-950 border border-white/10 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Header: Title and Close button only */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 shrink-0">
+          <h3 className="text-base font-heading font-black text-white">Inspired by</h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all"
+            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white transition-all active:scale-95"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Templates Grid */}
-        <div className="p-6 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3.5 no-scrollbar">
-          {SEED_GAMES.filter((g) => !g.isSponsored).map((game) => (
-            <div
-              key={game.id}
-              onClick={() => {
-                onSelectTemplate(game);
-                onClose();
-              }}
-              className="group p-4 rounded-2xl bg-zinc-950/70 hover:bg-zinc-800/80 border border-white/5 hover:border-jumby-lime/50 transition-all cursor-pointer flex flex-col justify-between gap-3 shadow-md active:scale-[0.98]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-jumby-purple/40 to-jumby-lime/30 border border-white/10 flex items-center justify-center text-xl shrink-0">
-                    <Gamepad2 className="w-5 h-5 text-jumby-lime" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-heading font-black text-white group-hover:text-jumby-lime transition-colors">
-                      {game.title}
-                    </h4>
-                    <span className="text-[10px] text-zinc-400 font-mono">
-                      {game.tags.slice(0, 2).join(' • ')}
-                    </span>
-                  </div>
+        {/* Thumbnail & Name Grid */}
+        <div className="p-5 overflow-y-auto grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 sm:gap-4 no-scrollbar">
+          {SEED_GAMES.filter((g) => !g.isSponsored).map((game, idx) => {
+            const gradient = TILE_GRADIENTS[idx % TILE_GRADIENTS.length];
+            const emoji = GAME_EMOJIS[game.slug] || '🎮';
+
+            return (
+              <button
+                key={game.id}
+                onClick={() => {
+                  onSelectTemplate(game);
+                  onClose();
+                }}
+                className="group flex flex-col items-center gap-2 p-1.5 rounded-2xl hover:bg-white/5 transition-all text-center focus:outline-none"
+              >
+                {/* Visual Thumbnail */}
+                <div className="relative aspect-square w-full rounded-2xl overflow-hidden border-2 border-white/10 group-hover:border-jumby-lime group-hover:scale-105 shadow-md group-hover:shadow-xl transition-all duration-200 bg-zinc-900 flex items-center justify-center">
+                  {game.thumbnailUrl ? (
+                    <img
+                      src={game.thumbnailUrl}
+                      alt={game.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-95 group-hover:opacity-100 transition-opacity flex items-center justify-center`}
+                    >
+                      <span className="text-3xl sm:text-4xl drop-shadow-md select-none group-hover:scale-115 transition-transform duration-200">
+                        {emoji}
+                      </span>
+                    </div>
+                  )}
+                  {/* Sheen on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 </div>
-                <ArrowRight className="w-4 h-4 text-zinc-500 group-hover:text-jumby-lime group-hover:translate-x-0.5 transition-all" />
-              </div>
 
-              <p className="text-xs text-zinc-400 line-clamp-2 leading-relaxed">
-                {game.description}
-              </p>
-
-              <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-2 border-t border-white/5 font-mono">
-                <span>{game.controlsHint}</span>
-                <span className="text-jumby-lime font-bold">Remix ⚡</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-3.5 bg-zinc-950 border-t border-white/10 flex items-center justify-between text-xs text-zinc-400 shrink-0">
-          <span>Don&apos;t want a template?</span>
-          <button
-            onClick={onClose}
-            className="text-xs font-bold text-jumby-lime hover:underline"
-          >
-            Start with Blank Slate
-          </button>
+                {/* Game Name */}
+                <span className="text-xs font-heading font-black text-white group-hover:text-jumby-lime truncate w-full transition-colors">
+                  {game.title}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
