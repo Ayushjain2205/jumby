@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { Game } from '@/types/game';
 
 interface GameTileProps {
   game: Game;
   index: number;
-  onClick?: (e: React.MouseEvent) => void;
 }
 
 // Preset playful color themes for tiles to recreate the iconic Friv mosaic vibe
@@ -38,15 +38,15 @@ const GAME_EMOJIS: Record<string, string> = {
   'make-a-tik-cvfv': '✨',
 };
 
-export function GameTile({ game, index, onClick }: GameTileProps) {
+export function GameTile({ game, index }: GameTileProps) {
   const gradient = TILE_GRADIENTS[index % TILE_GRADIENTS.length];
   const emoji = GAME_EMOJIS[game.slug] || '🎮';
 
   return (
-    <div
-      onClick={onClick}
+    <Link
+      href={`/g/${game.slug}`}
       title={game.title}
-      className="group relative flex aspect-square w-full h-full rounded-2xl overflow-hidden border-2 border-white/10 hover:border-jumby-lime shadow-md hover:shadow-2xl hover:shadow-jumby-purple/30 transition-all duration-200 active:scale-95 hover:scale-105 select-none cursor-pointer bg-zinc-900"
+      className="group relative flex aspect-square w-full rounded-2xl overflow-hidden border-2 border-white/10 hover:border-jumby-lime shadow-md hover:shadow-2xl hover:shadow-jumby-purple/30 transition-all duration-200 active:scale-95 hover:scale-105 select-none cursor-pointer bg-zinc-900"
     >
       {/* Background Thumbnail or Vibrant Dynamic Gradient */}
       {game.thumbnailUrl ? (
@@ -73,8 +73,8 @@ export function GameTile({ game, index, onClick }: GameTileProps) {
         </div>
       )}
 
-      {/* Gloss / Sheen Highlight */}
+      {/* Gloss / Sheen Highlight on Hover */}
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-    </div>
+    </Link>
   );
 }
