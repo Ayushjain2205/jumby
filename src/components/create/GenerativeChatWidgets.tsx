@@ -1,14 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Zap,
-  Sliders,
-  Sparkles,
-  Check,
-  Swords,
-  Plus,
-} from 'lucide-react';
+import { Check, Zap, Swords, Sparkles } from 'lucide-react';
 
 export type GenerativeWidgetType = 'difficulty' | 'boss' | 'powerups';
 
@@ -26,433 +19,293 @@ interface DifficultyWidgetProps {
   isGenerating?: boolean;
 }
 
+const PRESETS = [
+  { id: 'chill',    icon: '🌱', label: 'Chill',    speed: 0.75, hazard: 'relaxed'  as const, prog: 'endless' as const },
+  { id: 'balanced', icon: '⚡', label: 'Balanced', speed: 1.2,  hazard: 'moderate' as const, prog: 'stages'  as const },
+  { id: 'chaos',    icon: '💀', label: 'Chaos',    speed: 1.9,  hazard: 'swarm'    as const, prog: 'boss'    as const },
+];
+
+const PROGRESSIONS = [
+  { id: 'endless', label: 'Endless Ramp' },
+  { id: 'stages',  label: '3-Stage Run'  },
+  { id: 'boss',    label: 'Boss Finale'  },
+];
+
 export function GenerativeDifficultyWidget({
   initialConfig,
   onApply,
   isGenerating = false,
 }: DifficultyWidgetProps) {
-  const [preset, setPreset] = useState<'chill' | 'balanced' | 'chaos'>(
-    initialConfig?.preset || 'balanced'
-  );
-  const [speedMultiplier, setSpeedMultiplier] = useState(
-    initialConfig?.speedMultiplier || 1.2
-  );
-  const [hazardDensity, setHazardDensity] = useState<'relaxed' | 'moderate' | 'swarm'>(
-    initialConfig?.hazardDensity || 'moderate'
-  );
-  const [progressionMode, setProgressionMode] = useState<'endless' | 'stages' | 'boss'>(
-    initialConfig?.progressionMode || 'stages'
-  );
+  const [preset, setPreset]       = useState<'chill' | 'balanced' | 'chaos'>(initialConfig?.preset || 'balanced');
+  const [speed, setSpeed]         = useState(initialConfig?.speedMultiplier || 1.2);
+  const [progression, setProg]    = useState<'endless' | 'stages' | 'boss'>(initialConfig?.progressionMode || 'stages');
   const [customRule, setCustomRule] = useState('');
-  const [applied, setApplied] = useState(false);
+  const [applied, setApplied]     = useState(false);
 
-  const handleSelectPreset = (p: 'chill' | 'balanced' | 'chaos') => {
-    setPreset(p);
+  const pickPreset = (p: typeof PRESETS[number]) => {
+    setPreset(p.id as any);
+    setSpeed(p.speed);
+    setProg(p.prog);
     setApplied(false);
-    if (p === 'chill') {
-      setSpeedMultiplier(0.85);
-      setHazardDensity('relaxed');
-      setProgressionMode('endless');
-    } else if (p === 'balanced') {
-      setSpeedMultiplier(1.2);
-      setHazardDensity('moderate');
-      setProgressionMode('stages');
-    } else {
-      setSpeedMultiplier(1.8);
-      setHazardDensity('swarm');
-      setProgressionMode('boss');
-    }
   };
 
   const handleApply = () => {
     setApplied(true);
     onApply({
       preset,
-      speedMultiplier,
-      hazardDensity,
-      progressionMode,
+      speedMultiplier: speed,
+      hazardDensity: PRESETS.find(p => p.id === preset)?.hazard || 'moderate',
+      progressionMode: progression,
       customRule: customRule.trim() || undefined,
     });
   };
 
   return (
-    <div className="w-full mt-2.5 rounded-2xl bg-[#161426] border border-jumby-purple/30 p-3.5 text-white shadow-xl shadow-jumby-purple/10 space-y-3 font-sans">
-      {/* Header Badge */}
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-        <div className="flex items-center gap-1.5 font-heading font-black text-xs text-jumby-lime">
-          <Sliders className="w-3.5 h-3.5" />
-          <span>Interactive Pacing & Difficulty</span>
-        </div>
+    <div className="w-full mt-2 rounded-2xl bg-zinc-900 border border-white/10 p-3 space-y-3 font-sans">
+      {/* Presets */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {PRESETS.map(p => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => pickPreset(p)}
+            className={`flex flex-col items-center py-2.5 rounded-xl border text-center transition-all active:scale-95 ${
+              preset === p.id
+                ? 'bg-jumby-purple/20 border-jumby-purple text-white'
+                : 'bg-zinc-800/60 border-transparent text-zinc-400 hover:text-white hover:border-white/15'
+            }`}
+          >
+            <span className="text-lg leading-none mb-1">{p.icon}</span>
+            <span className="text-[11px] font-heading font-black">{p.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Preset Selector */}
+      {/* Speed Slider */}
       <div>
-        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1.5">
-          Pacing Presets
-        </label>
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { id: 'chill', icon: '🌱', label: 'Chill', desc: 'Relaxed & easy' },
-            { id: 'balanced', icon: '⚡', label: 'Balanced', desc: 'Classic arcade' },
-            { id: 'chaos', icon: '💀', label: 'Chaos', desc: 'Hardcore bullet-hell' },
-          ].map((item) => {
-            const isSelected = preset === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleSelectPreset(item.id as any)}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-center transition-all ${
-                  isSelected
-                    ? 'bg-jumby-purple/20 border-jumby-purple text-white shadow-sm shadow-jumby-purple/30 ring-1 ring-jumby-purple/50'
-                    : 'bg-zinc-900/60 border-white/10 text-zinc-400 hover:text-white hover:border-white/20'
-                }`}
-              >
-                <span className="text-sm mb-0.5">{item.icon}</span>
-                <span className="text-xs font-heading font-bold">{item.label}</span>
-                <span className="text-[9px] text-zinc-400 hidden sm:inline">{item.desc}</span>
-              </button>
-            );
-          })}
+        <div className="flex justify-between text-[11px] mb-1.5">
+          <span className="text-zinc-400">Speed</span>
+          <span className="font-mono text-jumby-lime font-bold">{speed.toFixed(1)}x</span>
         </div>
-      </div>
-
-      {/* Sliders */}
-      <div className="space-y-2.5 pt-1">
-        <div>
-          <div className="flex justify-between text-[11px] mb-1">
-            <span className="text-zinc-300 font-medium">Game Speed</span>
-            <span className="font-mono text-jumby-lime font-bold">{speedMultiplier.toFixed(1)}x</span>
-          </div>
-          <input
-            type="range"
-            min="0.6"
-            max="2.4"
-            step="0.1"
-            value={speedMultiplier}
-            onChange={(e) => {
-              setSpeedMultiplier(parseFloat(e.target.value));
-              setApplied(false);
-            }}
-            className="w-full accent-jumby-lime h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
-          />
-        </div>
-
-        <div>
-          <div className="flex justify-between text-[11px] mb-1">
-            <span className="text-zinc-300 font-medium">Hazard Spawn Rate</span>
-            <span className="font-mono text-jumby-sky font-bold capitalize">{hazardDensity}</span>
-          </div>
-          <div className="grid grid-cols-3 gap-1">
-            {(['relaxed', 'moderate', 'swarm'] as const).map((density) => (
-              <button
-                key={density}
-                type="button"
-                onClick={() => {
-                  setHazardDensity(density);
-                  setApplied(false);
-                }}
-                className={`py-1 text-[10px] font-heading font-bold rounded-lg border capitalize transition-all ${
-                  hazardDensity === density
-                    ? 'bg-jumby-sky/20 border-jumby-sky text-jumby-sky'
-                    : 'bg-zinc-900/60 border-white/5 text-zinc-400 hover:text-white'
-                }`}
-              >
-                {density}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Progression Mode */}
-      <div className="pt-1">
-        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1.5">
-          Progression Style
-        </label>
-        <div className="space-y-1">
-          {[
-            { id: 'endless', label: '♾️ Endless Score Ramp', desc: 'Speed ramps higher as you score' },
-            { id: 'stages', label: '🏆 3-Stage World Tour', desc: 'Level 1 → Level 2 → Level 3 transitions' },
-            { id: 'boss', label: '👹 Climax Boss Encounter', desc: 'Boss battle showdown at 50 points' },
-          ].map((mode) => {
-            const isSelected = progressionMode === mode.id;
-            return (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => {
-                  setProgressionMode(mode.id as any);
-                  setApplied(false);
-                }}
-                className={`w-full flex items-center justify-between p-2 rounded-xl border text-left transition-all ${
-                  isSelected
-                    ? 'bg-jumby-lime/10 border-jumby-lime/60 text-white'
-                    : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-white hover:border-white/15'
-                }`}
-              >
-                <div>
-                  <div className="text-xs font-heading font-bold text-white">{mode.label}</div>
-                  <div className="text-[9px] text-zinc-400">{mode.desc}</div>
-                </div>
-                {isSelected && <Check className="w-3.5 h-3.5 text-jumby-lime shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Custom Rule Input */}
-      <div className="pt-1">
-        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
-          Or Type Custom Rule / Mechanics
-        </label>
         <input
-          type="text"
-          value={customRule}
-          onChange={(e) => {
-            setCustomRule(e.target.value);
-            setApplied(false);
-          }}
-          placeholder="e.g. Gravity flips every 10 seconds, double jump on tap..."
-          className="w-full px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-jumby-lime font-sans"
+          type="range" min="0.5" max="2.5" step="0.1"
+          value={speed}
+          onChange={e => { setSpeed(parseFloat(e.target.value)); setApplied(false); }}
+          className="w-full accent-jumby-lime cursor-pointer"
         />
       </div>
 
-      {/* Apply Button */}
+      {/* Progression */}
+      <div className="flex gap-1.5">
+        {PROGRESSIONS.map(p => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => { setProg(p.id as any); setApplied(false); }}
+            className={`flex-1 py-1.5 rounded-lg text-[10px] font-heading font-bold transition-all border ${
+              progression === p.id
+                ? 'bg-jumby-lime/15 border-jumby-lime/50 text-jumby-lime'
+                : 'bg-zinc-800/50 border-transparent text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Custom Rule */}
+      <input
+        type="text"
+        value={customRule}
+        onChange={e => { setCustomRule(e.target.value); setApplied(false); }}
+        placeholder="Custom rule, e.g. gravity flips every 10s..."
+        className="w-full px-3 py-2 rounded-xl bg-zinc-800 border border-white/8 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-jumby-purple/50 transition-colors"
+      />
+
+      {/* Apply */}
       <button
         type="button"
         onClick={handleApply}
         disabled={isGenerating}
-        className={`w-full py-2 px-3 rounded-xl font-heading font-black text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer ${
+        className={`w-full py-2 rounded-xl font-heading font-black text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-40 ${
           applied
             ? 'bg-zinc-800 text-jumby-lime border border-jumby-lime/30'
-            : 'bg-gradient-to-r from-jumby-purple to-[#8a7bff] text-white hover:brightness-110 shadow-jumby-purple/30'
+            : 'bg-jumby-purple text-white hover:brightness-110 shadow-sm shadow-jumby-purple/30'
         }`}
       >
         {applied ? (
-          <>
-            <Check className="w-3.5 h-3.5 text-jumby-lime stroke-[3]" />
-            <span>Pacing Applied & Live Reloaded</span>
-          </>
+          <><Check className="w-3.5 h-3.5 stroke-[3]" /><span>Applied</span></>
         ) : (
-          <>
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            <span>Apply to Game Canvas</span>
-          </>
+          <><Zap className="w-3.5 h-3.5 fill-current" /><span>Apply to Game</span></>
         )}
       </button>
     </div>
   );
 }
 
+/* ─── Boss Widget ─────────────────────────────────────────────────── */
+
 interface BossWidgetProps {
-  onApply: (bossPrompt: string) => void;
+  onApply: (prompt: string) => void;
   isGenerating?: boolean;
 }
 
-export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidgetProps) {
-  const [bossType, setBossType] = useState('🛸 Laser Mothership');
-  const [customBoss, setCustomBoss] = useState('');
-  const [triggerScore, setTriggerScore] = useState(30);
+const BOSSES = [
+  { id: 'mothership', icon: '🛸', label: 'Laser Mothership' },
+  { id: 'slime',      icon: '👾', label: 'Cosmic Slime'      },
+  { id: 'robo',       icon: '🤖', label: 'Robo Guardian'     },
+];
 
-  const bosses = [
-    { name: '🛸 Laser Mothership', desc: 'Fires sweeping laser beams and spawns mini drones' },
-    { name: '👾 Giant Cosmic Slime', desc: 'Bounces aggressively and splits into smaller blobs' },
-    { name: '🤖 Robo-Core Guardian', desc: 'Rotating shields that deflect shots until exposed' },
-  ];
+export function GenerativeBossWidget({ onApply, isGenerating = false }: BossWidgetProps) {
+  const [boss, setBoss]             = useState('mothership');
+  const [customBoss, setCustomBoss] = useState('');
+  const [score, setScore]           = useState(30);
 
   const handleApply = () => {
-    const effectiveBoss = customBoss.trim() || bossType;
-    onApply(`Add a ${effectiveBoss} boss battle after reaching ${triggerScore} points with a health bar and warning alarm siren!`);
+    const name = customBoss.trim() || BOSSES.find(b => b.id === boss)?.label || '';
+    onApply(`Add a ${name} boss battle at ${score} points with a health bar and warning alarm!`);
   };
 
   return (
-    <div className="w-full mt-2.5 rounded-2xl bg-[#161426] border border-jumby-purple/30 p-3.5 text-white shadow-xl shadow-jumby-purple/10 space-y-3 font-sans">
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-        <div className="flex items-center gap-1.5 font-heading font-black text-xs text-jumby-purple">
-          <Swords className="w-3.5 h-3.5" />
-          <span>Boss Encounter Designer</span>
-        </div>
+    <div className="w-full mt-2 rounded-2xl bg-zinc-900 border border-white/10 p-3 space-y-3 font-sans">
+      {/* Boss Selector */}
+      <div className="space-y-1">
+        {BOSSES.map(b => (
+          <button
+            key={b.id}
+            type="button"
+            onClick={() => { setBoss(b.id); setCustomBoss(''); }}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left transition-all ${
+              !customBoss.trim() && boss === b.id
+                ? 'bg-jumby-purple/15 border-jumby-purple/60 text-white'
+                : 'bg-zinc-800/50 border-transparent text-zinc-400 hover:text-white hover:border-white/10'
+            }`}
+          >
+            <span className="text-base">{b.icon}</span>
+            <span className="text-xs font-heading font-bold flex-1">{b.label}</span>
+            {!customBoss.trim() && boss === b.id && (
+              <Check className="w-3.5 h-3.5 text-jumby-purple shrink-0" />
+            )}
+          </button>
+        ))}
       </div>
 
-      <div>
-        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1.5">
-          Select Boss Archetype
-        </label>
-        <div className="space-y-1.5">
-          {bosses.map((b) => {
-            const isSelected = !customBoss.trim() && bossType === b.name;
-            return (
-              <button
-                key={b.name}
-                type="button"
-                onClick={() => {
-                  setBossType(b.name);
-                  setCustomBoss('');
-                }}
-                className={`w-full p-2 rounded-xl border text-left transition-all ${
-                  isSelected
-                    ? 'bg-jumby-purple/20 border-jumby-purple text-white shadow-sm'
-                    : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-white'
-                }`}
-              >
-                <div className="text-xs font-heading font-bold text-white flex items-center justify-between">
-                  <span>{b.name}</span>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-jumby-purple" />}
-                </div>
-                <div className="text-[9px] text-zinc-400">{b.desc}</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* Custom Boss */}
+      <input
+        type="text"
+        value={customBoss}
+        onChange={e => setCustomBoss(e.target.value)}
+        placeholder="Or describe your own boss..."
+        className="w-full px-3 py-2 rounded-xl bg-zinc-800 border border-white/8 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-jumby-purple/50 transition-colors"
+      />
 
-      {/* Custom Boss Input */}
+      {/* Score trigger */}
       <div>
-        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
-          Or Describe Your Own Boss
-        </label>
-        <input
-          type="text"
-          value={customBoss}
-          onChange={(e) => setCustomBoss(e.target.value)}
-          placeholder="e.g. Giant fire-breathing pixel dragon that swoops down..."
-          className="w-full px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-jumby-purple font-sans"
-        />
-      </div>
-
-      <div>
-        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1.5">
-          Spawn Trigger (Score Milestone)
-        </label>
+        <div className="text-[10px] text-zinc-500 mb-1.5">Triggers at score</div>
         <div className="grid grid-cols-3 gap-1.5">
-          {[20, 35, 50].map((score) => (
+          {[20, 35, 50].map(s => (
             <button
-              key={score}
+              key={s}
               type="button"
-              onClick={() => setTriggerScore(score)}
-              className={`py-1.5 rounded-lg border text-xs font-heading font-bold transition-all ${
-                triggerScore === score
-                  ? 'bg-jumby-lime/20 border-jumby-lime text-jumby-lime'
-                  : 'bg-zinc-900/60 border-white/5 text-zinc-400 hover:text-white'
+              onClick={() => setScore(s)}
+              className={`py-1.5 rounded-lg text-[11px] font-heading font-bold transition-all border ${
+                score === s
+                  ? 'bg-jumby-lime/15 border-jumby-lime/50 text-jumby-lime'
+                  : 'bg-zinc-800/50 border-transparent text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              {score} Points
+              {s}pts
             </button>
           ))}
         </div>
       </div>
 
+      {/* Apply */}
       <button
         type="button"
         onClick={handleApply}
         disabled={isGenerating}
-        className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-jumby-purple to-[#8a7bff] text-white font-heading font-black text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-jumby-purple/30 cursor-pointer disabled:opacity-50"
+        className="w-full py-2 rounded-xl bg-jumby-purple text-white font-heading font-black text-xs flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-95 transition-all shadow-sm shadow-jumby-purple/30 disabled:opacity-40"
       >
         <Swords className="w-3.5 h-3.5" />
-        <span>Inject Boss into Game</span>
+        <span>Add Boss</span>
       </button>
     </div>
   );
 }
 
+/* ─── Power-ups Widget ────────────────────────────────────────────── */
+
 interface PowerupsWidgetProps {
-  onApply: (powerupPrompt: string) => void;
+  onApply: (prompt: string) => void;
   isGenerating?: boolean;
 }
 
+const PERKS = [
+  { id: 'shield',  icon: '🛡️', label: 'Shield'      },
+  { id: 'magnet',  icon: '🧲', label: 'Magnet'      },
+  { id: 'slowmo',  icon: '⏱️', label: 'Slow-Mo'     },
+  { id: 'blaster', icon: '💥', label: 'Blaster'     },
+];
+
 export function GenerativePowerupsWidget({ onApply, isGenerating = false }: PowerupsWidgetProps) {
-  const [selected, setSelected] = useState<string[]>(['shield', 'magnet']);
-  const [customPowerup, setCustomPowerup] = useState('');
+  const [selected, setSelected]       = useState<string[]>(['shield', 'magnet']);
+  const [customPerk, setCustomPerk]   = useState('');
 
-  const perks = [
-    { id: 'shield', icon: '🛡️', name: 'Energy Shield', desc: 'Absorbs 1 collision before breaking' },
-    { id: 'magnet', icon: '🧲', name: 'Gem Magnet', desc: 'Draws nearby score items automatically' },
-    { id: 'slowmo', icon: '⏱️', name: 'Bullet Time', desc: 'Slows down obstacles for 4 seconds' },
-    { id: 'blaster', icon: '💥', name: 'Laser Blaster', desc: 'Fires projectiles to clear hazards' },
-  ];
-
-  const togglePerk = (id: string) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    );
-  };
+  const toggle = (id: string) =>
+    setSelected(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
 
   const handleApply = () => {
-    const names = perks.filter((p) => selected.includes(p.id)).map((p) => p.name);
-    if (customPowerup.trim()) {
-      names.push(customPowerup.trim());
-    }
-    onApply(`Inject collectible power-up drops into the game: ${names.join(', ')} with visual floating bubbles!`);
+    const names = PERKS.filter(p => selected.includes(p.id)).map(p => p.label);
+    if (customPerk.trim()) names.push(customPerk.trim());
+    onApply(`Add collectible power-up drops: ${names.join(', ')} with floating pickup bubbles!`);
   };
 
-  const totalCount = selected.length + (customPowerup.trim() ? 1 : 0);
+  const count = selected.length + (customPerk.trim() ? 1 : 0);
 
   return (
-    <div className="w-full mt-2.5 rounded-2xl bg-[#161426] border border-jumby-purple/30 p-3.5 text-white shadow-xl shadow-jumby-purple/10 space-y-3 font-sans">
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-        <div className="flex items-center gap-1.5 font-heading font-black text-xs text-jumby-sky">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Collectible Power-ups</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {perks.map((p) => {
-          const isChecked = selected.includes(p.id);
+    <div className="w-full mt-2 rounded-2xl bg-zinc-900 border border-white/10 p-3 space-y-3 font-sans">
+      {/* Perk Grid */}
+      <div className="grid grid-cols-2 gap-1.5">
+        {PERKS.map(p => {
+          const on = selected.includes(p.id);
           return (
             <button
               key={p.id}
               type="button"
-              onClick={() => togglePerk(p.id)}
-              className={`p-2 rounded-xl border text-left transition-all ${
-                isChecked
-                  ? 'bg-jumby-sky/15 border-jumby-sky/80 text-white shadow-sm ring-1 ring-jumby-sky/30'
-                  : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-white'
+              onClick={() => toggle(p.id)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-all ${
+                on
+                  ? 'bg-jumby-sky/15 border-jumby-sky/60 text-white'
+                  : 'bg-zinc-800/50 border-transparent text-zinc-400 hover:text-white hover:border-white/10'
               }`}
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-base">{p.icon}</span>
-                <div
-                  className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${
-                    isChecked
-                      ? 'bg-jumby-sky border-jumby-sky text-black'
-                      : 'border-white/20'
-                  }`}
-                >
-                  {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                </div>
-              </div>
-              <div className="text-xs font-heading font-bold text-white">{p.name}</div>
-              <div className="text-[9px] text-zinc-400 line-clamp-1">{p.desc}</div>
+              <span className="text-base">{p.icon}</span>
+              <span className="text-xs font-heading font-bold flex-1">{p.label}</span>
+              {on && <Check className="w-3 h-3 text-jumby-sky shrink-0" />}
             </button>
           );
         })}
       </div>
 
-      {/* Custom Power-up Input */}
-      <div>
-        <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block mb-1">
-          Or Type Your Own Custom Perk
-        </label>
-        <input
-          type="text"
-          value={customPowerup}
-          onChange={(e) => setCustomPowerup(e.target.value)}
-          placeholder="e.g. Double jump, Freeze enemies, Coin magnet..."
-          className="w-full px-3 py-1.5 rounded-xl bg-zinc-900/80 border border-white/10 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-jumby-sky font-sans"
-        />
-      </div>
+      {/* Custom Perk */}
+      <input
+        type="text"
+        value={customPerk}
+        onChange={e => setCustomPerk(e.target.value)}
+        placeholder="Or type your own perk..."
+        className="w-full px-3 py-2 rounded-xl bg-zinc-800 border border-white/8 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-jumby-sky/50 transition-colors"
+      />
 
+      {/* Apply */}
       <button
         type="button"
         onClick={handleApply}
-        disabled={isGenerating || totalCount === 0}
-        className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-jumby-purple to-[#8a7bff] text-white font-heading font-black text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all shadow-md shadow-jumby-purple/30 cursor-pointer disabled:opacity-50"
+        disabled={isGenerating || count === 0}
+        className="w-full py-2 rounded-xl bg-jumby-purple text-white font-heading font-black text-xs flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-95 transition-all shadow-sm shadow-jumby-purple/30 disabled:opacity-40"
       >
         <Sparkles className="w-3.5 h-3.5" />
-        <span>Add ({totalCount}) Power-ups to Game</span>
+        <span>Add {count > 0 ? `${count} ` : ''}Power-up{count !== 1 ? 's' : ''}</span>
       </button>
     </div>
   );
