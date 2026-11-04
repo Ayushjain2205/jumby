@@ -1299,31 +1299,19 @@ function CreateStudioContent() {
               {isGenerating && (
                 <div className="absolute inset-0 z-30 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
                   {/* 3D Mascot visual with floating effect and glowing ambient backdrop */}
-                  <div className="relative mb-3 flex items-center justify-center">
+                  <div className="relative mb-2 flex items-center justify-center">
                     <div className="absolute -inset-4 rounded-full bg-jumby-purple/20 blur-xl animate-pulse" />
                     <img
                       src="/images/generating-mascot.png"
-                      alt="Jumby coding your micro-game..."
+                      alt="Coding game..."
                       className="relative w-40 h-40 sm:w-48 sm:h-48 object-contain animate-float drop-shadow-[0_16px_28px_rgba(113,96,255,0.4)] select-none pointer-events-none"
                     />
                   </div>
 
-                  {/* Engine Badge */}
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-jumby-purple/15 border border-jumby-purple/35 text-jumby-lime mb-2">
-                    <Sparkles className="w-3.5 h-3.5 animate-spin text-jumby-lime" />
-                    <span className="font-heading font-black text-[11px] uppercase tracking-wider">
-                      Jumby AI Studio
-                    </span>
-                  </div>
-
                   {/* Dynamic generation step text */}
-                  <h4 className="font-heading font-black text-base sm:text-lg text-white tracking-wide max-w-[280px] leading-snug">
+                  <h4 className="font-heading font-black text-base sm:text-lg text-white tracking-wide max-w-[320px] leading-snug">
                     {generationStep || 'Building Micro-Game...'}
                   </h4>
-
-                  <p className="text-[11px] sm:text-xs text-zinc-400 font-sans mt-1 max-w-[240px]">
-                    Synthesizing visuals, game juice, physics & 8-bit audio synth...
-                  </p>
 
                   {/* Shimmer progress bar */}
                   <div className="w-40 sm:w-48 h-1.5 rounded-full bg-white/10 overflow-hidden mt-3.5 relative">
