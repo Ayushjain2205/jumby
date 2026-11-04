@@ -50,13 +50,12 @@ const EXAMPLE_SUGGESTIONS_ROW1 = [
   { icon: '⚡', label: 'Neon cyber dodger', prompt: 'A fast 3-lane neon cyber dodger with glowing obstacles' },
   { icon: '🎮', label: 'Flappy bird in space', prompt: 'Flappy bird flying through cosmic space laser pipes' },
   { icon: '🧱', label: 'Block stacker', prompt: 'Satisfying 3D pastel block stacker with precision slicing' },
-  { icon: '🌮', label: 'Taco catcher', prompt: 'Catch falling spicy tacos in a sombrero basket with combo streak' },
 ];
 
 const EXAMPLE_SUGGESTIONS_ROW2 = [
+  { icon: '🌮', label: 'Taco catcher', prompt: 'Catch falling spicy tacos in a sombrero basket with combo streak' },
   { icon: '🪐', label: 'Orbit survival', prompt: 'Dual orbital pulse rhythm survival game, tap to switch orbit direction' },
   { icon: '🚀', label: 'Asteroid blaster', prompt: 'Classic arcade vector ship blasting pixel asteroids and invaders' },
-  { icon: '🚗', label: 'Gravity racer', prompt: 'High speed cyber car racer flipping gravity between ceiling and floor' },
 ];
 
 export function LovableHeroCreator({
@@ -388,21 +387,21 @@ export function LovableHeroCreator({
         </div>
 
         {/* OR TRY AN EXAMPLE Section */}
-        <div className="w-full max-w-xl mx-auto mt-7">
+        <div className="w-full max-w-2xl mx-auto mt-7">
           <div className="flex items-center gap-4 text-[11px] tracking-[0.2em] uppercase font-bold text-zinc-400 select-none mb-3.5">
             <div className="h-px bg-white/10 flex-1" />
             <span>OR TRY AN EXAMPLE</span>
             <div className="h-px bg-white/10 flex-1" />
           </div>
 
-          {/* Row 1 Suggestions */}
-          <div className="flex flex-wrap items-center justify-center gap-2.5 mb-2.5">
+          {/* Row 1 Suggestions (3 items) */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-2.5 mb-2.5">
             {EXAMPLE_SUGGESTIONS_ROW1.map((item) => (
               <button
                 key={item.label}
                 type="button"
                 onClick={() => onSelectSuggestion(item.prompt)}
-                className="px-3.5 py-1.5 rounded-full bg-[#1b1838]/90 hover:bg-[#25204d] border border-white/10 hover:border-jumby-purple/50 text-xs font-bold text-zinc-200 hover:text-white transition-all flex items-center gap-1.5 active:scale-95 shadow-sm cursor-pointer"
+                className="px-4 py-2 rounded-full bg-[#1b1838]/90 hover:bg-[#25204d] border border-white/10 hover:border-jumby-purple/50 text-xs font-bold text-zinc-200 hover:text-white transition-all flex items-center gap-1.5 active:scale-95 shadow-sm cursor-pointer whitespace-nowrap"
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
@@ -410,14 +409,14 @@ export function LovableHeroCreator({
             ))}
           </div>
 
-          {/* Row 2 Suggestions */}
-          <div className="flex flex-wrap items-center justify-center gap-2.5">
+          {/* Row 2 Suggestions (3 items) */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-2.5">
             {EXAMPLE_SUGGESTIONS_ROW2.map((item) => (
               <button
                 key={item.label}
                 type="button"
                 onClick={() => onSelectSuggestion(item.prompt)}
-                className="px-3.5 py-1.5 rounded-full bg-[#1b1838]/90 hover:bg-[#25204d] border border-white/10 hover:border-jumby-purple/50 text-xs font-bold text-zinc-200 hover:text-white transition-all flex items-center gap-1.5 active:scale-95 shadow-sm cursor-pointer"
+                className="px-4 py-2 rounded-full bg-[#1b1838]/90 hover:bg-[#25204d] border border-white/10 hover:border-jumby-purple/50 text-xs font-bold text-zinc-200 hover:text-white transition-all flex items-center gap-1.5 active:scale-95 shadow-sm cursor-pointer whitespace-nowrap"
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
