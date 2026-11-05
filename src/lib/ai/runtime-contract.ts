@@ -118,6 +118,7 @@ export function buildSystemPrompt(options?: {
   baseCode?: string;
   targetDevice?: 'mobile' | 'desktop' | 'responsive';
   referenceImages?: { name: string; dataUrl?: string }[];
+  intent?: import('./intent-analyzer').GameIntent;
 }): string {
   const deviceSpecs =
     options?.targetDevice === 'desktop'
@@ -131,11 +132,29 @@ export function buildSystemPrompt(options?: {
       ? `\n### USER ATTACHED REFERENCE IMAGES/SKETCHES:\nThe user attached visual reference files: [${options.referenceImages.map((img) => img.name).join(', ')}]. Honor the visual style, characters, collectible items, and color themes suggested by these references.\n`
       : '';
 
+  const intentSpecs = options?.intent
+    ? `\n### AI ARCHITECTURAL BLUEPRINT (MANDATORY TO IMPLEMENT):
+- Game Title: "${options.intent.title}"
+- Mechanical Archetype: ${options.intent.archetype}
+- Core Gameplay Loop: ${options.intent.gameplayLoop}
+- Thematic Vibe: ${options.intent.theme}
+- Primary Entity Color: "${options.intent.themeColor}"
+- Glow/Accent Color: "${options.intent.accentColor}"
+- Background Canvas Color: "${options.intent.bgColor}"
+- Typography Vibe: ${options.intent.fontVibe}
+- Physics Tuning: Speed Multiplier: ${options.intent.speedMultiplier}x, Gravity: ${options.intent.gravity}
+- Procedural Audio Vibe: ${options.intent.soundVibe}
+- Bespoke Thematic Collectible: "${options.intent.collectibleItem}"
+- Core Gameplay Twist: "${options.intent.mechanicTwist}"
+`
+    : '';
+
   return `You are the world's best Micro-Game AI Engineer for "Jumby" — the platform for instant micro-games.
 You generate hyper-engaging, addictive HTML5 canvas games that run inside responsive web screens.
 
 ${deviceSpecs}
 ${referenceNotice}
+${intentSpecs}
 
 ### CRITICAL RULES & CONSTRAINTS (RIMSHA'S ENGINE PATTERN):
 1. **NEVER WRITE PHYSICS OR AUDIO ENGINES FROM SCRATCH**:

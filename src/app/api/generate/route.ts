@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildSystemPrompt } from '@/lib/ai/runtime-contract';
 import { synthesizeProceduralGame } from '@/lib/ai/smart-generator';
 import { validateAndHealGameHtml } from '@/lib/ai/game-healer';
+import { extractGameIntent, type GameIntent } from '@/lib/ai/intent-analyzer';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function POST(req: NextRequest) {
     const {
       prompt,
       baseCode,
-      archetype = 'flappy',
+      archetype: requestedArchetype,
       apiKey: clientApiKey,
       provider = 'auto',
       targetDevice = 'mobile',
@@ -26,6 +27,17 @@ export async function POST(req: NextRequest) {
 
     const geminiKey = clientApiKey || process.env.GEMINI_API_KEY;
     const openaiKey = clientApiKey || process.env.OPENAI_API_KEY;
+
+    // Intelligent AI Intent & Architectural Blueprint Extraction
+    const intent = await extractGameIntent({
+      prompt,
+      requestedArchetype,
+      referenceImages,
+      apiKey: clientApiKey,
+      provider,
+    });
+
+    const archetype = intent.archetype || requestedArchetype || 'flappy';
 
     // If the user is remixing an existing game, pass that code so the AI can modify it.
     // If creating from scratch, pass undefined so the AI has full freedom to pick the right mechanic and palette.
@@ -51,7 +63,8 @@ export async function POST(req: NextRequest) {
           archetype,
           effectiveBaseCode,
           targetDevice,
-          referenceImages
+          referenceImages,
+          intent
         );
         if (proxyStream) {
           return proxyStream;
@@ -66,13 +79,13 @@ export async function POST(req: NextRequest) {
     const useOpenAI = provider === 'openai' || (provider === 'auto' && openaiKey && !geminiKey);
 
     if (useGemini && geminiKey) {
-      return streamFromGemini(geminiKey, prompt, archetype, effectiveBaseCode, targetDevice, referenceImages);
+      return streamFromGemini(geminiKey, prompt, archetype, effectiveBaseCode, targetDevice, referenceImages, intent);
     } else if (useOpenAI && openaiKey) {
-      return streamFromOpenAI(openaiKey, prompt, archetype, effectiveBaseCode, targetDevice, referenceImages);
+      return streamFromOpenAI(openaiKey, prompt, archetype, effectiveBaseCode, targetDevice, referenceImages, intent);
     }
 
     // 3. Fallback: High-fidelity procedural dynamic generation with SSE streaming
-    return streamProceduralGame(prompt, archetype, baseCode);
+    return streamProceduralGame(prompt, archetype, baseCode, intent);
   } catch (error: any) {
     console.error('[/api/generate] Error:', error);
     return NextResponse.json(
@@ -93,9 +106,10 @@ async function streamFromCliProxy(
   archetype?: string,
   baseCode?: string,
   targetDevice?: 'mobile' | 'desktop' | 'responsive',
-  referenceImages?: { name: string; dataUrl?: string }[]
+  referenceImages?: { name: string; dataUrl?: string }[],
+  intent?: GameIntent
 ): Promise<Response | null> {
-  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages });
+  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages, intent });
   const endpoint = `${proxyUrl.replace(/\/+$/, '')}/v1/chat/completions`;
 
   const controller = new AbortController();
@@ -147,11 +161,17 @@ async function streamFromCliProxy(
   const transformStream = new TransformStream({
     start(streamController) {
       // Send initial progress indicators to the studio UI
+      if (intent) {
+        streamController.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ step: `🧠 AI Intent: "${intent.title}" (${intent.theme})`, intent })}\n\n`)
+        );
+      } else {
+        streamController.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ step: `🤖 Connecting to ${model} via CLI Proxy...` })}\n\n`)
+        );
+      }
       streamController.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ step: `🤖 Connecting to ${model} via CLI Proxy...` })}\n\n`)
-      );
-      streamController.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ step: '⚡ Synthesizing micro-game logic & juice...' })}\n\n`)
+        encoder.encode(`data: ${JSON.stringify({ step: `⚡ Synthesizing ${archetype || 'micro-game'} mechanics & juice...` })}\n\n`)
       );
     },
     transform(chunk, streamController) {
@@ -215,7 +235,7 @@ async function streamFromCliProxy(
  * Procedural Dynamic Streamer: Breaks generated game code into realistic chunks
  * and streams over SSE with progressive status milestones.
  */
-function streamProceduralGame(prompt: string, archetype: any, baseCode?: string) {
+function streamProceduralGame(prompt: string, archetype: any, baseCode?: string, intent?: GameIntent) {
   const encoder = new TextEncoder();
   const fullHtml = synthesizeProceduralGame({ prompt, archetype, baseCode });
 
@@ -226,8 +246,13 @@ function streamProceduralGame(prompt: string, archetype: any, baseCode?: string)
       };
 
       // 1. Simulation milestones
-      sendEvent({ step: '🧠 Interpreting micro-game mechanics & physics...' });
-      await sleep(150);
+      if (intent) {
+        sendEvent({ step: `🧠 AI Intent: "${intent.title}" (${intent.theme})`, intent });
+        await sleep(150);
+      } else {
+        sendEvent({ step: '🧠 Interpreting micro-game mechanics & physics...' });
+        await sleep(150);
+      }
 
       sendEvent({ step: '🎨 Synthesizing procedural canvas shaders & neon glow...' });
       await sleep(200);
@@ -267,9 +292,10 @@ async function streamFromGemini(
   archetype?: string,
   baseCode?: string,
   targetDevice?: 'mobile' | 'desktop' | 'responsive',
-  referenceImages?: { name: string; dataUrl?: string }[]
+  referenceImages?: { name: string; dataUrl?: string }[],
+  intent?: GameIntent
 ) {
-  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages });
+  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages, intent });
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const geminiPayload = {
@@ -297,13 +323,20 @@ async function streamFromGemini(
   if (!response.ok) {
     const errText = await response.text();
     console.warn('[Gemini] Fallback due to error:', response.status, errText);
-    return streamProceduralGame(prompt, archetype, baseCode);
+    return streamProceduralGame(prompt, archetype, baseCode, intent);
   }
 
   const encoder = new TextEncoder();
   let accumulated = '';
 
   const transformStream = new TransformStream({
+    start(controller) {
+      if (intent) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ step: `🧠 AI Intent: "${intent.title}" (${intent.theme})`, intent })}\n\n`)
+        );
+      }
+    },
     transform(chunk, controller) {
       const text = new TextDecoder().decode(chunk);
       const lines = text.split('\n');
@@ -354,9 +387,10 @@ async function streamFromOpenAI(
   archetype?: string,
   baseCode?: string,
   targetDevice?: 'mobile' | 'desktop' | 'responsive',
-  referenceImages?: { name: string; dataUrl?: string }[]
+  referenceImages?: { name: string; dataUrl?: string }[],
+  intent?: GameIntent
 ) {
-  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages });
+  const systemPrompt = buildSystemPrompt({ archetype, baseCode, targetDevice, referenceImages, intent });
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -376,7 +410,7 @@ async function streamFromOpenAI(
   if (!response.ok) {
     const err = await response.text();
     console.warn('[OpenAI] Fallback due to error:', response.status, err);
-    return streamProceduralGame(prompt, archetype, baseCode);
+    return streamProceduralGame(prompt, archetype, baseCode, intent);
   }
 
   const encoder = new TextEncoder();

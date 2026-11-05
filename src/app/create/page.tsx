@@ -424,41 +424,8 @@ function CreateStudioContent() {
     setMessages((prev) => [...prev, userMsg]);
     setInputPrompt('');
     setIsGenerating(true);
-    // Detect archetype and update title if untitled
-    const lower = promptText.toLowerCase();
+    // Send prompt directly to AI generation engine (AI intelligently determines archetype, physics, colors, and mechanics)
     let targetArchetype = archetype;
-    if (lower.includes('stack') || lower.includes('tower') || lower.includes('block') || lower.includes('slice') || lower.includes('rhythm')) {
-      targetArchetype = 'stack';
-      setArchetype('stack');
-      if (title === 'Untitled Game') setTitle('Rhythm Stack Tower');
-    } else if (lower.includes('orbit') || lower.includes('circle') || lower.includes('planet') || lower.includes('pulse')) {
-      targetArchetype = 'orbit';
-      setArchetype('orbit');
-      if (title === 'Untitled Game') setTitle('Orbital Pulse');
-    } else if (lower.includes('runner') || lower.includes('lane') || lower.includes('dodge') || lower.includes('car') || lower.includes('dash')) {
-      targetArchetype = 'runner';
-      setArchetype('runner');
-      if (title === 'Untitled Game') setTitle('Cyber Runner');
-    } else if (lower.includes('flap') || lower.includes('bird') || lower.includes('jump')) {
-      targetArchetype = 'flappy';
-      setArchetype('flappy');
-      if (title === 'Untitled Game') setTitle('Neon Jumper');
-    } else if (title === 'Untitled Game') {
-      const words = promptText.trim().replace(/[^\w\s]/g, '').split(/\s+/).slice(0, 3).join(' ');
-      if (words) setTitle(words.replace(/\b\w/g, (c) => c.toUpperCase()));
-    }
-
-    // Instantly detect speed and gravity from prompt
-    if (lower.includes('fast') || lower.includes('turbo') || lower.includes('2x speed') || lower.includes('hard')) {
-      setSpeedMultiplier((prev) => Math.min(2.5, Number((prev * 1.3).toFixed(1))));
-    } else if (lower.includes('slow') || lower.includes('relax') || lower.includes('chill') || lower.includes('easy')) {
-      setSpeedMultiplier((prev) => Math.max(0.6, Number((prev * 0.75).toFixed(1))));
-    }
-    if (lower.includes('low gravity') || lower.includes('floaty') || lower.includes('moon')) {
-      setGravity((prev) => Math.max(0.18, Number((prev * 0.7).toFixed(2))));
-    } else if (lower.includes('heavy gravity') || lower.includes('high gravity')) {
-      setGravity((prev) => Math.min(0.70, Number((prev * 1.3).toFixed(2))));
-    }
 
     try {
       const res = await fetch('/api/generate', {
@@ -485,6 +452,7 @@ function CreateStudioContent() {
       const decoder = new TextDecoder();
       let accumulatedCode = '';
       let receivedCompleteHtml = '';
+      let extractedAiIntent: any = null;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -497,6 +465,24 @@ function CreateStudioContent() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.substring(6));
+
+              // Real-time intelligent intent synchronization
+              if (data.intent) {
+                extractedAiIntent = data.intent;
+                const it = data.intent;
+                if (it.title) setTitle(it.title);
+                if (it.archetype) {
+                  setArchetype(it.archetype);
+                  targetArchetype = it.archetype;
+                }
+                if (it.themeColor) setThemeColor(it.themeColor);
+                if (it.accentColor) setAccentColor(it.accentColor);
+                if (it.bgColor) setBgColor(it.bgColor);
+                if (it.themeColor && it.accentColor) setPaletteColors([it.themeColor, it.accentColor]);
+                if (typeof it.speedMultiplier === 'number') setSpeedMultiplier(it.speedMultiplier);
+                if (typeof it.gravity === 'number') setGravity(it.gravity);
+                if (it.fontVibe) setActiveFontVibe(it.fontVibe);
+              }
 
               if (data.step) {
                 setGenerationStep(data.step);
@@ -556,15 +542,19 @@ function CreateStudioContent() {
       // Add Assistant completion response with healing summary
       const fixSummary =
         healingResult.issuesFixed.length > 0
-          ? ` 🛡️ Auto-healed: ${healingResult.issuesFixed.slice(0, 2).join(', ')}.`
+          ? `🛡️ Auto-healed: ${healingResult.issuesFixed.slice(0, 2).join(', ')}.`
           : '';
+
+      const intentBadge = extractedAiIntent
+        ? `🎮 **${extractedAiIntent.title}** (${extractedAiIntent.theme})\n*${extractedAiIntent.gameplayLoop}*\n✨ Twist: ${extractedAiIntent.mechanicTwist}\n🎁 Collectible: ${extractedAiIntent.collectibleItem}`
+        : `Game synthesized! Injected high-score tracking, 8-bit audio, and screen juice.`;
 
       setMessages((prev) => [
         ...prev,
         {
           id: `msg_ai_${Date.now()}`,
           sender: 'assistant',
-          text: `Game synthesized! Injected high-score tracking, 8-bit audio, and screen juice.${fixSummary} Try playing in the live preview on the right!`,
+          text: `${intentBadge}\n\n${fixSummary ? fixSummary + '\n\n' : ''}Ready to play in the live sandbox!`,
           timestamp: 'Just now',
         },
       ]);
