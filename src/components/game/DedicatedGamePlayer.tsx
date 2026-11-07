@@ -234,10 +234,10 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
           {/* Live Jumby Coins Pill */}
           <button
             onClick={openShop}
-            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-jumby-lime/10 hover:bg-jumby-lime/20 border border-jumby-lime/30 text-jumby-lime text-xs font-heading font-black transition-all active:scale-95"
+            className="relative flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full bg-jumby-lime/10 hover:bg-jumby-lime/20 border border-jumby-lime/30 text-jumby-lime text-xs font-heading font-black transition-all active:scale-95"
             title="Your Jumby Coins"
           >
-            <JumbyCoin size="xs" className="w-3.5 h-3.5" />
+            <JumbyCoin size="md" className="h-5 w-auto" />
             {floatingCoin && (
               <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-jumby-lime text-zinc-950 text-[10px] font-black shadow-md animate-bounce flex items-center gap-1 whitespace-nowrap">
                 <span>+{floatingCoin.amount}</span>

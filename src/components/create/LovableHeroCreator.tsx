@@ -170,10 +170,10 @@ export function LovableHeroCreator({
           <button
             type="button"
             onClick={openShop}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1b1935] hover:bg-[#25224a] border border-white/10 text-white font-heading font-black text-xs shadow-inner transition-all active:scale-95 cursor-pointer"
+            className="flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-full bg-[#1b1935] hover:bg-[#25224a] border border-white/10 text-white font-heading font-black text-xs shadow-inner transition-all active:scale-95 cursor-pointer"
             title="Jumby Coins"
           >
-            <JumbyCoin size="sm" className="w-4 h-4" />
+            <JumbyCoin size="md" className="h-5.5 w-auto" />
             <span>{coins ? coins.toLocaleString() : '2,450'}</span>
             <Plus className="w-3 h-3 text-zinc-400 stroke-[3]" />
           </button>

@@ -174,9 +174,9 @@ export function GameCard({ game, isActive }: GameCardProps) {
           <button
             onClick={openShop}
             title="Open Jumby Coin Shop"
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-jumby-lime/15 hover:bg-jumby-lime/25 border border-jumby-lime/30 text-[11px] font-black text-jumby-lime backdrop-blur-md active:scale-95 transition-all shadow-sm font-heading"
+            className="flex items-center gap-1.5 pl-2 pr-2.5 py-0.5 rounded-full bg-jumby-lime/15 hover:bg-jumby-lime/25 border border-jumby-lime/30 text-[11px] font-black text-jumby-lime backdrop-blur-md active:scale-95 transition-all shadow-sm font-heading"
           >
-            <JumbyCoin size="xs" className="w-3.5 h-3.5" />
+            <JumbyCoin size="sm" className="h-4 w-auto" />
             <span>{coins}</span>
           </button>
 
