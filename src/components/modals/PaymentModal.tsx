@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useWallet } from '@/context/WalletContext';
+import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { Coins, Check, AlertCircle, ArrowRight } from 'lucide-react';
 
 export function PaymentModal() {
@@ -32,16 +33,17 @@ export function PaymentModal() {
         <div className="p-3.5 rounded-2xl bg-jumby-ink border border-white/10 mb-5 flex items-center justify-between">
           <div className="text-left">
             <div className="text-[10px] text-zinc-400 font-medium font-sans">Price</div>
-            <div className="flex items-center gap-1 text-sm font-heading font-black text-jumby-lime">
-              <span>🪙</span>
+            <div className="flex items-center gap-1.5 text-sm font-heading font-black text-jumby-lime">
+              <JumbyCoin size="xs" className="w-4 h-4" />
               <span>{paymentRequest.priceCoins} Coins</span>
             </div>
           </div>
 
           <div className="text-right">
             <div className="text-[10px] text-zinc-400 font-medium font-sans">Your Balance</div>
-            <div className="text-xs font-mono font-bold text-zinc-200">
-              🪙 {coins}
+            <div className="text-xs font-mono font-bold text-zinc-200 flex items-center justify-end gap-1">
+              <JumbyCoin size="xs" className="w-3.5 h-3.5" />
+              <span>{coins}</span>
             </div>
           </div>
         </div>
@@ -54,7 +56,7 @@ export function PaymentModal() {
               className="w-full py-3.5 rounded-full bg-jumby-lime hover:brightness-105 active:scale-95 font-heading font-black text-xs text-jumby-ink shadow-lg shadow-jumby-lime/25 transition-all flex items-center justify-center gap-1.5"
             >
               <Check className="w-4 h-4 stroke-[3]" />
-              <span>Confirm & Pay 🪙 {paymentRequest.priceCoins}</span>
+              <span className="flex items-center gap-1">Confirm & Pay <JumbyCoin size="xs" className="w-3.5 h-3.5" /> {paymentRequest.priceCoins}</span>
               <ArrowRight className="w-4 h-4 stroke-[3]" />
             </button>
             <button

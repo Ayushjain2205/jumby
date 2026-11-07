@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Game } from '@/types/game';
 import { useWallet } from '@/context/WalletContext';
 import { JumbyAppIcon } from '@/components/brand/JumbyAppIcon';
+import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import {
   Heart,
   Share2,
@@ -173,9 +174,9 @@ export function GameCard({ game, isActive }: GameCardProps) {
           <button
             onClick={openShop}
             title="Open Jumby Coin Shop"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-jumby-lime/15 hover:bg-jumby-lime/25 border border-jumby-lime/30 text-[11px] font-black text-jumby-lime backdrop-blur-md active:scale-95 transition-all shadow-sm font-heading"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-jumby-lime/15 hover:bg-jumby-lime/25 border border-jumby-lime/30 text-[11px] font-black text-jumby-lime backdrop-blur-md active:scale-95 transition-all shadow-sm font-heading"
           >
-            <span>🪙</span>
+            <JumbyCoin size="xs" className="w-3.5 h-3.5" />
             <span>{coins}</span>
           </button>
 

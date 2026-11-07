@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Share2, Check, RotateCcw, Trophy, Sparkles, X } from 'lucide-react';
 import { Game } from '@/types/game';
+import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { useWallet } from '@/context/WalletContext';
 
 interface DedicatedGamePlayerProps {
@@ -233,15 +234,15 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
           {/* Live Jumby Coins Pill */}
           <button
             onClick={openShop}
-            className="relative flex items-center gap-1 px-2.5 py-1 rounded-full bg-jumby-lime/10 hover:bg-jumby-lime/20 border border-jumby-lime/30 text-jumby-lime text-xs font-heading font-black transition-all active:scale-95"
+            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-jumby-lime/10 hover:bg-jumby-lime/20 border border-jumby-lime/30 text-jumby-lime text-xs font-heading font-black transition-all active:scale-95"
             title="Your Jumby Coins"
           >
-            <span>🪙</span>
+            <JumbyCoin size="xs" className="w-3.5 h-3.5" />
             {floatingCoin && (
               <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-jumby-lime text-zinc-950 text-[10px] font-black shadow-md animate-bounce flex items-center gap-1 whitespace-nowrap">
                 <span>+{floatingCoin.amount}</span>
                 <ItemIcon icon={floatingCoin.icon} className="w-3 h-3" />
-                {!floatingCoin.icon && <span>{floatingCoin.label || '🪙'}</span>}
+                {!floatingCoin.icon && <JumbyCoin size="xs" className="w-3 h-3" />}
               </span>
             )}
           </button>
@@ -312,19 +313,23 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
                 <span className="text-base font-heading font-black text-jumby-lime">
                   +{runSummary.totalReward} Coins
                 </span>
-                <span className="text-lg">🪙</span>
+                <JumbyCoin size="sm" className="w-5 h-5" />
               </div>
 
               {/* Coin Conversion Breakdown */}
               <div className="w-full space-y-1.5 text-[11px] text-zinc-400 border-t border-white/10 pt-2.5 mb-4 text-left">
                 <div className="flex justify-between items-center">
                   <span>Round Completion</span>
-                  <span className="text-white font-mono font-bold">+{runSummary.baseReward} 🪙</span>
+                  <span className="text-white font-mono font-bold flex items-center gap-1">
+                    +{runSummary.baseReward} <JumbyCoin size="xs" className="w-3.5 h-3.5" />
+                  </span>
                 </div>
                 {runSummary.milestoneReward > 0 && (
                   <div className="flex justify-between items-center text-jumby-lime">
                     <span>{runSummary.isNewBest ? 'High Score Bonus' : 'Solid Run Bonus'}</span>
-                    <span className="font-mono font-bold">+{runSummary.milestoneReward} 🪙</span>
+                    <span className="font-mono font-bold flex items-center gap-1">
+                      +{runSummary.milestoneReward} <JumbyCoin size="xs" className="w-3.5 h-3.5" />
+                    </span>
                   </div>
                 )}
                 {runSummary.pickupReward > 0 && (
@@ -335,7 +340,9 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
                         {runSummary.pickupItemName || 'Pickups'} (x{runSummary.pickupReward})
                       </span>
                     </span>
-                    <span className="font-mono font-bold">+{runSummary.pickupReward} 🪙</span>
+                    <span className="font-mono font-bold flex items-center gap-1">
+                      +{runSummary.pickupReward} <JumbyCoin size="xs" className="w-3.5 h-3.5" />
+                    </span>
                   </div>
                 )}
               </div>

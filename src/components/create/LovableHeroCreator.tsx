@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Game } from '@/types/game';
 import { JumbyLogo } from '@/components/brand/JumbyLogo';
+import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { useWallet } from '@/context/WalletContext';
 
 export type TargetDevice = 'mobile' | 'desktop' | 'responsive';
@@ -172,7 +173,7 @@ export function LovableHeroCreator({
             className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#1b1935] hover:bg-[#25224a] border border-white/10 text-white font-heading font-black text-xs shadow-inner transition-all active:scale-95 cursor-pointer"
             title="Jumby Coins"
           >
-            <span className="text-sm">🪙</span>
+            <JumbyCoin size="sm" className="w-4 h-4" />
             <span>{coins ? coins.toLocaleString() : '2,450'}</span>
             <Plus className="w-3 h-3 text-zinc-400 stroke-[3]" />
           </button>

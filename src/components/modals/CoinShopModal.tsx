@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
 import { JumbyAppIcon } from '@/components/brand/JumbyAppIcon';
+import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { Sparkles, X, Plus, Check } from 'lucide-react';
 
 export function CoinShopModal() {
@@ -50,8 +51,8 @@ export function CoinShopModal() {
             <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-heading font-black">
               Your Balance
             </div>
-            <div className="text-2xl font-heading font-black text-jumby-lime flex items-center gap-1.5">
-              <span>🪙</span>
+            <div className="text-2xl font-heading font-black text-jumby-lime flex items-center gap-2">
+              <JumbyCoin size="md" className="w-6 h-6" />
               <span>{coins}</span>
               <span className="text-xs text-zinc-400 font-normal font-sans">Coins</span>
             </div>
@@ -91,7 +92,7 @@ export function CoinShopModal() {
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <span className="text-lg">🪙</span>
+                <JumbyCoin size="md" className="w-5 h-5" />
                 <div>
                   <div className="text-xs font-heading font-black text-white flex items-center gap-1.5">
                     <span>+{pack.coins} Coins</span>
