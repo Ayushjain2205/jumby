@@ -35,7 +35,6 @@ const GAME_EMOJIS: Record<string, string> = {
   'orbit-clash': '🪐',
   'space-blast': '🚀',
   'gravity-flip': '🔄',
-  'make-a-tik-cvfv': '✨',
 };
 
 export function GameTile({ game, index }: GameTileProps) {

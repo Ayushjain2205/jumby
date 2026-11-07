@@ -50,7 +50,7 @@ export function ItemIcon({
 }
 
 export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
-  const { coins, addCoins, openShop } = useWallet();
+  const { coins, addCoins, openShop, requestPayment, requestRewardedAd } = useWallet();
 
   const [copied, setCopied] = useState(false);
   const [currentScore, setCurrentScore] = useState(0);
@@ -103,7 +103,11 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const data = event.data;
-      if (!data || typeof data !== 'object') return;
+      if (!data || typeof data !== 'object' || data.source !== 'JUMBY_GAME') return;
+
+      const postToGame = (payload: Record<string, unknown>) => {
+        iframeRef.current?.contentWindow?.postMessage(payload, '*');
+      };
 
       // 1. Live Score Update
       if (data.type === 'JUMBY_SCORE_UPDATE' && typeof data.score === 'number') {
@@ -164,11 +168,65 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
           totalReward: totalEarned + sessionPickups,
         });
       }
+
+      // 4. In-Game Purchase (IAP)
+      if (data.type === 'JUMBY_BUY_ITEM') {
+        requestPayment({
+          requestId: data.requestId,
+          item: data.item || 'Mystery Item',
+          priceCoins: Number(data.priceCoins) || 10,
+          gameTitle: game.title,
+          onSuccess: () => {
+            postToGame({ type: 'JUMBY_BUY_RESPONSE', requestId: data.requestId, success: true, item: data.item });
+          },
+          onCancel: () => {
+            postToGame({ type: 'JUMBY_BUY_RESPONSE', requestId: data.requestId, success: false });
+          },
+        });
+      }
+
+      // 5. Rewarded Ad
+      if (data.type === 'JUMBY_SHOW_REWARDED_AD') {
+        requestRewardedAd({
+          requestId: data.requestId,
+          sponsorName: 'Jumby Ads',
+          rewardType: 'Revive & Bonus',
+          onReward: () => {
+            postToGame({ type: 'JUMBY_AD_RESPONSE', requestId: data.requestId, rewardGranted: true });
+          },
+          onClose: () => {
+            postToGame({ type: 'JUMBY_AD_RESPONSE', requestId: data.requestId, rewardGranted: false });
+          },
+        });
+      }
+
+      // 6. Persistent Game Memory (localStorage-backed, namespaced per game)
+      if (data.type === 'JUMBY_STORAGE_GET' && data.key) {
+        let value: unknown = null;
+        try {
+          const raw = localStorage.getItem(`jumby_save_${game.id}_${data.key}`);
+          value = raw === null ? null : JSON.parse(raw);
+        } catch {
+          value = null;
+        }
+        postToGame({ type: 'JUMBY_STORAGE_RESPONSE', requestId: data.requestId, value });
+      }
+
+      if (data.type === 'JUMBY_STORAGE_SET' && data.key) {
+        let success = false;
+        try {
+          localStorage.setItem(`jumby_save_${game.id}_${data.key}`, JSON.stringify(data.value ?? null));
+          success = true;
+        } catch {
+          success = false;
+        }
+        postToGame({ type: 'JUMBY_STORAGE_RESPONSE', requestId: data.requestId, success });
+      }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [addCoins, currentScore, highScore, game.id, sessionPickups, customItem]);
+  }, [addCoins, currentScore, highScore, game.id, game.title, sessionPickups, customItem, requestPayment, requestRewardedAd]);
 
   const handleRestart = () => {
     setRunSummary(null);

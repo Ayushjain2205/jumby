@@ -16,7 +16,6 @@ export interface GameTemplateConfig {
   speedMultiplier: number;
   gravity: number;
   fontVibe?: string;
-  customJsSnippet?: string;
 }
 
 export function generateGameHtml(config: GameTemplateConfig): string {

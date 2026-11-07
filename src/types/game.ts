@@ -49,19 +49,3 @@ export type JumbyMessageType =
   | 'JUMBY_AD_RESPONSE'
   | 'JUMBY_PAUSE'
   | 'JUMBY_RESUME';
-
-export interface JumbyMessagePayload {
-  type: JumbyMessageType;
-  gameId?: string;
-  score?: number;
-  amount?: number;
-  reason?: string;
-  key?: string;
-  value?: unknown;
-  requestId?: string;
-  item?: string;
-  icon?: string;
-  priceCoins?: number;
-  success?: boolean;
-  rewardGranted?: boolean;
-}
