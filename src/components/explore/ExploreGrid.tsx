@@ -15,9 +15,7 @@ import {
   Gamepad2,
   Zap,
   X,
-  Compass,
-  Layers,
-  Users,
+  Play,
   Bell,
   ChevronDown,
 } from 'lucide-react';
@@ -83,6 +81,12 @@ export function ExploreGrid({ games }: ExploreGridProps) {
             <div className="h-5 w-px bg-white/15 hidden sm:block" />
 
             <nav className="flex items-center gap-1 sm:gap-1.5">
+              {/* Active Play */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-jumby-purple to-[#8374ff] text-white font-sans font-bold text-xs shadow-md shadow-jumby-purple/30 cursor-default">
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Play</span>
+              </div>
+
               {/* Create Pill */}
               <Link
                 href="/create"
@@ -91,30 +95,6 @@ export function ExploreGrid({ games }: ExploreGridProps) {
                 <Gamepad2 className="w-3.5 h-3.5 text-jumby-lime" />
                 <span>Create</span>
               </Link>
-
-              {/* Active Explore */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-jumby-purple to-[#8374ff] text-white font-sans font-bold text-xs shadow-md shadow-jumby-purple/30 cursor-default">
-                <Compass className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Explore</span>
-              </div>
-
-              {/* My Games */}
-              <Link
-                href="/create"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
-              >
-                <Layers className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="hidden md:inline">My Games</span>
-              </Link>
-
-              {/* Community */}
-              <button
-                type="button"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
-              >
-                <Users className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="hidden lg:inline">Community</span>
-              </button>
             </nav>
           </div>
 

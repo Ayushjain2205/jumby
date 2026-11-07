@@ -11,8 +11,7 @@ import {
   Layers,
   ArrowRight,
   Gamepad2,
-  Compass,
-  Users,
+  Play,
   Bell,
   Plus,
   ChevronDown,
@@ -36,7 +35,6 @@ interface LovableHeroCreatorProps {
   onSubmit: () => void;
   isGenerating: boolean;
   selectedTemplate: Game | null;
-  onOpenTemplatePicker: () => void;
   onClearTemplate: () => void;
   targetDevice: TargetDevice;
   onTargetDeviceChange: (device: TargetDevice) => void;
@@ -64,7 +62,6 @@ export function LovableHeroCreator({
   onSubmit,
   isGenerating,
   selectedTemplate,
-  onOpenTemplatePicker,
   onClearTemplate,
   targetDevice,
   onTargetDeviceChange,
@@ -140,39 +137,20 @@ export function LovableHeroCreator({
           <div className="h-5 w-px bg-white/15 hidden sm:block" />
 
           <nav className="flex items-center gap-1 sm:gap-1.5">
+            {/* Play */}
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
+            >
+              <Play className="w-3.5 h-3.5 text-zinc-400 fill-zinc-400" />
+              <span>Play</span>
+            </Link>
+
             {/* Active Create Pill */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-jumby-purple to-[#8374ff] text-white font-heading font-black text-xs shadow-md shadow-jumby-purple/30 cursor-default">
               <Gamepad2 className="w-3.5 h-3.5" />
               <span>Create</span>
             </div>
-
-            {/* Explore */}
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
-            >
-              <Compass className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="hidden md:inline">Explore</span>
-            </Link>
-
-            {/* My Games */}
-            <button
-              type="button"
-              onClick={onOpenTemplatePicker}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
-            >
-              <Layers className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="hidden md:inline">My Games</span>
-            </button>
-
-            {/* Community */}
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-zinc-300 hover:text-white hover:bg-white/5 font-sans font-bold text-xs transition-colors"
-            >
-              <Users className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="hidden lg:inline">Community</span>
-            </button>
           </nav>
         </div>
 

@@ -40,7 +40,6 @@ import {
   TargetDevice,
   AttachedImage,
 } from '@/components/create/LovableHeroCreator';
-import { TemplatePickerModal } from '@/components/create/TemplatePickerModal';
 import {
   GenerativeDifficultyWidget,
   GenerativeBossWidget,
@@ -193,46 +192,14 @@ function CreateStudioContent() {
   const [targetDevice, setTargetDevice] = useState<TargetDevice>('mobile');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
-  // Attached Reference Images & Template Picker
+  // Attached Reference Images & Template
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
-  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Game | null>(parentGame || null);
 
   const handleTargetDeviceChange = (dev: TargetDevice) => {
     setTargetDevice(dev);
     if (dev === 'desktop') setPreviewDevice('desktop');
     else setPreviewDevice('mobile');
-  };
-
-  const handleSelectTemplate = (template: Game) => {
-    setSelectedTemplate(template);
-    const isStack =
-      template.tags.some((t) => t.toLowerCase().includes('stack')) ||
-      template.title.toLowerCase().includes('stack') ||
-      template.title.toLowerCase().includes('build');
-    const isOrbit =
-      template.tags.some((t) => t.toLowerCase().includes('orbit') || t.toLowerCase().includes('dodge')) ||
-      template.title.toLowerCase().includes('orbit');
-    const arch: GameArchetype = isStack ? 'stack' : isOrbit ? 'orbit' : 'flappy';
-    setArchetype(arch);
-    setTitle(`${template.title} (Remix)`);
-    setInputPrompt(`A remix of ${template.title} with faster speed and neon colors`);
-
-    const targetFont = detectFontVibe('', arch).id;
-    setActiveFontVibe(targetFont);
-    const code = generateGameHtml({
-      title: template.title,
-      themeColor: themeColor,
-      accentColor: accentColor,
-      bgGradient: [bgColor, bgColor],
-      gameType: arch,
-      speedMultiplier: 1.0,
-      gravity: 0.38,
-      fontVibe: targetFont,
-    });
-    setHistory((prev) => (gameHtml ? [...prev, gameHtml] : []));
-    setGameHtml(code);
-    setHasStartedGenerating(true);
   };
 
   // Left Studio Panel Tabs: 'chat' | 'tune'
@@ -737,31 +704,23 @@ function CreateStudioContent() {
 
   if (isHeroState) {
     return (
-      <>
-        <LovableHeroCreator
-          prompt={inputPrompt}
-          onPromptChange={setInputPrompt}
-          onSubmit={() => handleApplyPrompt(inputPrompt)}
-          isGenerating={isGenerating}
-          selectedTemplate={selectedTemplate}
-          onOpenTemplatePicker={() => setIsTemplatePickerOpen(true)}
-          onClearTemplate={() => setSelectedTemplate(null)}
-          targetDevice={targetDevice}
-          onTargetDeviceChange={handleTargetDeviceChange}
-          attachedImages={attachedImages}
-          onAddImages={(newImgs) => setAttachedImages((prev) => [...prev, ...newImgs])}
-          onRemoveImage={(id) => setAttachedImages((prev) => prev.filter((img) => img.id !== id))}
-          onSelectSuggestion={(sugg) => {
-            setInputPrompt(sugg);
-            handleApplyPrompt(sugg);
-          }}
-        />
-        <TemplatePickerModal
-          isOpen={isTemplatePickerOpen}
-          onClose={() => setIsTemplatePickerOpen(false)}
-          onSelectTemplate={handleSelectTemplate}
-        />
-      </>
+      <LovableHeroCreator
+        prompt={inputPrompt}
+        onPromptChange={setInputPrompt}
+        onSubmit={() => handleApplyPrompt(inputPrompt)}
+        isGenerating={isGenerating}
+        selectedTemplate={selectedTemplate}
+        onClearTemplate={() => setSelectedTemplate(null)}
+        targetDevice={targetDevice}
+        onTargetDeviceChange={handleTargetDeviceChange}
+        attachedImages={attachedImages}
+        onAddImages={(newImgs) => setAttachedImages((prev) => [...prev, ...newImgs])}
+        onRemoveImage={(id) => setAttachedImages((prev) => prev.filter((img) => img.id !== id))}
+        onSelectSuggestion={(sugg) => {
+          setInputPrompt(sugg);
+          handleApplyPrompt(sugg);
+        }}
+      />
     );
   }
 
@@ -1384,12 +1343,6 @@ function CreateStudioContent() {
           </div>
         </div>
       </div>
-      {/* Template Picker Modal */}
-      <TemplatePickerModal
-        isOpen={isTemplatePickerOpen}
-        onClose={() => setIsTemplatePickerOpen(false)}
-        onSelectTemplate={handleSelectTemplate}
-      />
 
       {/* Publish Success Modal */}
       {publishedSlug && (

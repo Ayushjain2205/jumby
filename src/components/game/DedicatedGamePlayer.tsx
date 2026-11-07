@@ -205,7 +205,7 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
         <Link
           href="/"
           className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white transition-all shrink-0"
-          aria-label="Back to Explore"
+          aria-label="Back to Play"
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
