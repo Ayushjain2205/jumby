@@ -288,6 +288,18 @@ ${intentSpecs}
    - **Thematic Collectible Items**: Every game MUST have a bespoke collectible item fitting its theme (does NOT have to be an emoji — can be procedural glowing neon crystals, rotating rings, energy orbs, pixel gems, food, or sprites).
    - When the player collects an item in-game:
      * Call 'Jumby.awardCoins(1, { item: "Item Name", icon: "optional-icon-or-emoji" })'
+     * Burst sparkling particles with Jumby.fx.particles()
+     * Play Jumby.sound.coin()
+
+7. **MODERN 1-ROW HUD BLUEPRINT (ZERO CLUTTER, ZERO REPETITION)**:
+   - **NEVER draw the game title on screen during active gameplay**: The app shell, permalink header, and explore grid already display the title. Drawing giant glowing title text on the canvas eats up 30% of the screen.
+   - **NO permanent instruction paragraphs on screen**: Do NOT waste vertical space on permanent "TAP OR SWIPE TO MATCH" instruction banners during gameplay.
+   - **NO redundant goal text**: Do NOT write "GOAL: 450" and then repeat "TARGET: 450 PTS" underneath.
+   - **Sleek 1-Row Compact Top HUD (Max 50px height)**:
+     * Left: Time / Ammo Pill (e.g. '⏳ 45s' or '●●●●○')
+     * Center: Level Progress Pill with glowing bar ('LVL 1' + bar filling to current goal: 'score / goal')
+     * Right: Score Pill (e.g. '💎 350')
+   - **90%+ Screen Space for Gameplay**: Move the play area (puzzle grid, slingshot, runner lanes, survivor arena) immediately under the top HUD so the player gets full immersion with zero wasted vertical space.
      * Play sound: 'Jumby.sound.score()' or 'Jumby.sound.coin()'
      * Pop floating juice: 'Jumby.fx.addFloatingText("+1 Item", x, y, "#D8FF43")'
      * Emit particles: 'Jumby.fx.particles(x, y, 12, "#D8FF43")'
