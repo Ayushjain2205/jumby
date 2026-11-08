@@ -1,6 +1,59 @@
 import { Game } from '@/types/game';
 
 export const SEED_GAMES: Game[] = [
+  // Novel Universal Engine Seed Games
+  {
+    id: 'game_comet_slingshot',
+    slug: 'comet-slingshot',
+    title: 'Cosmic Slingshot',
+    description: 'Drag and release your cosmic comet around gravitational black holes to shatter crystals.',
+    prompt: 'Cosmic comet slingshot with drag-and-launch physics, black-hole gravity bending, and crystal targets',
+    creator: {
+      id: 'usr_gravity',
+      name: 'Astro Dave',
+      username: 'astro_dave',
+      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=astro',
+    },
+    parentGameId: null,
+    parentGameTitle: null,
+    engine: 'canvas2d',
+    bundleUrl: '/games/comet-slingshot/index.html',
+    stats: {
+      plays: 15420,
+      likes: 2130,
+      remixes: 88,
+      highScore: 1800,
+    },
+    tags: ['Physics', 'Slingshot', 'Arcade', 'Featured'],
+    controlsHint: 'Drag & Release to Launch',
+    createdAt: '2026-11-08T12:00:00Z',
+  },
+  {
+    id: 'game_neon_match3',
+    slug: 'neon-match3',
+    title: 'Neon Grid Spark',
+    description: 'Fast-paced 8x8 neon jewel match-3 puzzle with combo chain blasts and a 60-second timer.',
+    prompt: 'Fast-paced 8x8 neon jewel match-3 puzzle with combo chain blasts and 60s timer',
+    creator: {
+      id: 'usr_pixel',
+      name: 'Gem Master',
+      username: 'gem_master',
+      avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=gem',
+    },
+    parentGameId: null,
+    parentGameTitle: null,
+    engine: 'canvas2d',
+    bundleUrl: '/games/neon-match3/index.html',
+    stats: {
+      plays: 28900,
+      likes: 3410,
+      remixes: 142,
+      highScore: 3500,
+    },
+    tags: ['Puzzle', 'Match-3', 'Grid', 'Featured'],
+    controlsHint: 'Tap adjacent gems to swap',
+    createdAt: '2026-11-08T12:30:00Z',
+  },
   // 1
   {
     id: 'game_sky_islands',

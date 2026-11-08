@@ -46,15 +46,15 @@ interface LovableHeroCreatorProps {
 }
 
 const EXAMPLE_SUGGESTIONS_ROW1 = [
-  { icon: '⚡', label: 'Neon cyber dodger', prompt: 'A fast 3-lane neon cyber dodger with glowing obstacles' },
-  { icon: '🎮', label: 'Flappy bird in space', prompt: 'Flappy bird flying through cosmic space laser pipes' },
-  { icon: '🧱', label: 'Block stacker', prompt: 'Satisfying 3D pastel block stacker with precision slicing' },
+  { icon: '🏹', label: 'Physics Slingshot', prompt: 'Cosmic comet slingshot with drag-and-launch physics, black-hole gravity bending, and crystal targets' },
+  { icon: '🧩', label: '8x8 Match-3', prompt: 'Fast-paced 8x8 neon jewel match-3 puzzle with combo chain blasts and 60s timer' },
+  { icon: '⚔️', label: 'Survivors Danmaku', prompt: 'Top-down cyber twin-stick survivor with virtual stick, auto-targeting blasters, and enemy waves' },
 ];
 
 const EXAMPLE_SUGGESTIONS_ROW2 = [
-  { icon: '🌮', label: 'Taco catcher', prompt: 'Catch falling spicy tacos in a sombrero basket with combo streak' },
-  { icon: '🪐', label: 'Orbit survival', prompt: 'Dual orbital pulse rhythm survival game, tap to switch orbit direction' },
-  { icon: '🚀', label: 'Asteroid blaster', prompt: 'Classic arcade vector ship blasting pixel asteroids and invaders' },
+  { icon: '⛳', label: 'Cosmic Mini-Golf', prompt: 'Cosmic mini-golf where you drag to aim putts through warp portals and avoid orbital traps' },
+  { icon: '🧱', label: 'Block Slicer', prompt: 'Satisfying 3D pastel block stacker with precision slicing, dynamic colors, and combo streaks' },
+  { icon: '🃏', label: 'Cyberpunk Cards', prompt: 'Turn-based cyberpunk deck battler with energy cost cards: Laser Strike, Nanoshield, and EMP' },
 ];
 
 export function LovableHeroCreator({
