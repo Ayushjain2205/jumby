@@ -1473,13 +1473,6 @@ function CreateStudioContent() {
                 </div>
               )}
 
-              {/* Agentic Sandbox Verification Pill */}
-              {gameHtml && !isGenerating && playtestVerified && (
-                <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-950/80 border border-jumby-lime/40 backdrop-blur-md text-[10px] font-heading font-bold text-jumby-lime shadow-lg shadow-jumby-lime/10 animate-in fade-in slide-in-from-top-1 select-none pointer-events-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-jumby-lime animate-pulse" />
-                  <span>60 FPS Verified</span>
-                </div>
-              )}
 
               {/* Self-Healing Glitch Alert Banner */}
               {runtimeGlitch && (
