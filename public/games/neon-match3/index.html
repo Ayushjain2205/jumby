@@ -167,9 +167,11 @@
       return res;
     }
 
-    // Universal Level Progression Engine (Score Goal + Bonus Time)
+    // Universal Level Progression Engine (Score Goal + Bonus Time + Auto-Persistence)
     Jumby.level.init({
       objective: 'score',
+      persist: 'checkpoint',
+      persistKey: 'neon_match3',
       goal: (lvl) => Math.round(450 * Math.pow(lvl, 1.25)), // Lvl 1: 450, Lvl 2: 1070, Lvl 3: 1777...
       onLevelUp: (newLevel) => {
         timeLeft += 15;
@@ -178,14 +180,15 @@
       },
     });
 
-    function restartGame() {
-      score = 0;
+    function restartGame(keepCheckpoint = true) {
+      Jumby.level.reset(keepCheckpoint);
+      score = Jumby.level.getStartingScore();
       timeLeft = 60;
       combo = 0;
       selectedCell = null;
       isProcessing = false;
-      Jumby.setScore(0);
-      Jumby.level.reset();
+      Jumby.setScore(score);
+      Jumby.level.track(score);
       initBoard();
       state = 'playing';
       Jumby.sound.bgm.start('arcade');
@@ -353,7 +356,26 @@
 
     function onPointerDown(e) {
       if (state === 'gameover') {
-        restartGame();
+        const p = toVirtual(e.clientX, e.clientY);
+        const canResume = Jumby.level.highestLevel > 1;
+        if (canResume) {
+          // Continue Button (y: 440 to 492)
+          if (p.x >= V_WIDTH / 2 - 110 && p.x <= V_WIDTH / 2 + 110 && p.y >= 440 && p.y <= 492) {
+            restartGame(true);
+            return;
+          }
+          // Restart Level 1 Button (y: 506 to 552)
+          if (p.x >= V_WIDTH / 2 - 110 && p.x <= V_WIDTH / 2 + 110 && p.y >= 506 && p.y <= 552) {
+            restartGame(false);
+            return;
+          }
+        } else {
+          // Play Again Button (y: 460 to 514)
+          if (p.x >= V_WIDTH / 2 - 110 && p.x <= V_WIDTH / 2 + 110 && p.y >= 460 && p.y <= 514) {
+            restartGame(true);
+            return;
+          }
+        }
         return;
       }
       if (state !== 'playing' || isProcessing) return;
@@ -768,17 +790,42 @@
 
         ctx.fillStyle = '#00F0FF';
         ctx.font = '700 13px "Orbitron", sans-serif';
-        ctx.fillText(`CLEARED UP TO LEVEL ${Jumby.level.current}`, V_WIDTH / 2, 412);
+        ctx.fillText(`HIGHEST LEVEL: ${Jumby.level.highestLevel}`, V_WIDTH / 2, 412);
 
-        // Play Again Button Card
-        ctx.fillStyle = '#D8FF43';
-        ctx.beginPath();
-        ctx.roundRect(V_WIDTH / 2 - 110, 460, 220, 52, 26);
-        ctx.fill();
+        if (Jumby.level.highestLevel > 1) {
+          // Primary Continue Button
+          ctx.fillStyle = '#D8FF43';
+          ctx.beginPath();
+          ctx.roundRect(V_WIDTH / 2 - 110, 440, 220, 52, 26);
+          ctx.fill();
 
-        ctx.fillStyle = '#090717';
-        ctx.font = '900 16px "Orbitron", sans-serif';
-        ctx.fillText('PLAY AGAIN', V_WIDTH / 2, 492);
+          ctx.fillStyle = '#090717';
+          ctx.font = '900 15px "Orbitron", sans-serif';
+          ctx.fillText(`CONTINUE LVL ${Jumby.level.highestLevel}`, V_WIDTH / 2, 472);
+
+          // Secondary Restart Level 1 Button
+          ctx.fillStyle = 'rgba(20, 14, 41, 0.9)';
+          ctx.strokeStyle = '#4A3578';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(V_WIDTH / 2 - 110, 506, 220, 46, 23);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#A78BFA';
+          ctx.font = '700 13px "Orbitron", sans-serif';
+          ctx.fillText('RESTART LVL 1', V_WIDTH / 2, 535);
+        } else {
+          // Play Again Button Card
+          ctx.fillStyle = '#D8FF43';
+          ctx.beginPath();
+          ctx.roundRect(V_WIDTH / 2 - 110, 460, 220, 52, 26);
+          ctx.fill();
+
+          ctx.fillStyle = '#090717';
+          ctx.font = '900 16px "Orbitron", sans-serif';
+          ctx.fillText('PLAY AGAIN', V_WIDTH / 2, 492);
+        }
       }
 
       ctx.restore();

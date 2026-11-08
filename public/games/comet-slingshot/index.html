@@ -56,10 +56,9 @@
     const SLING_Y = 680;
 
     // Game state
-    let state = 'waiting'; // 'waiting', 'aiming', 'flying', 'gameover'
+    let state = 'aiming'; // Starts immediately in aiming mode — ZERO dim scrim!
     let score = 0;
     let launchesLeft = 5;
-    let sector = 1;
 
     // Comet physics object
     const comet = {
@@ -86,11 +85,26 @@
       });
     }
 
+    // Universal Level Progression Engine (Targets Cleared + Auto-Persistence)
+    Jumby.level.init({
+      objective: 'clear_targets',
+      persist: 'checkpoint',
+      persistKey: 'comet_slingshot',
+      goal: (lvl) => Math.min(3 + lvl, 8),
+      onLevelUp: (newLevel) => {
+        launchesLeft = Math.min(launchesLeft + 3, 7);
+        Jumby.awardCoins(2, { item: 'Sector Cleared', icon: '🚀' });
+        resetComet();
+        spawnLevel();
+        state = 'aiming';
+      },
+    });
+
     function spawnLevel() {
       crystals = [];
       blackHoles = [];
 
-      const crystalCount = Math.min(3 + sector, 7);
+      const crystalCount = Jumby.level.currentGoal || Math.min(3 + Jumby.level.current, 8);
       for (let i = 0; i < crystalCount; i++) {
         const angle = (i / crystalCount) * Math.PI + 0.2;
         const dist = 120 + Math.random() * 110;
@@ -98,7 +112,7 @@
         const cy = 180 + Math.sin(angle) * 90 + (i % 2) * 50;
         crystals.push({
           x: Math.max(40, Math.min(V_WIDTH - 40, cx)),
-          y: Math.max(100, Math.min(420, cy)),
+          y: Math.max(120, Math.min(420, cy)),
           radius: 18,
           alive: true,
           pulse: Math.random() * Math.PI * 2,
@@ -107,10 +121,12 @@
       }
 
       // Add 1 or 2 black holes in middle sector
-      const bhCount = sector >= 2 ? 2 : 1;
+      const bhCount = Math.min(1 + Math.floor((Jumby.level.current - 1) / 2), 3);
       for (let i = 0; i < bhCount; i++) {
+        const xSpan = V_WIDTH - 180;
+        const posX = bhCount > 1 ? 90 + (i * xSpan) / (bhCount - 1) : V_WIDTH / 2;
         blackHoles.push({
-          x: 100 + i * 190 + (Math.random() * 30 - 15),
+          x: posX + (Math.random() * 20 - 10),
           y: 340 + (Math.random() * 40 - 20),
           radius: 22,
           mass: 2800,
@@ -127,10 +143,10 @@
       comet.trail = [];
     }
 
-    function startGame() {
+    function restartGame(keepCheckpoint = true) {
+      Jumby.level.reset(keepCheckpoint);
       score = 0;
       launchesLeft = 5;
-      sector = 1;
       Jumby.setScore(0);
       resetComet();
       spawnLevel();
@@ -152,8 +168,26 @@
     function onPointerDown(e) {
       const p = toVirtual(e.clientX, e.clientY);
 
-      if (state === 'waiting' || state === 'gameover') {
-        startGame();
+      if (state === 'gameover') {
+        const canResume = Jumby.level.highestLevel > 1;
+        if (canResume) {
+          // Continue Button (y: 440 to 492)
+          if (p.x >= V_WIDTH / 2 - 110 && p.x <= V_WIDTH / 2 + 110 && p.y >= 440 && p.y <= 492) {
+            restartGame(true);
+            return;
+          }
+          // Restart Sector 1 Button (y: 506 to 552)
+          if (p.x >= V_WIDTH / 2 - 110 && p.x <= V_WIDTH / 2 + 110 && p.y >= 506 && p.y <= 552) {
+            restartGame(false);
+            return;
+          }
+        } else {
+          // Play Again Button (y: 460 to 514)
+          if (p.x >= V_WIDTH / 2 - 110 && p.x <= V_WIDTH / 2 + 110 && p.y >= 460 && p.y <= 514) {
+            restartGame(true);
+            return;
+          }
+        }
         return;
       }
 
@@ -298,21 +332,12 @@
               // Deflect comet
               comet.vx *= -0.4;
               comet.vy *= -0.4;
+
+              // Track target clear toward level objective
+              const res = Jumby.level.track(1, true);
+              if (res) return;
             }
           }
-        }
-
-        // Check if sector cleared
-        const remaining = crystals.filter((c) => c.alive).length;
-        if (remaining === 0) {
-          sector++;
-          launchesLeft = Math.min(launchesLeft + 3, 7);
-          Jumby.sound.fanfare();
-          Jumby.level.banner(`SECTOR ${sector}!`, '+3 BONUS LAUNCHES', COLORS.lime);
-          resetComet();
-          spawnLevel();
-          state = 'aiming';
-          return;
         }
 
         // Out of bounds or stopped
@@ -480,64 +505,141 @@
       Jumby.drawEmoji(ctx, '☄️', comet.x, comet.y, comet.radius * 2.4);
       ctx.restore();
 
-      // Top HUD Bar
-      ctx.fillStyle = COLORS.white;
+      // 1. SLEEK 1-ROW MODERN ARCADE HUD (Zero clutter, zero repetition)
+      // Left: Launches Pill
+      const isLowLaunches = launchesLeft <= 1;
+      ctx.fillStyle = isLowLaunches ? 'rgba(255, 23, 68, 0.2)' : 'rgba(20, 14, 41, 0.85)';
+      ctx.strokeStyle = isLowLaunches ? COLORS.magenta : '#32235C';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(20, 24, 82, 46, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#A78BFA';
+      ctx.font = '700 9px "Orbitron", sans-serif';
+      ctx.fillText('LAUNCHES', 61, 41);
+      ctx.fillStyle = isLowLaunches ? COLORS.magenta : COLORS.cyan;
       ctx.font = '900 15px "Orbitron", sans-serif';
+      ctx.fillText(`☄️ ${launchesLeft}`, 61, 60);
+
+      // Center: Sector & Goal Progress Pill
+      ctx.fillStyle = 'rgba(20, 14, 41, 0.85)';
+      ctx.strokeStyle = '#32235C';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(110, 24, V_WIDTH - 220, 46, 14);
+      ctx.fill();
+      ctx.stroke();
+
       ctx.textAlign = 'left';
-      ctx.fillText(`SECTOR ${sector}`, 20, 48);
-
-      ctx.fillStyle = COLORS.cyan;
-      ctx.fillText(`LAUNCHES: ${'●'.repeat(Math.max(0, launchesLeft))}`, 20, 72);
-
       ctx.fillStyle = COLORS.lime;
+      ctx.font = '900 11px "Orbitron", sans-serif';
+      ctx.fillText(`SECTOR ${Jumby.level.current}`, 124, 42);
+
       ctx.textAlign = 'right';
-      ctx.fillText(`SCORE: ${score}`, V_WIDTH - 20, 48);
+      ctx.fillStyle = COLORS.cyan;
+      ctx.font = '700 10px "Orbitron", sans-serif';
+      ctx.fillText(`💎 ${Math.round(Jumby.level.currentProgress)}/${Jumby.level.currentGoal}`, V_WIDTH - 124, 42);
+
+      // Level Progress Bar
+      const pBarX = 124;
+      const pBarY = 50;
+      const pBarW = V_WIDTH - 248;
+      const pBarH = 6;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath();
+      ctx.roundRect(pBarX, pBarY, pBarW, pBarH, 3);
+      ctx.fill();
+
+      const progressW = Math.max(0, Math.min(pBarW, pBarW * Jumby.level.progressRatio));
+      if (progressW > 0) {
+        ctx.fillStyle = COLORS.cyan;
+        ctx.shadowColor = COLORS.cyan;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.roundRect(pBarX, pBarY, progressW, pBarH, 3);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Right: Score Pill
+      ctx.fillStyle = 'rgba(20, 14, 41, 0.85)';
+      ctx.strokeStyle = '#32235C';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(V_WIDTH - 102, 24, 82, 46, 14);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#A78BFA';
+      ctx.font = '700 9px "Orbitron", sans-serif';
+      ctx.fillText('SCORE', V_WIDTH - 61, 41);
+      ctx.fillStyle = COLORS.lime;
+      ctx.font = '900 16px "Orbitron", sans-serif';
+      ctx.fillText(`${score}`, V_WIDTH - 61, 60);
 
       // FX Layer
       Jumby.fx.updateAndRender(ctx, V_WIDTH, V_HEIGHT);
 
-      // Overlays
-      if (state === 'waiting') {
-        ctx.fillStyle = 'rgba(7, 4, 18, 0.88)';
-        ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
-
-        ctx.textAlign = 'center';
-        ctx.fillStyle = COLORS.cyan;
-        ctx.font = '900 30px "Orbitron", sans-serif';
-        ctx.fillText('COSMIC', V_WIDTH / 2, 320);
-        ctx.fillStyle = COLORS.magenta;
-        ctx.fillText('SLINGSHOT', V_WIDTH / 2, 365);
-
-        ctx.fillStyle = COLORS.white;
-        ctx.font = '700 13px "Orbitron", sans-serif';
-        ctx.fillText('PULL COMET & BEND AROUND BLACK HOLES', V_WIDTH / 2, 420);
-
-        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
-        ctx.globalAlpha = 0.5 + pulse * 0.5;
-        ctx.fillStyle = COLORS.lime;
-        ctx.font = '900 18px "Orbitron", sans-serif';
-        ctx.fillText('TAP ANYWHERE TO PLAY', V_WIDTH / 2, 510);
-        ctx.globalAlpha = 1.0;
-      } else if (state === 'gameover') {
-        ctx.fillStyle = 'rgba(7, 4, 18, 0.9)';
+      // Game Over Screen (Only on Mission Failed!)
+      if (state === 'gameover') {
+        ctx.fillStyle = 'rgba(7, 4, 18, 0.92)';
         ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
 
         ctx.textAlign = 'center';
         ctx.fillStyle = COLORS.magenta;
         ctx.font = '900 32px "Orbitron", sans-serif';
+        ctx.shadowColor = COLORS.magenta;
+        ctx.shadowBlur = 18;
         ctx.fillText('MISSION OVER', V_WIDTH / 2, 330);
+        ctx.shadowBlur = 0;
 
         ctx.fillStyle = COLORS.white;
-        ctx.font = '700 15px "Orbitron", sans-serif';
-        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 385);
-        ctx.fillText(`REACHED SECTOR: ${sector}`, V_WIDTH / 2, 415);
+        ctx.font = '700 16px "Orbitron", sans-serif';
+        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 375);
 
-        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
-        ctx.globalAlpha = 0.5 + pulse * 0.5;
-        ctx.fillStyle = COLORS.lime;
-        ctx.font = '900 18px "Orbitron", sans-serif';
-        ctx.fillText('TAP TO PLAY AGAIN', V_WIDTH / 2, 510);
-        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = COLORS.cyan;
+        ctx.font = '700 13px "Orbitron", sans-serif';
+        ctx.fillText(`HIGHEST SECTOR: ${Jumby.level.highestLevel}`, V_WIDTH / 2, 404);
+
+        if (Jumby.level.highestLevel > 1) {
+          // Primary Continue Button
+          ctx.fillStyle = COLORS.lime;
+          ctx.beginPath();
+          ctx.roundRect(V_WIDTH / 2 - 110, 440, 220, 52, 26);
+          ctx.fill();
+
+          ctx.fillStyle = '#070412';
+          ctx.font = '900 15px "Orbitron", sans-serif';
+          ctx.fillText(`CONTINUE SECTOR ${Jumby.level.highestLevel}`, V_WIDTH / 2, 472);
+
+          // Secondary Restart Sector 1 Button
+          ctx.fillStyle = 'rgba(20, 14, 41, 0.9)';
+          ctx.strokeStyle = '#4A3578';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(V_WIDTH / 2 - 110, 506, 220, 46, 23);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#A78BFA';
+          ctx.font = '700 13px "Orbitron", sans-serif';
+          ctx.fillText('RESTART SECTOR 1', V_WIDTH / 2, 535);
+        } else {
+          // Play Again Button Card
+          ctx.fillStyle = COLORS.lime;
+          ctx.beginPath();
+          ctx.roundRect(V_WIDTH / 2 - 110, 460, 220, 52, 26);
+          ctx.fill();
+
+          ctx.fillStyle = '#070412';
+          ctx.font = '900 16px "Orbitron", sans-serif';
+          ctx.fillText('PLAY AGAIN', V_WIDTH / 2, 492);
+        }
       }
 
       ctx.restore();
@@ -549,6 +651,8 @@
       requestAnimationFrame(loop);
     }
 
+    restartGame(true);
+    Jumby.fx.addFloatingText('DRAG & RELEASE TO LAUNCH!', V_WIDTH / 2, SLING_Y - 50, COLORS.lime, 15);
     Jumby.ready();
     requestAnimationFrame(loop);
   </script>

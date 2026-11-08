@@ -793,17 +793,69 @@
     onLevelUp: null,
     goalFormula: null,
 
+    // Persistence settings ('checkpoint' | 'milestone' | false)
+    persist: null,
+    persistKey: '',
+    highestLevel: 1,
+
     // Active banner state for visual rendering
     activeBanner: null, // { title, subtitle, color, startTime, duration }
+
+    _getStorageKey: function () {
+      if (this.persistKey) return `jumby_lvl_${this.persistKey}`;
+      try {
+        const slug = (global.location && global.location.pathname) ? global.location.pathname.replace(/[^a-zA-Z0-9_-]/g, '_') : 'default';
+        return `jumby_lvl_${slug}`;
+      } catch (e) {
+        return 'jumby_lvl_default';
+      }
+    },
+
+    _loadSavedLevel: function () {
+      if (!this.persist) return 1;
+      try {
+        const key = this._getStorageKey();
+        if (global.localStorage) {
+          const saved = global.localStorage.getItem(key);
+          if (saved !== null) {
+            const num = parseInt(saved, 10);
+            if (!isNaN(num) && num >= 1) return num;
+          }
+        }
+      } catch (e) {}
+      return 1;
+    },
+
+    _saveLevel: function (lvl) {
+      if (!this.persist) return;
+      try {
+        const key = this._getStorageKey();
+        if (global.localStorage) {
+          global.localStorage.setItem(key, String(lvl));
+        }
+        sendToParent('JUMBY_STORAGE_SET', { key: 'level_checkpoint', value: lvl });
+      } catch (e) {}
+    },
 
     init: function (opts = {}) {
       this.enabled = opts.enabled !== undefined ? !!opts.enabled : true;
       this.autoBanner = opts.autoBanner !== undefined ? !!opts.autoBanner : true;
-      this.current = opts.startLevel || 1;
       this.maxLevels = opts.maxLevels || null;
       this.objective = opts.objective || (opts.pointsPerLevel ? 'score' : 'score');
       this.breatherDuration = opts.breatherDuration !== undefined ? opts.breatherDuration : 2200;
       this.onLevelUp = typeof opts.onLevelUp === 'function' ? opts.onLevelUp : null;
+
+      // Persistence configuration
+      this.persist = opts.persist !== undefined ? opts.persist : null;
+      this.persistKey = opts.persistKey || '';
+      this.highestLevel = this._loadSavedLevel();
+
+      // Checkpoint mode picks up from saved checkpoint level
+      if (this.persist === 'checkpoint' || this.persist === true) {
+        this.current = opts.startLevel !== undefined ? opts.startLevel : this.highestLevel;
+      } else {
+        this.current = opts.startLevel || 1;
+      }
 
       // Dynamic Goal Formula Configuration
       if (typeof opts.goal === 'function') {
@@ -832,16 +884,38 @@
       this.activeBanner = null;
     },
 
-    reset: function () {
-      this.current = 1;
+    getStartingScore: function () {
+      if (this.objective === 'score' && this.current > 1 && this.goalFormula) {
+        return this.goalFormula(this.current - 1);
+      }
+      return 0;
+    },
+
+    reset: function (keepCheckpoint = true) {
+      if ((this.persist === 'checkpoint' || this.persist === true) && keepCheckpoint) {
+        this.current = this.highestLevel;
+      } else {
+        this.current = 1;
+      }
       this.currentProgress = 0;
       this.progressRatio = 0.0;
-      this.currentGoal = this.goalFormula ? this.goalFormula(1) : 500;
+      this.currentGoal = this.goalFormula ? this.goalFormula(this.current) : 500;
       this.isComplete = false;
-      this.multiplier = 1.0;
+      this.multiplier = 1.0 + (this.current - 1) * 0.15;
       this.isBreather = false;
       this._breatherUntil = 0;
       this.activeBanner = null;
+    },
+
+    resetProgress: function (clearSaved = true) {
+      if (clearSaved) {
+        try {
+          const key = this._getStorageKey();
+          if (global.localStorage) global.localStorage.removeItem(key);
+        } catch (e) {}
+        this.highestLevel = 1;
+      }
+      this.reset(false);
     },
 
     /**
@@ -859,7 +933,11 @@
         this.currentProgress = Number(val) || 0;
       }
 
-      this.progressRatio = Math.max(0, Math.min(1, this.currentProgress / (this.currentGoal || 1)));
+      const prevThreshold = (this.objective === 'score' && this.current > 1 && this.goalFormula)
+        ? this.goalFormula(this.current - 1)
+        : 0;
+      const span = Math.max(1, this.currentGoal - prevThreshold);
+      this.progressRatio = Math.max(0, Math.min(1, (this.currentProgress - prevThreshold) / span));
 
       if (this.currentProgress >= this.currentGoal) {
         return this.advanceLevel();
@@ -884,6 +962,10 @@
       }
 
       this.current = prevLvl + 1;
+      if (this.current > this.highestLevel) {
+        this.highestLevel = this.current;
+        this._saveLevel(this.highestLevel);
+      }
       this.multiplier = Math.round((1.0 + (this.current - 1) * 0.15) * 100) / 100;
       this.currentGoal = this.goalFormula(this.current);
 

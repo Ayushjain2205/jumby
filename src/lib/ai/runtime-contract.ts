@@ -39,7 +39,8 @@ interface Window {
 
     // 2.5 UNIVERSAL OBJECTIVE & LEVEL ENGINE
     level: {
-      current: number;                                      // Current level (starts at 1)
+      current: number;                                      // Current level (starts at 1 or resumes from checkpoint)
+      highestLevel: number;                                 // Highest level reached across all sessions
       objective: 'score' | 'clear_targets' | 'survive_time' | 'collect'; // Gameplay objective type
       currentProgress: number;                              // Current value (points, targets cleared, seconds survived)
       currentGoal: number;                                  // Target goal for current level (calculated via formula)
@@ -50,6 +51,8 @@ interface Window {
       init(opts?: {
         objective?: 'score' | 'clear_targets' | 'survive_time' | 'collect';
         goal?: number | ((level: number) => number);        // Dynamic scaling formula e.g. (lvl) => 400 * Math.pow(lvl, 1.25)
+        persist?: 'checkpoint' | 'milestone' | boolean;     // 'checkpoint' = auto-resume highest level on boot; 'milestone' = tracks highest reached
+        persistKey?: string;                                // Custom namespaced key for localStorage save
         maxLevels?: number;                                 // Optional campaign level cap (or omit for infinite)
         startLevel?: number;
         autoBanner?: boolean;
@@ -57,7 +60,9 @@ interface Window {
       }): void;
       track(value: number, isDelta?: boolean): boolean | any; // Update progress toward objective (auto-advances when >= goal)
       advanceLevel(): any;                                  // Manually trigger level up & next goal calculation
-      reset(): void;                                        // Reset to Level 1
+      getStartingScore(): number;                           // Starting score for current level checkpoint (prev level goal in cumulative score mode)
+      reset(keepCheckpoint?: boolean): void;                // Reset current run (keeps unlocked checkpoint if true)
+      resetProgress(clearSaved?: boolean): void;            // Reset to Level 1 and optionally wipe saved localStorage
       banner(title: string, subtitle?: string, color?: string, duration?: number): void;
       renderProgressBar(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height?: number, opts?: { bg?: string; color?: string; showText?: boolean; label?: string }): void;
       getSpeed(baseSpeed: number): number;                  // baseSpeed * multiplier
