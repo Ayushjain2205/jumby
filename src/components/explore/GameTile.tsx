@@ -54,10 +54,10 @@ export function GameTile({ game, index, isActive = false, onHover, onLeave }: Ga
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
-      className={`group relative flex aspect-square w-full rounded-2xl sm:rounded-3xl overflow-hidden border-2 transition-all duration-200 select-none cursor-pointer bg-zinc-900 ${
+      className={`group relative flex aspect-square w-full rounded-xl sm:rounded-2xl overflow-hidden border-2 transition-all duration-150 select-none cursor-pointer bg-zinc-900 ${
         isActive
-          ? 'border-jumby-lime ring-4 ring-jumby-lime/40 scale-110 z-20 shadow-2xl shadow-jumby-lime/40'
-          : 'border-white/10 hover:border-jumby-lime hover:ring-2 hover:ring-jumby-lime/40 hover:scale-115 hover:z-20 hover:shadow-xl hover:shadow-jumby-purple/40 active:scale-95'
+          ? 'border-jumby-lime ring-4 ring-jumby-lime/50 scale-115 z-30 shadow-2xl shadow-jumby-lime/50'
+          : 'border-white/10 hover:border-jumby-lime hover:ring-2 hover:ring-jumby-lime/50 hover:scale-120 hover:z-30 hover:shadow-2xl hover:shadow-jumby-purple/50 active:scale-95'
       }`}
     >
       {/* Background Thumbnail or Vibrant Dynamic Gradient */}

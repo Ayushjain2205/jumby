@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Game } from '@/types/game';
 import { GameTile } from './GameTile';
-import { FrivCenterScreen } from './FrivCenterScreen';
 import { JumbyLogo } from '@/components/brand/JumbyLogo';
 import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { useWallet } from '@/context/WalletContext';
@@ -40,31 +39,6 @@ export function ExploreGrid({ games }: ExploreGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
-
-  // Hover state for real-time Friv center display updates
-  const [hoveredGame, setHoveredGame] = useState<Game | null>(null);
-  const [featuredIndex, setFeaturedIndex] = useState(0);
-  const lastHoverTimeRef = useRef<number>(0);
-
-  // Featured game list for idle auto-rotation
-  const featuredGames = useMemo(() => {
-    const featured = games.filter(
-      (g) => g.tags.includes('Featured') || g.stats.plays > 100000
-    );
-    return featured.length > 0 ? featured : games;
-  }, [games]);
-
-  // Auto-rotate featured game in the center screen when user is idle
-  useEffect(() => {
-    lastHoverTimeRef.current = Date.now();
-    const interval = setInterval(() => {
-      // Only auto-advance if no tile hovered in the last 4 seconds
-      if (Date.now() - lastHoverTimeRef.current > 4000) {
-        setFeaturedIndex((prev) => (prev + 1) % featuredGames.length);
-      }
-    }, 4500);
-    return () => clearInterval(interval);
-  }, [featuredGames.length]);
 
   // Filtered games based on search and category
   const filteredGames = useMemo(() => {
@@ -104,34 +78,28 @@ export function ExploreGrid({ games }: ExploreGridProps) {
     });
   }, [games, searchQuery, activeCategory]);
 
+  // Full Wall Generator: Repeats games to produce an unbroken, massive arcade wall of tiles
+  const wallGames = useMemo(() => {
+    if (searchQuery.trim()) {
+      return filteredGames;
+    }
 
+    if (filteredGames.length === 0) return [];
 
-
-
-  const activePreviewGame =
-    hoveredGame ||
-    featuredGames[featuredIndex % featuredGames.length] ||
-    games[0];
-
-  const handleTileHover = (game: Game) => {
-    lastHoverTimeRef.current = Date.now();
-    setHoveredGame(game);
-  };
-
-  const handleTileLeave = () => {
-    lastHoverTimeRef.current = Date.now();
-  };
-
-  const isFullMosaic =
-    activeCategory === 'all' &&
-    !searchQuery.trim() &&
-    filteredGames.length >= 36;
+    // For full wall: guarantee at least 120 tiles (12 cols x 10 rows or 10 cols x 12 rows)
+    const targetCount = activeCategory === 'all' ? 120 : 60;
+    const result: Game[] = [];
+    while (result.length < targetCount) {
+      result.push(...filteredGames);
+    }
+    return result.slice(0, targetCount);
+  }, [filteredGames, searchQuery, activeCategory]);
 
   return (
     <div className="min-h-screen w-full bg-[#0d0b1a] text-white flex flex-col font-sans select-none">
       {/* Top Header: Brand & Navigation on left, Coins & Profile on right */}
       <header className="sticky top-0 z-40 bg-[#120f26]/95 backdrop-blur-xl border-b border-white/5 px-3 sm:px-6 py-2.5">
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           {/* Brand Logo & Navigation */}
           <div className="flex items-center gap-3 sm:gap-4">
             <Link href="/" className="shrink-0 flex items-center">
@@ -197,7 +165,7 @@ export function ExploreGrid({ games }: ExploreGridProps) {
         </div>
 
         {/* Category Pills Bar with Compact Search */}
-        <div className="max-w-[1440px] mx-auto mt-2 flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+        <div className="max-w-[1600px] mx-auto mt-2 flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
           {/* Expandable Search Pill */}
           {isSearchOpen ? (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-jumby-purple/60 text-white shrink-0 animate-in fade-in zoom-in-95 duration-150">
@@ -205,7 +173,7 @@ export function ExploreGrid({ games }: ExploreGridProps) {
               <input
                 type="text"
                 autoFocus
-                placeholder="Search 50+ arcade games..."
+                placeholder="Search games..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-none w-36 sm:w-48"
@@ -253,47 +221,18 @@ export function ExploreGrid({ games }: ExploreGridProps) {
         </div>
       </header>
 
-      {/* Main Friv Arcade Wall Layout */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto p-2 sm:p-4 md:p-5 flex flex-col">
-        {filteredGames.length > 0 ? (
-          <>
-            {/* Mobile / Tablet / Search View: Top Preview Banner */}
-            {(!isFullMosaic || true) && (
-              <div className={isFullMosaic ? 'block lg:hidden mb-2.5 sm:mb-3' : 'block mb-3 sm:mb-4'}>
-                {activePreviewGame && (
-                  <FrivCenterScreen game={activePreviewGame} isCompact={true} />
-                )}
-              </div>
-            )}
-
-            {/* Dense Mosaic Grid */}
-            <div
-              className={`grid gap-1.5 sm:gap-2 md:gap-2.5 ${
-                isFullMosaic
-                  ? 'grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 [grid-auto-flow:dense]'
-                  : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8'
-              }`}
-            >
-              {/* Desktop Classic Center Screen (takes up 4 cols x 2 rows in the dead center) */}
-              {isFullMosaic && activePreviewGame && (
-                <div className="hidden lg:flex lg:col-start-4 lg:row-start-3 lg:col-span-4 lg:row-span-2 z-10">
-                  <FrivCenterScreen game={activePreviewGame} className="w-full h-full" />
-                </div>
-              )}
-
-              {/* Game Tiles */}
-              {filteredGames.map((game, index) => (
-                <GameTile
-                  key={game.id}
-                  game={game}
-                  index={index}
-                  isActive={hoveredGame?.id === game.id}
-                  onHover={handleTileHover}
-                  onLeave={handleTileLeave}
-                />
-              ))}
-            </div>
-          </>
+      {/* Main Full Arcade Wall (Pure Dense Grid, No Center Box) */}
+      <main className="flex-1 max-w-[1600px] w-full mx-auto p-2 sm:p-3 md:p-4 flex flex-col">
+        {wallGames.length > 0 ? (
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-14 gap-1.5 sm:gap-2 md:gap-2.5">
+            {wallGames.map((game, index) => (
+              <GameTile
+                key={`${game.id}-${index}`}
+                game={game}
+                index={index}
+              />
+            ))}
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
             <span className="text-5xl">🕹️</span>
