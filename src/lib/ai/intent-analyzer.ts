@@ -7,7 +7,7 @@
 export interface GameIntent {
   title: string;
   tagline?: string;
-  archetype: 'stack' | 'runner' | 'flappy' | 'catcher' | 'shooter' | 'breakout' | 'orbit' | 'custom';
+  archetype: 'slingshot' | 'grid_puzzle' | 'survivors_arena' | 'card_strategy' | 'stack' | 'runner' | 'flappy' | 'catcher' | 'shooter' | 'breakout' | 'orbit' | 'custom' | string;
   gameplayLoop: string;
   theme: string;
   themeColor: string;
@@ -19,6 +19,7 @@ export interface GameIntent {
   soundVibe: 'arcade' | 'cyber' | 'chill' | 'action';
   collectibleItem: string;
   mechanicTwist: string;
+  requiredPrimitives?: ('physics' | 'grid' | 'camera' | 'slingshot' | 'particles' | 'virtualStick')[];
 }
 
 export interface IntentOptions {
@@ -34,7 +35,7 @@ Analyze the user game prompt and return ONLY a valid, raw JSON object (no markdo
 {
   "title": "Punchy, catchy arcade title (e.g. Neon Sushi Express)",
   "tagline": "Short 4-8 word hook",
-  "archetype": "stack" | "runner" | "flappy" | "catcher" | "shooter" | "breakout" | "orbit" | "custom",
+  "archetype": "slingshot" | "grid_puzzle" | "survivors_arena" | "card_strategy" | "stack" | "runner" | "flappy" | "catcher" | "shooter" | "breakout" | "orbit" | "custom",
   "gameplayLoop": "1-2 sentences explaining core interaction and win/loss condition",
   "theme": "Visual aesthetic name (e.g. Cyberpunk Synthwave, Cozy Lo-fi, Saffron Festival)",
   "themeColor": "#HEX primary dominant entity/player color",
@@ -170,9 +171,22 @@ function parseIntentJson(raw: string): GameIntent | null {
 }
 
 function sanitizeArchetype(val: any): GameIntent['archetype'] {
-  const allowed = ['stack', 'runner', 'flappy', 'catcher', 'shooter', 'breakout', 'orbit', 'custom'];
+  const allowed = [
+    'slingshot',
+    'grid_puzzle',
+    'survivors_arena',
+    'card_strategy',
+    'stack',
+    'runner',
+    'flappy',
+    'catcher',
+    'shooter',
+    'breakout',
+    'orbit',
+    'custom',
+  ];
   const s = String(val).toLowerCase().trim();
-  return (allowed.includes(s) ? s : 'catcher') as GameIntent['archetype'];
+  return allowed.includes(s) ? (s as GameIntent['archetype']) : s || 'custom';
 }
 
 function sanitizeHex(val: any, fallback: string): string {
@@ -195,8 +209,16 @@ function sanitizeSoundVibe(val: any): GameIntent['soundVibe'] {
 function fallbackSemanticIntent(prompt: string, requestedArchetype?: string): GameIntent {
   const lower = prompt.toLowerCase();
 
-  let archetype: GameIntent['archetype'] = (requestedArchetype as any) || 'catcher';
-  if (lower.includes('stack') || lower.includes('tower') || lower.includes('slice') || lower.includes('balance')) {
+  let archetype: GameIntent['archetype'] = (requestedArchetype as any) || 'custom';
+  if (lower.includes('slingshot') || lower.includes('catapult') || lower.includes('angry') || lower.includes('golf') || lower.includes('pinball') || lower.includes('billiards') || lower.includes('pool')) {
+    archetype = 'slingshot';
+  } else if (lower.includes('match') || lower.includes('grid') || lower.includes('puzzle') || lower.includes('2048') || lower.includes('sand') || lower.includes('chess') || lower.includes('sokoban') || lower.includes('tetris')) {
+    archetype = 'grid_puzzle';
+  } else if (lower.includes('survivor') || lower.includes('arena') || lower.includes('swarm') || lower.includes('bullet hell') || lower.includes('danmaku') || lower.includes('rogue')) {
+    archetype = 'survivors_arena';
+  } else if (lower.includes('card') || lower.includes('deck') || lower.includes('turn') || lower.includes('battle')) {
+    archetype = 'card_strategy';
+  } else if (lower.includes('stack') || lower.includes('tower') || lower.includes('slice') || lower.includes('balance')) {
     archetype = 'stack';
   } else if (lower.includes('runner') || lower.includes('car') || lower.includes('dash') || lower.includes('subway')) {
     archetype = 'runner';

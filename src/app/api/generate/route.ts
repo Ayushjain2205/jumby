@@ -40,16 +40,9 @@ export async function POST(req: NextRequest) {
     const archetype = intent.archetype || requestedArchetype || 'flappy';
 
     // If the user is remixing an existing game, pass that code so the AI can modify it.
-    // If creating from scratch, pass undefined so the AI has full freedom to pick the right mechanic and palette.
+    // If creating from scratch, pass undefined so the AI has full freedom to synthesize novel mechanics.
     const isRemix = Boolean(baseCode && baseCode.trim().length > 50);
-    let effectiveBaseCode = isRemix ? baseCode : undefined;
-
-    const lowerPrompt = prompt.toLowerCase();
-    const isStackRequest = archetype === 'stack' || lowerPrompt.includes('stack') || lowerPrompt.includes('tower') || lowerPrompt.includes('slice') || lowerPrompt.includes('block stack');
-
-    if (isStackRequest && (!effectiveBaseCode || !effectiveBaseCode.includes('drawIsoBlock'))) {
-      effectiveBaseCode = synthesizeProceduralGame({ prompt, archetype: 'stack' });
-    }
+    const effectiveBaseCode = isRemix ? baseCode : undefined;
 
     // 1. Try Local CLI Proxy API if requested or in auto mode
     const tryProxy = provider === 'proxy' || provider === 'cliproxy' || provider === 'auto';

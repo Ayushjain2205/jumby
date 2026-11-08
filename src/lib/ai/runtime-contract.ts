@@ -72,7 +72,7 @@ interface Window {
     drawSprite(ctx: CanvasRenderingContext2D, options: { image: HTMLImageElement | string; x: number; y: number; width?: number; height?: number; frame?: number; frameWidth: number; frameHeight: number; cols?: number; flipX?: boolean; flipY?: boolean; rotation?: number; scale?: number }): void;
     getImage(src: string): HTMLImageElement;
 
-    // 5. UNIFIED INPUT (Touch, Pointer, Keyboard)
+    // 5. UNIFIED INPUT & GESTURES
     input: {
       isDown: boolean;                                      // True while mouse/finger is touching screen or Space/ArrowUp is held
       justPressed: boolean;                                 // True for exactly ONE frame when touch/click begins
@@ -81,6 +81,87 @@ interface Window {
       keysJustPressed: Set<string>;                         // Set of keys pressed this frame
       init(canvasElement: HTMLCanvasElement): void;         // Bind canvas to input events
       endFrame(): void;                                     // MUST CALL at the end of each game tick to reset justPressed!
+      onDrag(handlers: {
+        onStart?: (pos: { x: number; y: number }) => void;
+        onDrag?: (pos: { x: number; y: number }, pullVec: { x: number; y: number }, dist: number, angle: number) => void;
+        onRelease?: (releaseVec: { x: number; y: number }, dist: number) => void;
+      }): () => void;                                       // Slingshot / pull / release gesture helper!
+      onSwipe(callback: (dir: 'up' | 'down' | 'left' | 'right') => void): () => void;
+      virtualStick: {                                       // On-screen floating analog stick for twin-stick / top-down
+        enabled: boolean;
+        active: boolean;
+        x: number;                                          // -1.0 to 1.0 horizontal tilt
+        y: number;                                          // -1.0 to 1.0 vertical tilt
+        enable(): void;
+        render(ctx: CanvasRenderingContext2D): void;        // Draw virtual joystick
+      };
+    };
+
+    // 5.5 UNIVERSAL 2D VECTORS & MATH
+    vec2(x: number, y: number): {
+      x: number;
+      y: number;
+      add(v: { x: number; y: number }): this;
+      sub(v: { x: number; y: number }): this;
+      mult(n: number): this;
+      div(n: number): this;
+      mag(): number;
+      dist(v: { x: number; y: number }): number;
+      normalize(): this;
+      dot(v: { x: number; y: number }): number;
+      heading(): number;
+      angleTo(v: { x: number; y: number }): number;
+      lerp(v: { x: number; y: number }, t: number): this;
+      clone(): this;
+    };
+    math: {
+      lerp(a: number, b: number, t: number): number;
+      clamp(val: number, min: number, max: number): number;
+      map(val: number, inMin: number, inMax: number, outMin: number, outMax: number): number;
+      damp(a: number, b: number, lambda: number, dt: number): number;
+      randomFloat(min?: number, max?: number): number;
+      randomInt(min?: number, max?: number): number;
+      randomChoice<T>(arr: T[]): T;
+      dist(x1: number, y1: number, x2: number, y2: number): number;
+      angle(x1: number, y1: number, x2: number, y2: number): number;
+    };
+
+    // 5.6 UNIVERSAL 2D PHYSICS & COLLISION
+    physics: {
+      circleCircle(c1: { x: number; y: number; radius?: number; r?: number }, c2: { x: number; y: number; radius?: number; r?: number }): { hit: boolean; dist: number; overlap: number; normal: { x: number; y: number } };
+      circleRect(circle: { x: number; y: number; radius?: number; r?: number }, rect: { x: number; y: number; width?: number; w?: number; height?: number; h?: number }): { hit: boolean; nearestX: number; nearestY: number; dist: number };
+      rectRect(r1: { x: number; y: number; width?: number; w?: number; height?: number; h?: number }, r2: { x: number; y: number; width?: number; w?: number; height?: number; h?: number }): boolean;
+      pointInPoly(px: number, py: number, vertices: { x: number; y: number }[]): boolean;
+      reflect(velocity: { x: number; y: number }, normal: { x: number; y: number }, restitution?: number): { x: number; y: number };
+    };
+
+    // 5.7 GRID & TILEMAP MATRIX (For match-3, 2048, sand, minesweeper, chess, sokoban)
+    grid: {
+      create<T>(rows: number, cols: number, initialValue?: T | ((r: number, c: number) => T)): {
+        rows: number;
+        cols: number;
+        cells: T[][];
+        get(r: number, c: number): T | undefined;
+        set(r: number, c: number, val: T): boolean;
+        swap(r1: number, c1: number, r2: number, c2: number): boolean;
+        getNeighbors(r: number, c: number, diagonals?: boolean): { r: number; c: number; val: T }[];
+        screenToGrid(screenX: number, screenY: number, cellSize: number, originX?: number, originY?: number): { r: number; c: number; valid: boolean };
+        gridToScreen(r: number, c: number, cellSize: number, originX?: number, originY?: number): { x: number; y: number; width: number; height: number };
+        findMatches(minCount?: number): { r: number; c: number; val: T }[];
+        forEach(cb: (val: T, r: number, c: number) => void): void;
+      };
+    };
+
+    // 5.8 VIRTUAL 2D CAMERA (Pan, Follow & Zoom)
+    camera: {
+      x: number;
+      y: number;
+      zoom: number;
+      bounds: { minX: number; minY: number; maxX: number; maxY: number } | null;
+      follow(targetX: number, targetY: number, smoothing?: number): void;
+      setZoom(factor: number): void;
+      apply(ctx: CanvasRenderingContext2D, canvasWidth?: number, canvasHeight?: number): void;
+      restore(ctx: CanvasRenderingContext2D): void;
     };
 
     // 6. CLOUD STORAGE & PERSISTENCE
@@ -231,48 +312,36 @@ ${intentSpecs}
    Include '<script src="/jumby-runtime.js"></script>' in the '<head>'.
    NO explanations, NO conversational markdown before or after the code block.
 
-### CORE GAMEPLAY MECHANIC BLUEPRINTS:
-Pick the most intuitive, rock-solid mechanic based on the user's prompt:
-- **Catcher / Falling Collector**: (e.g. "catch tacos in sombrero", "collect falling coins", "fruit catcher", "dodge bombs").
-  Player basket/character moves along the bottom horizontally tracking 'Jumby.input.touchPos.x' or Arrow keys. Items spawn from top at random intervals and fall with 'speed'. Catching collectibles increments score and plays 'Jumby.sound.score()'. Missing or hitting hazards calls 'die()'.
-- **Shooter / Wave Blaster**: (e.g. "space shooter", "alien blaster", "laser cannon", "shoot targets").
-  Player ship at bottom. Tap or Space fires laser projectiles upwards. Obstacles/enemies spawn and descend. Projectile hits trigger particles + score.
-- **Tapper / Pop / Reflex**: (e.g. "pop balloons", "whack a mole", "tap the coins", "rhythm tap").
-  Targets spawn at random locations with a timer ring. Tapping a target's radius pops it with juice and score. Expired targets reduce lives or end game.
-- **Dodge Runner / Lane Racer**: (e.g. "cyber runner", "car dodge", "subway dash").
-  Player slides left/right or between lanes dodging oncoming hazards.
-- **Hopper / Flappy**: (e.g. "flappy bird", "jump over hurdles", "tap to jump").
-  Player has gravity and taps to jump through obstacles.
-- **Stacker / Slicer (Ketchapp Stack style)**: (e.g. "stack tower", "slice blocks", "pastel stacker").
-  * Rules & Architecture:
-    - TRUE 3D ISOMETRIC PROJECTION ONLY. (x, z) MUST be the CENTER of the block!
-    - Isometric 30° projection math: toScreen(x, y, z, originX, originY): { x: originX + (x - z) * Math.cos(Math.PI/6), y: originY + (x + z) * Math.sin(Math.PI/6) - y }.
-    - The 8 Isometric Vertices for block (x, z, y, w, d, h):
-      pBack = toScreen(x - w/2, y + h, z - d/2); pRight = toScreen(x + w/2, y + h, z - d/2);
-      pFront = toScreen(x + w/2, y + h, z + d/2); pLeft = toScreen(x - w/2, y + h, z + d/2);
-      bLeft = toScreen(x - w/2, y, z + d/2); bFront = toScreen(x + w/2, y, z + d/2); bRight = toScreen(x + w/2, y, z - d/2);
-    - Draw 3 Watertight Faces:
-      1. Front-Left Face: moveTo(pLeft) -> lineTo(pFront) -> lineTo(bFront) -> lineTo(bLeft), fill with shade(color, -18).
-      2. Front-Right Face: moveTo(pFront) -> lineTo(pRight) -> lineTo(bRight) -> lineTo(bFront), fill with shade(color, -34).
-      3. Top Face: moveTo(pBack) -> lineTo(pRight) -> lineTo(pFront) -> lineTo(pLeft), fill with color.
-    - Ground Pedestal (MANDATORY): Draw a foundation pedestal below the base block: { x: 0, z: 0, y: -300, w: 140, d: 140, h: 300, color: '#1A162B' } to ground the tower.
-    - Alternate sliding axis: Block N sweeps along X, Block N+1 sweeps along Z.
-    - Movement Clamps (LIMIT = 180): if (b.x >= LIMIT) { b.x = LIMIT; b.dir = -1; } else if (b.x <= -LIMIT) { b.x = -LIMIT; b.dir = 1; }.
-    - Centered Slicing Formulas:
-      * If axis === 'x': diff = active.x - top.x; absDiff = Math.abs(diff);
-        - If absDiff < 4: Snap to top.x, combo++, ascending chime, +50 PERFECT!
-        - If absDiff >= top.w: Total miss, drop entire block, die().
-        - Else: newW = top.w - absDiff; newX = top.x + diff / 2; debrisW = absDiff; debrisX = diff > 0 ? newX + newW/2 + debrisW/2 : newX - newW/2 - debrisW/2;
-      * If axis === 'z': diff = active.z - top.z; absDiff = Math.abs(diff);
-        - If absDiff < 4: Snap to top.z, combo++, ascending chime, +50 PERFECT!
-        - If absDiff >= top.d: Total miss, drop entire block, die().
-        - Else: newD = top.d - absDiff; newZ = top.z + diff / 2; debrisD = absDiff; debrisZ = diff > 0 ? newZ + newD/2 + debrisD/2 : newZ - newD/2 - debrisD/2;
-    - Camera Tracking: targetCameraY = (stack.length - 1) * BLOCK_HEIGHT; cameraY += (targetCameraY - cameraY) * 0.12; originY = height * 0.65 + cameraY.
-    - Immediate Start: Call resetGame() at startup so the block sweeps across immediately. Tap anywhere resets and restarts instantly.
-- **Paddle / Pong / Brick Bouncer**: (e.g. "brick breaker", "paddle bounce").
-  Ball bounces at angles; player controls paddle at bottom to deflect.
-- **Orbit / Spinner**: (e.g. "orbital pulse", "circle defend").
-  Player orbits center core; tap to reverse orbit direction.
+### UNIVERSAL GAME GENRE & MECHANICS ARCHITECTURE:
+You have complete freedom to synthesize ANY 2D genre. Choose the most exciting, intuitive mechanic tailored to the user's prompt using the built-in Jumby primitives:
+
+1. **Physics Slingshot & Trajectory** (e.g. Angry Birds, Mini-Golf, Pinball, Catapults, Billiards):
+   - Use 'Jumby.input.onDrag({ onStart, onDrag, onRelease })' to draw an aiming line or dotted trajectory trajectory.
+   - On release: apply releaseVector as projectile velocity: 'vel = releaseVector.clone().mult(0.18)'.
+   - Use 'Jumby.physics.reflect(vel, normal, 0.75)' for realistic ricochets off walls or targets.
+   - Trigger 'Jumby.fx.shake(8)' and 'Jumby.sound.hit()' on impacts.
+
+2. **Grid, Tilemap & Board Puzzles** (e.g. Match-3, 2048, Sandspiel falling sand, Minesweeper, Sokoban, Tetris, Chess):
+   - Create the board with 'grid = Jumby.grid.create(rows, cols, null)'.
+   - Handle clicks or drags with 'const { r, c, valid } = grid.screenToGrid(touchPos.x, touchPos.y, cellSize, originX, originY)'.
+   - For Match-3: use 'const matches = grid.findMatches(3)' to detect combos, pop 'Jumby.fx.particles()', and award points.
+   - For sand/cellular automata: update cells with simple gravity/fall rules in your game loop.
+
+3. **Action, Roguelites & Survivors Arena** (e.g. Vampire Survivors, Twin-Stick shooter, Danmaku bullet hell, Arena brawlers):
+   - Use 'Jumby.input.virtualStick.enable()' or Arrow/WASD keys for omni-directional player movement.
+   - Use 'Jumby.camera.follow(player.x, player.y, 0.1)' so the world extends seamlessly beyond the screen edges.
+   - Spawn enemy swarms that seek the player: 'const dir = player.sub(enemy).normalize().mult(speed)'.
+   - Auto-fire or tap-fire projectiles with 'Jumby.sound.laser()'.
+   - Enemies drop bespoke XP/Coin gems awarded via 'Jumby.awardCoins(1, { item: "Gem" })'.
+
+4. **Precision Reflex & Timing** (e.g. Ketchapp Stack 3D, Flappy, Gravity Flip, Subway Runner, Rhythm Beat):
+   - 1-tap/touch input loop tracking 'Jumby.input.justPressed'.
+   - Dynamic difficulty scaling using 'Jumby.level.multiplier' and 'Jumby.level.isBreather'.
+   - Tight hitboxes with 'Jumby.physics.circleRect' or 'circleCircle'.
+
+5. **Turn-Based Strategy & Card Battlers** (e.g. Slay the Spire mini, Card Clash, Monster Tamer):
+   - State machine: 'PLAYER_TURN' -> 'RESOLVING' -> 'ENEMY_TURN'.
+   - Tap cards in hand to play, deduct energy, trigger spell particles with 'Jumby.fx.particles()', and resolve enemy health.
 
 ### TYPED API CONTRACT REFERENCE:
 \`\`\`typescript

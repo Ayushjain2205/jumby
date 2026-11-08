@@ -566,7 +566,55 @@
     touchPos: { x: 0, y: 0 },
     keysDown: new Set(),
     keysJustPressed: new Set(),
-    _autoResetTimer: null,
+    _dragHandlers: [],
+    _swipeHandlers: [],
+    _dragStartPos: null,
+    _swipeStartTime: 0,
+    virtualStick: {
+      enabled: false,
+      active: false,
+      origin: { x: 0, y: 0 },
+      current: { x: 0, y: 0 },
+      x: 0,
+      y: 0,
+      maxRadius: 45,
+      enable: function () {
+        this.enabled = true;
+      },
+      render: function (ctx) {
+        if (!this.enabled || !this.active || !ctx) return;
+        ctx.save();
+        // Base ring
+        ctx.beginPath();
+        ctx.arc(this.origin.x, this.origin.y, this.maxRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(216, 255, 67, 0.35)';
+        ctx.stroke();
+
+        // Inner thumb knob
+        ctx.beginPath();
+        ctx.arc(this.current.x, this.current.y, 20, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(216, 255, 67, 0.7)';
+        ctx.shadowColor = '#D8FF43';
+        ctx.shadowBlur = 10;
+        ctx.fill();
+        ctx.restore();
+      },
+    },
+    onDrag: function (handlers) {
+      this._dragHandlers.push(handlers);
+      return () => {
+        this._dragHandlers = this._dragHandlers.filter((h) => h !== handlers);
+      };
+    },
+    onSwipe: function (callback) {
+      this._swipeHandlers.push(callback);
+      return () => {
+        this._swipeHandlers = this._swipeHandlers.filter((cb) => cb !== callback);
+      };
+    },
     init: function (canvasElement) {
       if (!canvasElement) return;
 
@@ -585,6 +633,23 @@
         this.justPressed = true;
         updatePos(x, y);
 
+        this._dragStartPos = { x: this.touchPos.x, y: this.touchPos.y };
+        this._swipeStartTime = Date.now();
+
+        // Virtual stick activation on left half of screen if enabled
+        if (this.virtualStick.enabled && this.touchPos.x < canvasElement.width * 0.6) {
+          this.virtualStick.active = true;
+          this.virtualStick.origin = { x: this.touchPos.x, y: this.touchPos.y };
+          this.virtualStick.current = { x: this.touchPos.x, y: this.touchPos.y };
+          this.virtualStick.x = 0;
+          this.virtualStick.y = 0;
+        }
+
+        // Notify drag handlers
+        this._dragHandlers.forEach((h) => {
+          if (typeof h.onStart === 'function') h.onStart(this.touchPos);
+        });
+
         // Safety auto-reset so justPressed never stays true forever if endFrame() is omitted
         if (this._autoResetTimer) clearTimeout(this._autoResetTimer);
         this._autoResetTimer = setTimeout(() => {
@@ -594,10 +659,78 @@
 
       const handleMove = (x, y) => {
         updatePos(x, y);
+
+        if (this.isDown && this._dragStartPos) {
+          const dx = this.touchPos.x - this._dragStartPos.x;
+          const dy = this.touchPos.y - this._dragStartPos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx);
+          const pullVector = { x: -dx, y: -dy }; // Inverse pull for slingshot
+
+          this._dragHandlers.forEach((h) => {
+            if (typeof h.onDrag === 'function') {
+              h.onDrag(this.touchPos, pullVector, dist, angle);
+            }
+          });
+
+          // Virtual Stick update
+          if (this.virtualStick.active) {
+            const vx = this.touchPos.x - this.virtualStick.origin.x;
+            const vy = this.touchPos.y - this.virtualStick.origin.y;
+            const vDist = Math.sqrt(vx * vx + vy * vy);
+            const r = this.virtualStick.maxRadius;
+            if (vDist > r && vDist > 0) {
+              this.virtualStick.current = {
+                x: this.virtualStick.origin.x + (vx / vDist) * r,
+                y: this.virtualStick.origin.y + (vy / vDist) * r,
+              };
+              this.virtualStick.x = vx / vDist;
+              this.virtualStick.y = vy / vDist;
+            } else {
+              this.virtualStick.current = { x: this.touchPos.x, y: this.touchPos.y };
+              this.virtualStick.x = r > 0 ? vx / r : 0;
+              this.virtualStick.y = r > 0 ? vy / r : 0;
+            }
+          }
+        }
       };
 
       const handleUp = () => {
+        if (this.isDown && this._dragStartPos) {
+          const dx = this.touchPos.x - this._dragStartPos.x;
+          const dy = this.touchPos.y - this._dragStartPos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const elapsed = Date.now() - this._swipeStartTime;
+
+          // Swipe detection (quick flick > 35px in < 350ms)
+          if (dist > 35 && elapsed < 350) {
+            let swipeDir = null;
+            if (Math.abs(dx) > Math.abs(dy)) {
+              swipeDir = dx > 0 ? 'right' : 'left';
+            } else {
+              swipeDir = dy > 0 ? 'down' : 'up';
+            }
+            if (swipeDir) {
+              this._swipeHandlers.forEach((cb) => cb(swipeDir));
+            }
+          }
+
+          // Release drag handlers
+          const releaseVector = { x: -dx, y: -dy };
+          this._dragHandlers.forEach((h) => {
+            if (typeof h.onRelease === 'function') {
+              h.onRelease(releaseVector, dist);
+            }
+          });
+        }
+
         this.isDown = false;
+        this._dragStartPos = null;
+        if (this.virtualStick.active) {
+          this.virtualStick.active = false;
+          this.virtualStick.x = 0;
+          this.virtualStick.y = 0;
+        }
       };
 
       canvasElement.addEventListener('pointerdown', (e) => {
@@ -859,6 +992,270 @@
     },
   };
 
+  // 5.5 Universal Engine Primitives: Vectors & Math
+  function Vec2(x = 0, y = 0) {
+    if (typeof x === 'object' && x !== null) {
+      this.x = Number(x.x) || 0;
+      this.y = Number(x.y) || 0;
+    } else {
+      this.x = Number(x) || 0;
+      this.y = Number(y) || 0;
+    }
+  }
+  Vec2.prototype.set = function (x, y) {
+    if (typeof x === 'object' && x !== null) {
+      this.x = Number(x.x) || 0;
+      this.y = Number(x.y) || 0;
+    } else {
+      this.x = Number(x) || 0;
+      this.y = Number(y) || 0;
+    }
+    return this;
+  };
+  Vec2.prototype.add = function (v) { this.x += v.x; this.y += v.y; return this; };
+  Vec2.prototype.sub = function (v) { this.x -= v.x; this.y -= v.y; return this; };
+  Vec2.prototype.mult = function (n) { this.x *= n; this.y *= n; return this; };
+  Vec2.prototype.div = function (n) { if (n !== 0) { this.x /= n; this.y /= n; } return this; };
+  Vec2.prototype.mag = function () { return Math.sqrt(this.x * this.x + this.y * this.y); };
+  Vec2.prototype.magSq = function () { return this.x * this.x + this.y * this.y; };
+  Vec2.prototype.dist = function (v) { const dx = this.x - v.x, dy = this.y - v.y; return Math.sqrt(dx * dx + dy * dy); };
+  Vec2.prototype.normalize = function () { const m = this.mag(); if (m > 0.00001) this.div(m); return this; };
+  Vec2.prototype.dot = function (v) { return this.x * v.x + this.y * v.y; };
+  Vec2.prototype.heading = function () { return Math.atan2(this.y, this.x); };
+  Vec2.prototype.angleTo = function (v) { return Math.atan2(v.y - this.y, v.x - this.x); };
+  Vec2.prototype.lerp = function (v, t) { this.x += (v.x - this.x) * t; this.y += (v.y - this.y) * t; return this; };
+  Vec2.prototype.clone = function () { return new Vec2(this.x, this.y); };
+
+  const MathUtils = {
+    lerp: function (a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); },
+    clamp: function (val, min, max) { return Math.max(min, Math.min(max, val)); },
+    map: function (val, inMin, inMax, outMin, outMax) {
+      if (inMax === inMin) return outMin;
+      return outMin + ((val - inMin) / (inMax - inMin)) * (outMax - outMin);
+    },
+    damp: function (a, b, lambda, dt) { return this.lerp(a, b, 1 - Math.exp(-lambda * dt)); },
+    randomFloat: function (min = 0, max = 1) { return min + Math.random() * (max - min); },
+    randomInt: function (min = 0, max = 10) { return Math.floor(min + Math.random() * (max - min + 1)); },
+    randomChoice: function (arr) { return arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : null; },
+    dist: function (x1, y1, x2, y2) { const dx = x1 - x2, dy = y1 - y2; return Math.sqrt(dx * dx + dy * dy); },
+    angle: function (x1, y1, x2, y2) { return Math.atan2(y2 - y1, x2 - x1); },
+  };
+
+  const Physics = {
+    circleCircle: function (c1, c2) {
+      const dx = (c2.x || 0) - (c1.x || 0);
+      const dy = (c2.y || 0) - (c1.y || 0);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const rSum = (c1.radius || c1.r || 10) + (c2.radius || c2.r || 10);
+      const hit = dist < rSum;
+      return {
+        hit: hit,
+        dist: dist,
+        overlap: hit ? rSum - dist : 0,
+        normal: dist > 0.0001 ? new Vec2(dx / dist, dy / dist) : new Vec2(1, 0),
+      };
+    },
+    circleRect: function (circle, rect) {
+      const cx = circle.x || 0;
+      const cy = circle.y || 0;
+      const cr = circle.radius || circle.r || 10;
+      const rx = rect.x || 0;
+      const ry = rect.y || 0;
+      const rw = rect.width || rect.w || 20;
+      const rh = rect.height || rect.h || 20;
+
+      const nearestX = MathUtils.clamp(cx, rx, rx + rw);
+      const nearestY = MathUtils.clamp(cy, ry, ry + rh);
+      const dx = cx - nearestX;
+      const dy = cy - nearestY;
+      const distSq = dx * dx + dy * dy;
+      const hit = distSq < cr * cr;
+      return {
+        hit: hit,
+        nearestX: nearestX,
+        nearestY: nearestY,
+        dist: Math.sqrt(distSq),
+      };
+    },
+    rectRect: function (r1, r2) {
+      const x1 = r1.x || 0, y1 = r1.y || 0, w1 = r1.width || r1.w || 10, h1 = r1.height || r1.h || 10;
+      const x2 = r2.x || 0, y2 = r2.y || 0, w2 = r2.width || r2.w || 10, h2 = r2.height || r2.h || 10;
+      return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
+    },
+    pointInPoly: function (px, py, vertices) {
+      if (!vertices || vertices.length < 3) return false;
+      let inside = false;
+      for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+        const xi = vertices[i].x, yi = vertices[i].y;
+        const xj = vertices[j].x, yj = vertices[j].y;
+        const intersect = ((yi > py) !== (yj > py)) && (px < ((xj - xi) * (py - yi)) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    },
+    reflect: function (velocity, normal, restitution = 0.8) {
+      const v = velocity instanceof Vec2 ? velocity.clone() : new Vec2(velocity.x, velocity.y);
+      const n = normal instanceof Vec2 ? normal : new Vec2(normal.x, normal.y);
+      const d = v.dot(n);
+      return new Vec2(
+        (v.x - (1 + restitution) * d * n.x),
+        (v.y - (1 + restitution) * d * n.y)
+      );
+    },
+  };
+
+  // 5.6 Grid & Tilemap System
+  function Grid(rows = 8, cols = 8, initialValue = null) {
+    this.rows = Math.max(1, rows);
+    this.cols = Math.max(1, cols);
+    this.cells = [];
+    for (let r = 0; r < this.rows; r++) {
+      const row = [];
+      for (let c = 0; c < this.cols; c++) {
+        row.push(typeof initialValue === 'function' ? initialValue(r, c) : initialValue);
+      }
+      this.cells.push(row);
+    }
+  }
+  Grid.prototype.inBounds = function (r, c) {
+    return r >= 0 && r < this.rows && c >= 0 && c < this.cols;
+  };
+  Grid.prototype.get = function (r, c) {
+    return this.inBounds(r, c) ? this.cells[r][c] : undefined;
+  };
+  Grid.prototype.set = function (r, c, val) {
+    if (this.inBounds(r, c)) {
+      this.cells[r][c] = val;
+      return true;
+    }
+    return false;
+  };
+  Grid.prototype.swap = function (r1, c1, r2, c2) {
+    if (this.inBounds(r1, c1) && this.inBounds(r2, c2)) {
+      const tmp = this.cells[r1][c1];
+      this.cells[r1][c1] = this.cells[r2][c2];
+      this.cells[r2][c2] = tmp;
+      return true;
+    }
+    return false;
+  };
+  Grid.prototype.getNeighbors = function (r, c, diagonals = false) {
+    const list = [];
+    const dirs = diagonals
+      ? [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]]
+      : [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    for (let i = 0; i < dirs.length; i++) {
+      const nr = r + dirs[i][0];
+      const nc = c + dirs[i][1];
+      if (this.inBounds(nr, nc)) {
+        list.push({ r: nr, c: nc, val: this.cells[nr][nc] });
+      }
+    }
+    return list;
+  };
+  Grid.prototype.screenToGrid = function (screenX, screenY, cellSize, originX = 0, originY = 0) {
+    const r = Math.floor((screenY - originY) / cellSize);
+    const c = Math.floor((screenX - originX) / cellSize);
+    return { r: r, c: c, valid: this.inBounds(r, c) };
+  };
+  Grid.prototype.gridToScreen = function (r, c, cellSize, originX = 0, originY = 0) {
+    return {
+      x: originX + c * cellSize,
+      y: originY + r * cellSize,
+      width: cellSize,
+      height: cellSize,
+    };
+  };
+  Grid.prototype.forEach = function (cb) {
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        cb(this.cells[r][c], r, c);
+      }
+    }
+  };
+  Grid.prototype.findMatches = function (minCount = 3) {
+    const matched = new Set();
+    // Horizontal check
+    for (let r = 0; r < this.rows; r++) {
+      let streak = 1;
+      for (let c = 1; c < this.cols; c++) {
+        const prev = this.cells[r][c - 1];
+        const curr = this.cells[r][c];
+        if (curr !== null && curr !== undefined && curr === prev) {
+          streak++;
+        } else {
+          if (streak >= minCount) {
+            for (let k = c - streak; k < c; k++) matched.add(`${r},${k}`);
+          }
+          streak = 1;
+        }
+      }
+      if (streak >= minCount) {
+        for (let k = this.cols - streak; k < this.cols; k++) matched.add(`${r},${k}`);
+      }
+    }
+    // Vertical check
+    for (let c = 0; c < this.cols; c++) {
+      let streak = 1;
+      for (let r = 1; r < this.rows; r++) {
+        const prev = this.cells[r - 1][c];
+        const curr = this.cells[r][c];
+        if (curr !== null && curr !== undefined && curr === prev) {
+          streak++;
+        } else {
+          if (streak >= minCount) {
+            for (let k = r - streak; k < r; k++) matched.add(`${k},${c}`);
+          }
+          streak = 1;
+        }
+      }
+      if (streak >= minCount) {
+        for (let k = this.rows - streak; k < this.rows; k++) matched.add(`${k},${c}`);
+      }
+    }
+    return Array.from(matched).map((coord) => {
+      const parts = coord.split(',');
+      const r = Number(parts[0]), c = Number(parts[1]);
+      return { r, c, val: this.cells[r][c] };
+    });
+  };
+
+  const GridModule = {
+    create: function (rows, cols, initialValue) {
+      return new Grid(rows, cols, initialValue);
+    },
+  };
+
+  // 5.7 Virtual 2D Camera
+  const Camera = {
+    x: 0,
+    y: 0,
+    zoom: 1.0,
+    bounds: null,
+    follow: function (targetX, targetY, smoothing = 0.1) {
+      this.x = MathUtils.lerp(this.x, targetX, smoothing);
+      this.y = MathUtils.lerp(this.y, targetY, smoothing);
+      if (this.bounds) {
+        this.x = MathUtils.clamp(this.x, this.bounds.minX, this.bounds.maxX);
+        this.y = MathUtils.clamp(this.y, this.bounds.minY, this.bounds.maxY);
+      }
+    },
+    setZoom: function (factor) {
+      this.zoom = Math.max(0.2, Math.min(4.0, Number(factor) || 1.0));
+    },
+    apply: function (ctx, canvasWidth = 400, canvasHeight = 600) {
+      if (!ctx) return;
+      ctx.save();
+      ctx.translate(canvasWidth / 2, canvasHeight / 2);
+      ctx.scale(this.zoom, this.zoom);
+      ctx.translate(-this.x, -this.y);
+    },
+    restore: function (ctx) {
+      if (!ctx) return;
+      ctx.restore();
+    },
+  };
+
   // The Primary Jumby API
   const Jumby = {
     ready: function () {
@@ -929,6 +1326,13 @@
     }),
     graphics: Graphics,
     input: Input,
+    vec2: function (x, y) {
+      return new Vec2(x, y);
+    },
+    math: MathUtils,
+    physics: Physics,
+    grid: GridModule,
+    camera: Camera,
     on: function (eventType, callback) {
       const type = 'JUMBY_' + eventType.toUpperCase();
       if (!listeners.has(type)) listeners.set(type, []);
