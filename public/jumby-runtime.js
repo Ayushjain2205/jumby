@@ -36,6 +36,16 @@
     const data = event.data;
     if (!data || typeof data !== 'object') return;
 
+    // Platform Host Audio & Mute Controls
+    if (data.type === 'JUMBY_TOGGLE_MUTE') {
+      Sound.bgm.toggle();
+      return;
+    }
+    if (data.type === 'JUMBY_SET_MUTE') {
+      Sound.bgm.setMuted(Boolean(data.muted));
+      return;
+    }
+
     if (data.requestId && pendingRequests.has(data.requestId)) {
       const resolver = pendingRequests.get(data.requestId);
       pendingRequests.delete(data.requestId);
@@ -70,7 +80,9 @@
   }
 
   const Sound = {
+    muted: false,
     playTone: function (freq = 440, duration = 0.1, type = 'sine', volume = 0.2) {
+      if (this.muted) return;
       const ctx = getAudioCtx();
       if (!ctx) return;
       // If duration is passed in milliseconds (e.g. 40, 100, 250), convert to seconds
@@ -217,8 +229,15 @@
 
     toggle: function () {
       this.muted = !this.muted;
-      this._updateMuteButtonUi();
+      Sound.muted = this.muted;
+      sendToParent('JUMBY_MUTE_STATE', { muted: this.muted });
       return !this.muted;
+    },
+
+    setMuted: function (val) {
+      this.muted = Boolean(val);
+      Sound.muted = this.muted;
+      sendToParent('JUMBY_MUTE_STATE', { muted: this.muted });
     },
 
     setVolume: function (vol) {
@@ -308,26 +327,18 @@
     },
 
     _createMuteButton: function () {
-      if (document.getElementById('jumby-bgm-mute-btn')) return;
-      const btn = document.createElement('button');
-      btn.id = 'jumby-bgm-mute-btn';
-      btn.title = 'Toggle Music';
-      btn.innerHTML = '🎵';
-      btn.style.cssText =
-        'position:fixed;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(20,20,30,0.65);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:99999;transition:all 0.2s ease;user-select:none;-webkit-tap-highlight-color:transparent;';
-      btn.onclick = (e) => {
-        e.stopPropagation();
-        this.toggle();
-      };
-      document.body.appendChild(btn);
+      // Audio controls are standardized in the platform game header.
+      // Do NOT create in-game DOM buttons that interfere with gameplay and canvas HUD.
+      try {
+        const existing = document.getElementById('jumby-bgm-mute-btn');
+        if (existing && existing.parentNode) {
+          existing.parentNode.removeChild(existing);
+        }
+      } catch (e) {}
     },
 
     _updateMuteButtonUi: function () {
-      const btn = document.getElementById('jumby-bgm-mute-btn');
-      if (btn) {
-        btn.innerHTML = this.muted ? '🔇' : '🎵';
-        btn.style.opacity = this.muted ? '0.45' : '0.9';
-      }
+      // Platform header controls mute UI
     },
   };
 

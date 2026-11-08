@@ -11,6 +11,7 @@ import {
   Check,
   Sliders,
   Volume2,
+  VolumeX,
   MessageSquare,
   Palette,
   Type,
@@ -218,17 +219,32 @@ function CreateStudioContent() {
   // Publishing State
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const toggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    iframeRef.current?.contentWindow?.postMessage(
+      { source: 'JUMBY_HOST', type: 'JUMBY_SET_MUTE', muted: next },
+      '*'
+    );
+  };
 
   const [mounted, setMounted] = useState(false);
   const [runtimeGlitch, setRuntimeGlitch] = useState<{ message: string; line?: number } | null>(null);
   const [isAutoHealing, setIsAutoHealing] = useState(false);
   const [playtestVerified, setPlaytestVerified] = useState(false);
 
-  // Runtime Error Shield Listener
+  // Runtime Error Shield & Platform Sync Listener
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const data = event.data;
       if (!data || typeof data !== 'object') return;
+
+      if (data.type === 'JUMBY_MUTE_STATE' && typeof data.muted === 'boolean') {
+        setIsMuted(data.muted);
+      }
+
       if (data.type === 'JUMBY_RUNTIME_ERROR') {
         console.warn('[Create Studio] Captured game runtime glitch:', data);
         setRuntimeGlitch({
@@ -968,6 +984,21 @@ function CreateStudioContent() {
 
         {/* Top Right Controls */}
         <div className="flex items-center gap-2">
+          {/* Audio Mute/Unmute in Studio Header */}
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white transition-all cursor-pointer"
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+            aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+          >
+            {isMuted ? (
+              <VolumeX className="w-4 h-4 text-zinc-400" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-jumby-lime" />
+            )}
+          </button>
+
           {history.length > 1 && (
             <button
               onClick={handleUndo}

@@ -291,6 +291,7 @@ ${intentSpecs}
    - Call Jumby.fx.particles(x, y, 20, '#D8FF43') whenever items are collected or destroyed.
    - Call Jumby.fx.addFloatingText('+100', x, y, '#D8FF43') whenever points are scored!
    - Note on playTone(freq, duration): duration is in SECONDS (e.g. 0.1 for 100ms). NEVER pass large numbers like 40 or 100!
+   - DO NOT create or draw in-game mute buttons on canvas or DOM. Audio mute/unmute is handled exclusively by the platform header bar.
 5. **GAME FEEL & PLAYABILITY (NON-NEGOTIABLE)**:
    - **Forgiving Hitboxes**: NEVER make gameplay frustratingly punishing.
    - For Stack/Tower games: If misalignment is small (Math.abs(diff) < 5), reward the player with a **"PERFECT!"** alignment: keep the full block width, play Jumby.sound.coin(), pop up "+50 PERFECT!" text with Jumby.fx.addFloatingText, and burst particles!

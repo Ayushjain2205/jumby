@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Share2, Check, RotateCcw, Trophy, Sparkles, X, Pencil } from 'lucide-react';
+import { ArrowLeft, Share2, Check, RotateCcw, Trophy, Sparkles, X, Pencil, Volume2, VolumeX } from 'lucide-react';
 import { Game } from '@/types/game';
 import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { useWallet } from '@/context/WalletContext';
@@ -66,8 +66,18 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
   const [customItem, setCustomItem] = useState<{ name: string; icon: string } | null>(null);
   const [floatingCoin, setFloatingCoin] = useState<{ amount: number; icon?: string; label?: string } | null>(null);
   const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const toggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    iframeRef.current?.contentWindow?.postMessage(
+      { source: 'JUMBY_HOST', type: 'JUMBY_SET_MUTE', muted: next },
+      '*'
+    );
+  };
 
   // Play audio chime on coin reward
   const playRewardSound = (isBest: boolean) => {
@@ -108,6 +118,11 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
       const postToGame = (payload: Record<string, unknown>) => {
         iframeRef.current?.contentWindow?.postMessage(payload, '*');
       };
+
+      // 0. Live Audio Mute State Sync
+      if (data.type === 'JUMBY_MUTE_STATE' && typeof data.muted === 'boolean') {
+        setIsMuted(data.muted);
+      }
 
       // 1. Live Score Update
       if (data.type === 'JUMBY_SCORE_UPDATE' && typeof data.score === 'number') {
@@ -302,6 +317,20 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
                 <ItemIcon icon={floatingCoin.icon} className="w-3 h-3" />
                 {!floatingCoin.icon && <JumbyCoin size="xs" className="w-3 h-3" />}
               </span>
+            )}
+          </button>
+
+          {/* Audio Mute/Unmute in Game Header */}
+          <button
+            onClick={toggleMute}
+            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white transition-all cursor-pointer"
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+            aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+          >
+            {isMuted ? (
+              <VolumeX className="w-4 h-4 text-zinc-400" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-jumby-lime" />
             )}
           </button>
 
