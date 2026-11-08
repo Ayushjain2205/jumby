@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      acorn:
+        specifier: ^8.19.0
+        version: 8.19.0
       lucide-react:
         specifier: ^1.66.0
         version: 1.66.0(@types/react@19.3.0)(react@19.3.0)
@@ -24,6 +27,9 @@ importers:
       '@tailwindcss/turbopack':
         specifier: ^4
         version: 4.3.3
+      '@types/acorn':
+        specifier: ^6.0.4
+        version: 6.0.4
       '@types/node':
         specifier: ^20
         version: 20.19.43
@@ -755,6 +761,10 @@ packages:
 
   '@tybys/wasm-util@0.10.4':
     resolution: {integrity: sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==}
+
+  '@types/acorn@6.0.4':
+    resolution: {integrity: sha512-DafqcBAjbOOmgqIx3EF9EAdBKAKgspv00aQVIW3fVQ0TXo5ZPBeSRey1SboVAUzjw8Ucm7cd1gtTSlosYoEQLA==}
+    deprecated: This is a stub types definition. acorn provides its own type definitions, so you do not need this installed.
 
   '@types/estree@1.0.10':
     resolution: {integrity: sha512-lTyOMnOcmRBzdCv6/4zUZCrEhV0xrqQiUZBZtVcbmLHBXKLnN8q89v/wKRF/Q0HbwVsqbIG3o5HDoFl9sduM+g==}
@@ -2856,6 +2866,10 @@ snapshots:
     dependencies:
       tslib: 2.9.1
     optional: true
+
+  '@types/acorn@6.0.4':
+    dependencies:
+      acorn: 8.19.0
 
   '@types/estree@1.0.10': {}
 

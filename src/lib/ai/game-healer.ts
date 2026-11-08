@@ -7,17 +7,20 @@
  */
 
 import { synthesizeProceduralGame } from './smart-generator';
+import { validateGameAst, type AstValidationResult } from './ast-validator';
 
 export interface HealingResult {
   html: string;
   issuesFixed: string[];
   isPlayable: boolean;
   wasSynthesizedFallback: boolean;
+  astValidation?: AstValidationResult;
 }
 
 export interface ValidationOptions {
   prompt?: string;
   archetype?: string;
+  fallbackOnAstError?: boolean;
 }
 
 /**
@@ -324,10 +327,27 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
     code = code.replace('</body>', `<script>\n${jsPatched}\n  </script>\n</body>`);
   }
 
+  // 6. AST Syntax Verification Guardian
+  const astCheck = validateGameAst(code);
+  let isPlayable = astCheck.valid;
+  let wasSynthesizedFallback = false;
+
+  if (!astCheck.valid) {
+    issuesFixed.push(`AST Syntax Warning: ${astCheck.error}`);
+    // If strict fallback on AST error is enabled, or if code cannot parse and fallback requested
+    if (options?.fallbackOnAstError) {
+      issuesFixed.push('Unrecoverable JS syntax error detected; replaced with reliable procedural fallback');
+      code = synthesizeProceduralGame({ prompt, archetype });
+      isPlayable = true;
+      wasSynthesizedFallback = true;
+    }
+  }
+
   return {
     html: code,
     issuesFixed,
-    isPlayable: true,
-    wasSynthesizedFallback: false,
+    isPlayable,
+    wasSynthesizedFallback,
+    astValidation: astCheck,
   };
 }
