@@ -773,23 +773,25 @@
     },
   };
 
-  // 5. Level & Progressive Difficulty Engine
+  // 5. Universal Objective & Progressive Level Engine
   const Level = {
     current: 1,
-    score: 0,
+    maxLevels: null, // null = infinite scaling, number = campaign cap
+    objective: 'score', // 'score' | 'clear_targets' | 'survive_time' | 'collect' | 'custom'
+    currentProgress: 0,
+    currentGoal: 500,
+    progressRatio: 0.0, // 0.0 to 1.0 for UI progress bars
     multiplier: 1.0,
-    progress: 0.0,
+    isComplete: false,
     isBreather: false,
     _breatherUntil: 0,
 
     // Configuration
     enabled: true,
     autoBanner: true,
-    pointsPerLevel: 10,
-    maxMultiplier: 2.2,
-    breatherDuration: 2500, // 2.5s safe breather window after leveling up
-    curve: 'smooth', // 'smooth' | 'stepped' | 'waves'
+    breatherDuration: 2200,
     onLevelUp: null,
+    goalFormula: null,
 
     // Active banner state for visual rendering
     activeBanner: null, // { title, subtitle, color, startTime, duration }
@@ -798,14 +800,33 @@
       this.enabled = opts.enabled !== undefined ? !!opts.enabled : true;
       this.autoBanner = opts.autoBanner !== undefined ? !!opts.autoBanner : true;
       this.current = opts.startLevel || 1;
-      this.pointsPerLevel = opts.pointsPerLevel || 10;
-      this.maxMultiplier = opts.maxMultiplier || 2.2;
-      this.breatherDuration = opts.breatherDuration !== undefined ? opts.breatherDuration : 2500;
-      this.curve = opts.curve || 'smooth';
+      this.maxLevels = opts.maxLevels || null;
+      this.objective = opts.objective || (opts.pointsPerLevel ? 'score' : 'score');
+      this.breatherDuration = opts.breatherDuration !== undefined ? opts.breatherDuration : 2200;
       this.onLevelUp = typeof opts.onLevelUp === 'function' ? opts.onLevelUp : null;
-      this.multiplier = this._calcMultiplier(this.current);
-      this.score = 0;
-      this.progress = 0;
+
+      // Dynamic Goal Formula Configuration
+      if (typeof opts.goal === 'function') {
+        this.goalFormula = opts.goal;
+      } else if (typeof opts.goal === 'number') {
+        const baseGoal = opts.goal;
+        this.goalFormula = (lvl) => Math.round(baseGoal * Math.pow(lvl, 1.25));
+      } else if (opts.pointsPerLevel) {
+        const ppl = Number(opts.pointsPerLevel) || 500;
+        this.goalFormula = (lvl) => Math.round(ppl * Math.pow(lvl, 1.2));
+      } else {
+        // Sensible default per objective
+        if (this.objective === 'clear_targets') this.goalFormula = (lvl) => 3 + lvl;
+        else if (this.objective === 'survive_time') this.goalFormula = (lvl) => 25 + lvl * 5;
+        else if (this.objective === 'collect') this.goalFormula = (lvl) => 10 + lvl * 4;
+        else this.goalFormula = (lvl) => Math.round(450 * Math.pow(lvl, 1.22));
+      }
+
+      this.currentGoal = this.goalFormula(this.current);
+      this.currentProgress = 0;
+      this.progressRatio = 0.0;
+      this.isComplete = false;
+      this.multiplier = 1.0 + (this.current - 1) * 0.15;
       this.isBreather = false;
       this._breatherUntil = 0;
       this.activeBanner = null;
@@ -813,88 +834,145 @@
 
     reset: function () {
       this.current = 1;
-      this.score = 0;
+      this.currentProgress = 0;
+      this.progressRatio = 0.0;
+      this.currentGoal = this.goalFormula ? this.goalFormula(1) : 500;
+      this.isComplete = false;
       this.multiplier = 1.0;
-      this.progress = 0.0;
       this.isBreather = false;
       this._breatherUntil = 0;
       this.activeBanner = null;
     },
 
-    _calcLevel: function (score) {
-      if (typeof this.pointsPerLevel === 'function') {
-        let lvl = 1;
-        while (score >= this.pointsPerLevel(lvl)) {
-          lvl++;
-        }
-        return lvl;
-      }
-      if (this.curve === 'smooth' || this.curve === 'exponential') {
-        const base = this.pointsPerLevel;
-        let threshold = 0;
-        let lvl = 1;
-        while (true) {
-          const needed = base + (lvl - 1) * Math.floor(base * 0.4);
-          if (score < threshold + needed) {
-            this.progress = Math.max(0, Math.min(1, (score - threshold) / needed));
-            break;
-          }
-          threshold += needed;
-          lvl++;
-        }
-        return lvl;
+    /**
+     * Track progress toward the objective.
+     * @param {number} val Current value (e.g. score, seconds survived) OR delta (+1 target)
+     * @param {boolean} isDelta If true, adds to currentProgress instead of setting it
+     * @returns {boolean|object} False if still in progress, or level-up result if advanced
+     */
+    track: function (val, isDelta = false) {
+      if (!this.enabled || this.isComplete) return false;
+
+      if (isDelta) {
+        this.currentProgress += Number(val) || 0;
       } else {
-        const lvl = Math.floor(score / this.pointsPerLevel) + 1;
-        this.progress = (score % this.pointsPerLevel) / this.pointsPerLevel;
-        return lvl;
+        this.currentProgress = Number(val) || 0;
       }
+
+      this.progressRatio = Math.max(0, Math.min(1, this.currentProgress / (this.currentGoal || 1)));
+
+      if (this.currentProgress >= this.currentGoal) {
+        return this.advanceLevel();
+      }
+
+      return false;
     },
 
-    _calcMultiplier: function (lvl) {
-      if (lvl <= 1) return 1.0;
-      const rate = 0.22;
-      const m = 1.0 + (this.maxMultiplier - 1.0) * (1 - Math.exp(-rate * (lvl - 1)));
-      return Math.round(m * 100) / 100;
-    },
+    /**
+     * Advance to the next level
+     */
+    advanceLevel: function () {
+      const prevLvl = this.current;
 
-    check: function (score) {
-      if (!this.enabled) return this.current;
-      const s = Number(score) || 0;
-      this.score = s;
-      const newLvl = this._calcLevel(s);
+      // Check max levels (campaign victory)
+      if (this.maxLevels && prevLvl >= this.maxLevels) {
+        this.isComplete = true;
+        this.banner('VICTORY!', 'ALL LEVELS CLEARED!', '#D8FF43', 3500);
+        Sound.fanfare();
+        Juice.shake(16);
+        return { isCampaignComplete: true, level: prevLvl };
+      }
+
+      this.current = prevLvl + 1;
+      this.multiplier = Math.round((1.0 + (this.current - 1) * 0.15) * 100) / 100;
+      this.currentGoal = this.goalFormula(this.current);
+
+      // In non-cumulative modes, reset progress for the new level
+      if (this.objective === 'clear_targets' || this.objective === 'collect' || this.objective === 'survive_time') {
+        this.currentProgress = 0;
+      }
+      this.progressRatio = Math.max(0, Math.min(1, this.currentProgress / (this.currentGoal || 1)));
+
+      // Audio & Screen FX Celebration
+      Sound.fanfare();
+      Juice.shake(12);
 
       const now = Date.now();
-      if (this.isBreather && now >= this._breatherUntil) {
-        this.isBreather = false;
+      if (this.breatherDuration > 0) {
+        this.isBreather = true;
+        this._breatherUntil = now + this.breatherDuration;
       }
 
-      if (newLvl > this.current) {
-        const prevLvl = this.current;
-        this.current = newLvl;
-        this.multiplier = this._calcMultiplier(this.current);
+      if (this.autoBanner) {
+        let sub = `GOAL: ${this.currentGoal}`;
+        if (this.objective === 'score') sub = `TARGET: ${this.currentGoal} PTS`;
+        else if (this.objective === 'clear_targets') sub = `TARGETS: ${this.currentGoal}`;
+        else if (this.objective === 'survive_time') sub = `SURVIVE ${this.currentGoal}s`;
+        this.banner(`LEVEL ${this.current}!`, sub, '#00F0FF', 2200);
+      }
 
-        if (this.breatherDuration > 0) {
-          this.isBreather = true;
-          this._breatherUntil = now + this.breatherDuration;
-        }
-
-        if (this.autoBanner) {
-          this.banner(`LEVEL ${this.current}!`, `SPEED ${this.multiplier}x`, '#FFD700', 2200);
-        }
-
-        Sound.fanfare();
-        Juice.shake(12);
-
-        if (this.onLevelUp) {
-          try {
-            this.onLevelUp(this.current, prevLvl);
-          } catch (e) {
-            console.warn('[Jumby onLevelUp Error]', e);
-          }
+      let reward = null;
+      if (this.onLevelUp) {
+        try {
+          reward = this.onLevelUp(this.current, prevLvl);
+        } catch (e) {
+          console.warn('[Jumby onLevelUp Error]', e);
         }
       }
 
-      return this.current;
+      return { level: this.current, prevLevel: prevLvl, reward, goal: this.currentGoal };
+    },
+
+    // Backwards-compatible check method
+    check: function (score) {
+      return this.track(score, false);
+    },
+
+    /**
+     * Helper to render a sleek, glowing neon progress bar with Level badge
+     */
+    renderProgressBar: function (ctx, x, y, width, height = 8, opts = {}) {
+      if (!ctx) return;
+      ctx.save();
+
+      const bg = opts.bg || 'rgba(255, 255, 255, 0.1)';
+      const fill = opts.color || '#00F0FF';
+      const label = opts.label !== undefined ? opts.label : `LVL ${this.current}`;
+      const showNumbers = opts.showNumbers !== undefined ? opts.showNumbers : true;
+
+      // Background track
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, height / 2);
+      ctx.fill();
+
+      // Filled progress
+      const fillW = Math.max(0, Math.min(width, width * this.progressRatio));
+      if (fillW > 0) {
+        ctx.fillStyle = fill;
+        ctx.shadowColor = fill;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.roundRect(x, y, fillW, height, height / 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Optional text
+      if (opts.showText) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '700 11px -apple-system, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x, y - 4);
+
+        if (showNumbers) {
+          ctx.textAlign = 'right';
+          ctx.fillStyle = fill;
+          ctx.fillText(`${Math.round(this.currentProgress)} / ${this.currentGoal}`, x + width, y - 4);
+        }
+      }
+
+      ctx.restore();
     },
 
     banner: function (title, subtitle = '', color = '#FFD700', duration = 2200) {

@@ -37,26 +37,31 @@ interface Window {
       };
     };
 
-    // 2.5 LEVEL & PROGRESSIVE DIFFICULTY ENGINE
+    // 2.5 UNIVERSAL OBJECTIVE & LEVEL ENGINE
     level: {
       current: number;                                      // Current level (starts at 1)
-      multiplier: number;                                   // Smooth speed/difficulty multiplier (1.0 -> 2.2)
-      progress: number;                                     // 0.0 to 1.0 progress toward next level
-      isBreather: boolean;                                  // True for 2.5s safe breather window after leveling up
+      objective: 'score' | 'clear_targets' | 'survive_time' | 'collect'; // Gameplay objective type
+      currentProgress: number;                              // Current value (points, targets cleared, seconds survived)
+      currentGoal: number;                                  // Target goal for current level (calculated via formula)
+      progressRatio: number;                                // 0.0 to 1.0 progress toward next level (for UI progress bars)
+      multiplier: number;                                   // Difficulty/speed multiplier (e.g. 1.0 -> 1.15 -> 1.30)
+      maxLevels: number | null;                             // null = infinite scaling, number = campaign victory cap
+      isComplete: boolean;                                  // True if campaign maxLevels is reached
       init(opts?: {
+        objective?: 'score' | 'clear_targets' | 'survive_time' | 'collect';
+        goal?: number | ((level: number) => number);        // Dynamic scaling formula e.g. (lvl) => 400 * Math.pow(lvl, 1.25)
+        maxLevels?: number;                                 // Optional campaign level cap (or omit for infinite)
         startLevel?: number;
-        pointsPerLevel?: number;
-        curve?: 'smooth' | 'stepped' | 'waves';
-        maxMultiplier?: number;
-        breatherDuration?: number;
         autoBanner?: boolean;
-        onLevelUp?: (level: number, prevLevel: number) => void;
+        onLevelUp?: (newLevel: number, prevLevel: number) => any; // Callback when level advances
       }): void;
-      check(score: number): number;                         // Triggered automatically by Jumby.setScore(score)
+      track(value: number, isDelta?: boolean): boolean | any; // Update progress toward objective (auto-advances when >= goal)
+      advanceLevel(): any;                                  // Manually trigger level up & next goal calculation
       reset(): void;                                        // Reset to Level 1
-      banner(title: string, subtitle?: string, color?: string, duration?: number): void; // Pop up banner announcement
-      getSpeed(baseSpeed: number, score?: number): number;  // baseSpeed * multiplier
-      getSpawnInterval(baseInterval: number, score?: number, minInterval?: number): number;
+      banner(title: string, subtitle?: string, color?: string, duration?: number): void;
+      renderProgressBar(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height?: number, opts?: { bg?: string; color?: string; showText?: boolean; label?: string }): void;
+      getSpeed(baseSpeed: number): number;                  // baseSpeed * multiplier
+      getSpawnInterval(baseInterval: number, minInterval?: number): number;
     };
 
     // 3. JUICE & SCREEN FX

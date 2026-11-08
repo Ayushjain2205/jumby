@@ -167,6 +167,17 @@
       return res;
     }
 
+    // Universal Level Progression Engine (Score Goal + Bonus Time)
+    Jumby.level.init({
+      objective: 'score',
+      goal: (lvl) => Math.round(450 * Math.pow(lvl, 1.25)), // Lvl 1: 450, Lvl 2: 1070, Lvl 3: 1777...
+      onLevelUp: (newLevel) => {
+        timeLeft += 15;
+        Jumby.fx.addFloatingText('+15s BONUS TIME!', V_WIDTH / 2, 160, '#00F0FF', 16);
+        Jumby.awardCoins(2, { item: 'Level Up', icon: '⭐' });
+      },
+    });
+
     function restartGame() {
       score = 0;
       timeLeft = 60;
@@ -174,6 +185,7 @@
       selectedCell = null;
       isProcessing = false;
       Jumby.setScore(0);
+      Jumby.level.reset();
       initBoard();
       state = 'playing';
       Jumby.sound.bgm.start('arcade');
@@ -244,6 +256,7 @@
       const matchScore = matches.length * 60 * combo;
       score += matchScore;
       Jumby.setScore(score);
+      Jumby.level.track(score);
 
       Jumby.sound.score();
       Jumby.fx.shake(5 + Math.min(combo * 3, 12));
@@ -622,51 +635,70 @@
       ctx.strokeStyle = '#32235C';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(20, 65, V_WIDTH - 40, 75, 18);
+      ctx.roundRect(20, 65, V_WIDTH - 40, 85, 18);
       ctx.fill();
       ctx.stroke();
 
-      // Time & Score Text
+      // Row 1: Time, Level Badge, and Score
       ctx.textAlign = 'left';
       ctx.fillStyle = '#A78BFA';
       ctx.font = '700 11px "Orbitron", sans-serif';
-      ctx.fillText('TIME REMAINING', 38, 88);
+      ctx.fillText('TIME', 36, 88);
 
       const isUrgent = timeLeft <= 10;
       ctx.fillStyle = isUrgent ? '#FF1744' : '#FFFFFF';
-      ctx.font = '900 22px "Orbitron", sans-serif';
-      ctx.fillText(`${timeLeft}s`, 38, 114);
+      ctx.font = '900 20px "Orbitron", sans-serif';
+      ctx.fillText(`${timeLeft}s`, 36, 110);
 
+      // Center: Level Badge
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#D8FF43';
+      ctx.font = '900 14px "Orbitron", sans-serif';
+      ctx.fillText(`LVL ${Jumby.level.current}`, V_WIDTH / 2, 90);
+      ctx.fillStyle = '#A78BFA';
+      ctx.font = '700 10px "Orbitron", sans-serif';
+      ctx.fillText(`GOAL: ${Jumby.level.currentGoal}`, V_WIDTH / 2, 108);
+
+      // Right: Score
       ctx.textAlign = 'right';
       ctx.fillStyle = '#A78BFA';
       ctx.font = '700 11px "Orbitron", sans-serif';
-      ctx.fillText('TOTAL SCORE', V_WIDTH - 38, 88);
+      ctx.fillText('SCORE', V_WIDTH - 36, 88);
 
-      ctx.fillStyle = '#D8FF43';
-      ctx.font = '900 22px "Orbitron", sans-serif';
-      ctx.fillText(`${score}`, V_WIDTH - 38, 114);
+      ctx.fillStyle = '#00F0FF';
+      ctx.font = '900 20px "Orbitron", sans-serif';
+      ctx.fillText(`${score}`, V_WIDTH - 36, 110);
 
-      // Time Progress Bar
-      const timePercent = Math.max(0, timeLeft / maxTime);
-      const barX = 38;
-      const barY = 124;
-      const barW = V_WIDTH - 76;
-      const barH = 5;
+      // Row 2: Objective Progress Bar (Track progress toward next level)
+      const barX = 36;
+      const barY = 126;
+      const barW = V_WIDTH - 72;
+      const barH = 8;
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW, barH, 4);
+      ctx.fill();
 
-      ctx.fillStyle = isUrgent ? '#FF1744' : '#00F0FF';
-      ctx.shadowColor = isUrgent ? '#FF1744' : '#00F0FF';
-      ctx.shadowBlur = 6;
-      ctx.fillRect(barX, barY, barW * timePercent, barH);
-      ctx.shadowBlur = 0;
+      const progressW = Math.max(0, Math.min(barW, barW * Jumby.level.progressRatio));
+      if (progressW > 0) {
+        ctx.fillStyle = '#00F0FF';
+        ctx.shadowColor = '#00F0FF';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.roundRect(barX, barY, progressW, barH, 4);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
 
       // Instructions Banner
       ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.font = '700 12px "Orbitron", sans-serif';
-      ctx.fillText('TAP OR SWIPE ADJACENT GEMS TO MATCH 3', V_WIDTH / 2, 185);
+      ctx.fillStyle = '#00F0FF';
+      ctx.font = '700 11px "Orbitron", sans-serif';
+      ctx.fillText(`TARGET: ${Jumby.level.currentGoal} PTS  •  REWARD: +15s BONUS`, V_WIDTH / 2, 175);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.font = '700 10px "Orbitron", sans-serif';
+      ctx.fillText('TAP OR SWIPE ADJACENT GEMS TO MATCH 3', V_WIDTH / 2, 192);
 
       // 2. BRIGHT ARCADE BOARD
       ctx.save();
@@ -734,7 +766,11 @@
 
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '700 16px "Orbitron", sans-serif';
-        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 395);
+        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 385);
+
+        ctx.fillStyle = '#00F0FF';
+        ctx.font = '700 13px "Orbitron", sans-serif';
+        ctx.fillText(`CLEARED UP TO LEVEL ${Jumby.level.current}`, V_WIDTH / 2, 412);
 
         // Play Again Button Card
         ctx.fillStyle = '#D8FF43';
