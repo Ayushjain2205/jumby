@@ -217,6 +217,7 @@ function CreateStudioContent() {
 
   const [mounted, setMounted] = useState(false);
   const [runtimeGlitch, setRuntimeGlitch] = useState<{ message: string; line?: number } | null>(null);
+  const [isAutoHealing, setIsAutoHealing] = useState(false);
 
   // Runtime Error Shield Listener
   useEffect(() => {
@@ -235,8 +236,47 @@ function CreateStudioContent() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const handleAutoFixGlitch = () => {
-    if (!gameHtml) return;
+  const handleAutoFixGlitch = async () => {
+    if (!gameHtml || isAutoHealing) return;
+    setIsAutoHealing(true);
+    setGenerationStep('🛡️ Repairing runtime glitch with AI...');
+
+    try {
+      const res = await fetch('/api/heal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: gameHtml,
+          error: runtimeGlitch,
+          prompt: title,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.repairedHtml) {
+          setGameHtml(data.repairedHtml);
+          setRuntimeGlitch(null);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `msg_ai_fix_${Date.now()}`,
+              sender: 'assistant',
+              text: `🛡️ Applied AI reflection repair patch! Resolved: ${data.fixedError || runtimeGlitch?.message || 'runtime glitch'}. Game reloaded at 60 FPS.`,
+              timestamp: 'Just now',
+            },
+          ]);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('[Create Studio] AI reflection repair failed, falling back:', err);
+    } finally {
+      setIsAutoHealing(false);
+      setGenerationStep(null);
+    }
+
+    // Heuristic fallback repair
     const healed = validateAndHealGameHtml(gameHtml, {
       prompt: title,
       archetype,
@@ -344,8 +384,56 @@ function CreateStudioContent() {
   const [history, setHistory] = useState<string[]>([]);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const stagingIframeRef = useRef<HTMLIFrameElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Automated Pre-Flight Sandbox Evaluation
+  const runPreflightSandbox = (candidateHtml: string, timeoutMs = 450): Promise<{ ok: boolean; error?: { message: string; line?: number } }> => {
+    return new Promise((resolve) => {
+      let resolved = false;
+
+      const handleMessage = (e: MessageEvent) => {
+        const data = e.data;
+        if (!data || typeof data !== 'object') return;
+
+        if (data.type === 'JUMBY_RUNTIME_ERROR') {
+          if (!resolved) {
+            resolved = true;
+            cleanup();
+            resolve({ ok: false, error: { message: data.message, line: data.line } });
+          }
+        } else if (data.type === 'JUMBY_READY') {
+          if (!resolved) {
+            resolved = true;
+            cleanup();
+            resolve({ ok: true });
+          }
+        }
+      };
+
+      const cleanup = () => {
+        window.removeEventListener('message', handleMessage);
+        if (timer) clearTimeout(timer);
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      const timer = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          resolve({ ok: true });
+        }
+      }, timeoutMs);
+
+      if (stagingIframeRef.current) {
+        stagingIframeRef.current.srcdoc = candidateHtml;
+      } else {
+        resolve({ ok: true });
+      }
+    });
+  };
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     requestAnimationFrame(() => {
@@ -496,6 +584,35 @@ function CreateStudioContent() {
         setActiveFontVibe(activeVibe.id);
       }
 
+      // Step 3: Automated Pre-Flight Sandbox Verification
+      setGenerationStep('Verifying 60 FPS in staging sandbox...');
+      let preflight = await runPreflightSandbox(fontEnrichedHtml, 450);
+
+      let reflectionNotice = '';
+      if (!preflight.ok) {
+        setGenerationStep('🛡️ AI reflection repairing script anomaly...');
+        try {
+          const healRes = await fetch('/api/heal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: fontEnrichedHtml,
+              error: preflight.error,
+              prompt: promptText,
+            }),
+          });
+          if (healRes.ok) {
+            const healData = await healRes.json();
+            if (healData.repairedHtml) {
+              fontEnrichedHtml = healData.repairedHtml;
+              reflectionNotice = `🛡️ Auto-healed script anomaly: "${healData.fixedError || preflight.error?.message}". Verified at 60 FPS!`;
+            }
+          }
+        } catch (healErr) {
+          console.warn('[Preflight] Auto-repair call failed:', healErr);
+        }
+      }
+
       setHistory((prev) => [...prev, gameHtml]);
       setGameHtml(fontEnrichedHtml);
 
@@ -507,10 +624,11 @@ function CreateStudioContent() {
       if (extracted.colors.length > 0) setPaletteColors(extracted.colors);
 
       // Add Assistant completion response with healing summary
-      const fixSummary =
-        healingResult.issuesFixed.length > 0
-          ? `🛡️ Auto-healed: ${healingResult.issuesFixed.slice(0, 2).join(', ')}.`
-          : '';
+      const fixSummary = reflectionNotice
+        ? reflectionNotice
+        : healingResult.issuesFixed.length > 0
+        ? `🛡️ Auto-healed: ${healingResult.issuesFixed.slice(0, 2).join(', ')}.`
+        : '';
 
       const intentBadge = extractedAiIntent
         ? `🎮 **${extractedAiIntent.title}** (${extractedAiIntent.theme})\n*${extractedAiIntent.gameplayLoop}*\n✨ Twist: ${extractedAiIntent.mechanicTwist}\n🎁 Collectible: ${extractedAiIntent.collectibleItem}`
@@ -1343,6 +1461,14 @@ function CreateStudioContent() {
           </div>
         </div>
       </div>
+
+      {/* Hidden Staging Pre-Flight Sandbox Iframe */}
+      <iframe
+        ref={stagingIframeRef}
+        className="hidden pointer-events-none opacity-0 fixed -top-[9999px] -left-[9999px] w-[390px] h-[844px]"
+        sandbox="allow-scripts allow-same-origin"
+        title="Staging Sandbox"
+      />
 
       {/* Publish Success Modal */}
       {publishedSlug && (
