@@ -5,7 +5,19 @@
 
 import { injectOrReplaceFontInHtml, detectFontVibe } from '@/lib/fonts/game-fonts';
 
-export type GameArchetype = 'flappy' | 'orbit' | 'stack' | 'runner';
+export type GameArchetype =
+  | 'flappy'
+  | 'orbit'
+  | 'stack'
+  | 'runner'
+  | 'grid_puzzle'
+  | 'slingshot'
+  | 'survivors_arena'
+  | 'card_strategy'
+  | 'catcher'
+  | 'shooter'
+  | 'breakout'
+  | 'custom';
 
 export interface GameTemplateConfig {
   title: string;

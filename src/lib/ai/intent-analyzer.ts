@@ -28,6 +28,8 @@ export interface IntentOptions {
   referenceImages?: { name: string; dataUrl?: string }[];
   apiKey?: string;
   provider?: string;
+  isEdit?: boolean;
+  currentTitle?: string;
 }
 
 const SYSTEM_INTENT_PROMPT = `You are the Jumby Lead Game Designer AI.
@@ -53,13 +55,23 @@ Analyze the user game prompt and return ONLY a valid, raw JSON object (no markdo
  * Intelligent AI Intent Extraction
  */
 export async function extractGameIntent(options: IntentOptions): Promise<GameIntent> {
-  const { prompt, requestedArchetype } = options;
+  const { prompt, requestedArchetype, isEdit, currentTitle } = options;
 
   const cliProxyUrl = process.env.CLI_PROXY_URL || 'http://127.0.0.1:8317';
   const cliProxyKey = process.env.CLI_PROXY_KEY || '123456';
   const cliProxyModel = process.env.CLI_PROXY_MODEL || 'gemini-3-flash';
 
-  const userContent = requestedArchetype && requestedArchetype !== 'custom'
+  const userContent = isEdit
+    ? `EDITING EXISTING GAME:
+Title: "${currentTitle || 'Existing Game'}"
+Archetype: ${requestedArchetype || 'preserve existing'}
+User Edit Instruction: "${prompt}"
+
+CRITICAL: The user is EDITING an existing game. DO NOT CHANGE THE TITLE OR THE ARCHETYPE!
+Set "title": "${currentTitle || 'Existing Game'}"
+Set "archetype": "${requestedArchetype || 'grid_puzzle'}"
+Update the visual theme, colors, font vibe, and item to reflect the user's requested edit.`
+    : requestedArchetype && requestedArchetype !== 'custom'
     ? `Game Prompt: "${prompt}" (Preferred Base Archetype: ${requestedArchetype})`
     : `Game Prompt: "${prompt}"`;
 
@@ -91,7 +103,7 @@ export async function extractGameIntent(options: IntentOptions): Promise<GameInt
       const data = await res.json();
       const content = data.choices?.[0]?.message?.content?.trim();
       if (content) {
-        const parsed = parseIntentJson(content);
+        const parsed = parseIntentJson(content, isEdit, currentTitle, requestedArchetype);
         if (parsed) return parsed;
       }
     }
@@ -128,7 +140,7 @@ export async function extractGameIntent(options: IntentOptions): Promise<GameInt
         const data = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
-          const parsed = parseIntentJson(text);
+          const parsed = parseIntentJson(text, isEdit, currentTitle, requestedArchetype);
           if (parsed) return parsed;
         }
       }
@@ -136,10 +148,15 @@ export async function extractGameIntent(options: IntentOptions): Promise<GameInt
   }
 
   // 3. Resilient Semantic Heuristic Fallback
-  return fallbackSemanticIntent(prompt, requestedArchetype);
+  return fallbackSemanticIntent(prompt, requestedArchetype, isEdit, currentTitle);
 }
 
-function parseIntentJson(raw: string): GameIntent | null {
+function parseIntentJson(
+  raw: string,
+  isEdit?: boolean,
+  currentTitle?: string,
+  requestedArchetype?: string
+): GameIntent | null {
   try {
     let clean = raw.trim();
     if (clean.startsWith('```json')) clean = clean.slice(7);
@@ -149,10 +166,15 @@ function parseIntentJson(raw: string): GameIntent | null {
 
     const data = JSON.parse(clean);
     if (data.title && data.archetype) {
+      const finalTitle = isEdit && currentTitle ? currentTitle : String(data.title).trim();
+      const finalArchetype = isEdit && requestedArchetype && requestedArchetype !== 'custom'
+        ? (requestedArchetype as any)
+        : sanitizeArchetype(data.archetype);
+
       return {
-        title: String(data.title).trim(),
+        title: finalTitle,
         tagline: data.tagline ? String(data.tagline).trim() : undefined,
-        archetype: sanitizeArchetype(data.archetype),
+        archetype: finalArchetype,
         gameplayLoop: String(data.gameplayLoop || 'Tap to play and survive.'),
         theme: String(data.theme || 'Arcade'),
         themeColor: sanitizeHex(data.themeColor, '#7160FF'),
@@ -206,11 +228,18 @@ function sanitizeSoundVibe(val: any): GameIntent['soundVibe'] {
   return (allowed.includes(s) ? s : 'arcade') as GameIntent['soundVibe'];
 }
 
-function fallbackSemanticIntent(prompt: string, requestedArchetype?: string): GameIntent {
+function fallbackSemanticIntent(
+  prompt: string,
+  requestedArchetype?: string,
+  isEdit?: boolean,
+  currentTitle?: string
+): GameIntent {
   const lower = prompt.toLowerCase();
 
   let archetype: GameIntent['archetype'] = (requestedArchetype as any) || 'custom';
-  if (lower.includes('slingshot') || lower.includes('catapult') || lower.includes('angry') || lower.includes('golf') || lower.includes('pinball') || lower.includes('billiards') || lower.includes('pool')) {
+  if (isEdit && requestedArchetype) {
+    archetype = requestedArchetype as any;
+  } else if (lower.includes('slingshot') || lower.includes('catapult') || lower.includes('angry') || lower.includes('golf') || lower.includes('pinball') || lower.includes('billiards') || lower.includes('pool')) {
     archetype = 'slingshot';
   } else if (lower.includes('match') || lower.includes('grid') || lower.includes('puzzle') || lower.includes('2048') || lower.includes('sand') || lower.includes('chess') || lower.includes('sokoban') || lower.includes('tetris')) {
     archetype = 'grid_puzzle';
@@ -233,21 +262,21 @@ function fallbackSemanticIntent(prompt: string, requestedArchetype?: string): Ga
   }
 
   const words = prompt.trim().replace(/[^\w\s]/g, '').split(/\s+/).slice(0, 3).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-  const title = words.length > 0 ? `${words.join(' ')} Arcade` : 'Arcade Surge';
+  const title = isEdit && currentTitle ? currentTitle : words.length > 0 ? `${words.join(' ')} Arcade` : 'Arcade Surge';
 
   return {
     title,
     archetype,
     gameplayLoop: 'Dodge obstacles and collect rewards with precise 1-tap timing.',
-    theme: 'Arcade Glow',
-    themeColor: '#7160FF',
-    accentColor: '#D8FF43',
-    bgColor: '#090A14',
-    fontVibe: archetype === 'stack' ? 'cartoon' : 'pixel',
+    theme: lower.includes('horror') ? 'Gothic Horror' : 'Arcade Glow',
+    themeColor: lower.includes('horror') ? '#DC2626' : '#7160FF',
+    accentColor: lower.includes('horror') ? '#991B1B' : '#D8FF43',
+    bgColor: lower.includes('horror') ? '#080508' : '#090A14',
+    fontVibe: lower.includes('horror') ? 'action' : archetype === 'stack' ? 'cartoon' : 'pixel',
     speedMultiplier: lower.includes('fast') ? 1.6 : 1.2,
     gravity: 0.38,
-    soundVibe: archetype === 'stack' ? 'chill' : 'arcade',
-    collectibleItem: '💎 Gem',
+    soundVibe: lower.includes('horror') ? 'action' : archetype === 'stack' ? 'chill' : 'arcade',
+    collectibleItem: lower.includes('horror') ? '💀 Skull' : '💎 Gem',
     mechanicTwist: 'Perfect timing unlocks speed frenzy mode',
   };
 }

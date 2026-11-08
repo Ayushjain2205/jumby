@@ -11,8 +11,25 @@ export interface GeneratorParams {
 }
 
 export function synthesizeProceduralGame(params: GeneratorParams): string {
-  const { prompt, archetype } = params;
+  const { prompt, archetype, baseCode } = params;
   const p = prompt.toLowerCase();
+
+  // If modifying existing game code, preserve the original game mechanics and apply theme tweaks
+  if (baseCode && baseCode.trim().length > 50) {
+    let modified = baseCode;
+    if (p.includes('horror') || p.includes('dark') || p.includes('zombie') || p.includes('spooky') || p.includes('ghost') || p.includes('vampire')) {
+      modified = modified.replace(/#7160FF/gi, '#DC2626')
+                         .replace(/#D8FF43/gi, '#991B1B')
+                         .replace(/#0F0F0F/gi, '#080508')
+                         .replace(/#1D173F/gi, '#1A0808')
+                         .replace(/#00F0FF/gi, '#DC2626')
+                         .replace(/#FF007F/gi, '#880808');
+    } else if (p.includes('neon') || p.includes('cyber') || p.includes('synthwave')) {
+      modified = modified.replace(/#DC2626/gi, '#7160FF')
+                         .replace(/#991B1B/gi, '#D8FF43');
+    }
+    return modified;
+  }
 
   // 1. Analyze Title & Concept
   let title = 'Neon Pulse';

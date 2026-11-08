@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
       provider = 'auto',
       targetDevice = 'mobile',
       referenceImages = [],
+      isEdit,
+      currentTitle,
     } = body;
 
     if (!prompt || typeof prompt !== 'string') {
@@ -28,21 +30,30 @@ export async function POST(req: NextRequest) {
     const geminiKey = clientApiKey || process.env.GEMINI_API_KEY;
     const openaiKey = clientApiKey || process.env.OPENAI_API_KEY;
 
+    // Detect if this is an in-place edit on existing code
+    const isEditing = Boolean((baseCode && baseCode.trim().length > 50) || isEdit);
+    const effectiveBaseCode = isEditing && baseCode ? baseCode : undefined;
+
+    // Preserve existing archetype in edit mode by inspecting baseCode if needed
+    let effectiveArchetype = requestedArchetype;
+    if (isEditing && (!effectiveArchetype || effectiveArchetype === 'custom' || effectiveArchetype === 'flappy')) {
+      effectiveArchetype = detectArchetypeFromCode(baseCode || '') || requestedArchetype || 'custom';
+    }
+
     // Intelligent AI Intent & Architectural Blueprint Extraction
     const intent = await extractGameIntent({
       prompt,
-      requestedArchetype,
+      requestedArchetype: effectiveArchetype,
       referenceImages,
       apiKey: clientApiKey,
       provider,
+      isEdit: isEditing,
+      currentTitle,
     });
 
-    const archetype = intent.archetype || requestedArchetype || 'flappy';
-
-    // If the user is remixing an existing game, pass that code so the AI can modify it.
-    // If creating from scratch, pass undefined so the AI has full freedom to synthesize novel mechanics.
-    const isRemix = Boolean(baseCode && baseCode.trim().length > 50);
-    const effectiveBaseCode = isRemix ? baseCode : undefined;
+    const archetype = isEditing && effectiveArchetype && effectiveArchetype !== 'custom'
+      ? effectiveArchetype
+      : (intent.archetype || requestedArchetype || 'flappy');
 
     // 1. Try Local CLI Proxy API if requested or in auto mode
     const tryProxy = provider === 'proxy' || provider === 'cliproxy' || provider === 'auto';
@@ -155,16 +166,19 @@ async function streamFromCliProxy(
     start(streamController) {
       // Send initial progress indicators to the studio UI
       if (intent) {
+        const stepMsg = baseCode
+          ? `🎨 Applying "${intent.theme}" updates to "${intent.title}"...`
+          : `🧠 Dreaming up "${intent.title}" (${intent.theme})...`;
         streamController.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ step: `🧠 AI Intent: "${intent.title}" (${intent.theme})`, intent })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ step: stepMsg, intent })}\n\n`)
         );
       } else {
         streamController.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ step: `🤖 Connecting to ${model} via CLI Proxy...` })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ step: baseCode ? `🎨 Updating game elements...` : `⚡ Cooking up your game concept...` })}\n\n`)
         );
       }
       streamController.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ step: `⚡ Synthesizing ${archetype || 'micro-game'} mechanics & juice...` })}\n\n`)
+        encoder.encode(`data: ${JSON.stringify({ step: `🎮 Building gameplay, visuals & juicy sounds...` })}\n\n`)
       );
     },
     transform(chunk, streamController) {
@@ -179,10 +193,16 @@ async function streamFromCliProxy(
         if (trimmed.startsWith('data: ')) {
           const payload = trimmed.slice(6);
           if (payload === '[DONE]') {
-            const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
+            const healed = validateAndHealGameHtml(accumulated, { prompt, archetype, fallbackOnAstError: true });
             streamController.enqueue(
               encoder.encode(
-                `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+                `data: ${JSON.stringify({
+                  done: true,
+                  fullHtml: healed.html,
+                  issuesFixed: healed.issuesFixed,
+                  astValidation: healed.astValidation,
+                  isPlayable: healed.isPlayable,
+                })}\n\n`
               )
             );
             try {
@@ -206,10 +226,16 @@ async function streamFromCliProxy(
       }
     },
     flush(streamController) {
-      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
+      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype, fallbackOnAstError: true });
       streamController.enqueue(
         encoder.encode(
-          `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+          `data: ${JSON.stringify({
+            done: true,
+            fullHtml: healed.html,
+            issuesFixed: healed.issuesFixed,
+            astValidation: healed.astValidation,
+            isPlayable: healed.isPlayable,
+          })}\n\n`
         )
       );
     },
@@ -240,7 +266,10 @@ function streamProceduralGame(prompt: string, archetype: any, baseCode?: string,
 
       // 1. Simulation milestones
       if (intent) {
-        sendEvent({ step: `🧠 AI Intent: "${intent.title}" (${intent.theme})`, intent });
+        const stepMsg = baseCode
+          ? `🎨 Applying "${intent.theme}" updates to "${intent.title}"...`
+          : `🧠 AI Intent: "${intent.title}" (${intent.theme})`;
+        sendEvent({ step: stepMsg, intent });
         await sleep(150);
       } else {
         sendEvent({ step: '🧠 Interpreting micro-game mechanics & physics...' });
@@ -325,8 +354,11 @@ async function streamFromGemini(
   const transformStream = new TransformStream({
     start(controller) {
       if (intent) {
+        const stepMsg = baseCode
+          ? `🎨 Applying "${intent.theme}" updates to "${intent.title}"...`
+          : `🧠 AI Intent: "${intent.title}" (${intent.theme})`;
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ step: `🧠 AI Intent: "${intent.title}" (${intent.theme})`, intent })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ step: stepMsg, intent })}\n\n`)
         );
       }
     },
@@ -353,10 +385,16 @@ async function streamFromGemini(
       }
     },
     flush(controller) {
-      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
+      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype, fallbackOnAstError: true });
       controller.enqueue(
         encoder.encode(
-          `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+          `data: ${JSON.stringify({
+            done: true,
+            fullHtml: healed.html,
+            issuesFixed: healed.issuesFixed,
+            astValidation: healed.astValidation,
+            isPlayable: healed.isPlayable,
+          })}\n\n`
         )
       );
     },
@@ -410,6 +448,16 @@ async function streamFromOpenAI(
   let accumulated = '';
 
   const transformStream = new TransformStream({
+    start(controller) {
+      if (intent) {
+        const stepMsg = baseCode
+          ? `🎨 Applying "${intent.theme}" updates to "${intent.title}"...`
+          : `🧠 AI Intent: "${intent.title}" (${intent.theme})`;
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ step: stepMsg, intent })}\n\n`)
+        );
+      }
+    },
     transform(chunk, controller) {
       const text = new TextDecoder().decode(chunk);
       const lines = text.split('\n');
@@ -430,10 +478,16 @@ async function streamFromOpenAI(
       }
     },
     flush(controller) {
-      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype });
+      const healed = validateAndHealGameHtml(accumulated, { prompt, archetype, fallbackOnAstError: true });
       controller.enqueue(
         encoder.encode(
-          `data: ${JSON.stringify({ done: true, fullHtml: healed.html, issuesFixed: healed.issuesFixed })}\n\n`
+          `data: ${JSON.stringify({
+            done: true,
+            fullHtml: healed.html,
+            issuesFixed: healed.issuesFixed,
+            astValidation: healed.astValidation,
+            isPlayable: healed.isPlayable,
+          })}\n\n`
         )
       );
     },
@@ -446,6 +500,63 @@ async function streamFromOpenAI(
       Connection: 'keep-alive',
     },
   });
+}
+
+function detectArchetypeFromCode(code: string): string | undefined {
+  if (!code) return undefined;
+  const lower = code.toLowerCase();
+  if (
+    lower.includes('findmatches') ||
+    lower.includes('screentogrid') ||
+    lower.includes('grid.create') ||
+    lower.includes('match-3') ||
+    lower.includes('match3') ||
+    lower.includes('cellsize') ||
+    lower.includes('grid')
+  ) {
+    return 'grid_puzzle';
+  }
+  if (
+    lower.includes('ondrag') ||
+    lower.includes('releasevec') ||
+    lower.includes('pullvec') ||
+    lower.includes('slingshot') ||
+    lower.includes('catapult')
+  ) {
+    return 'slingshot';
+  }
+  if (
+    lower.includes('virtualstick') ||
+    lower.includes('camera.follow') ||
+    lower.includes('survivor') ||
+    lower.includes('bullet hell') ||
+    lower.includes('danmaku') ||
+    lower.includes('swarm')
+  ) {
+    return 'survivors_arena';
+  }
+  if (lower.includes('card') && (lower.includes('deck') || lower.includes('player_turn') || lower.includes('hand'))) {
+    return 'card_strategy';
+  }
+  if (lower.includes('stack') || lower.includes('slice') || lower.includes('tower')) {
+    return 'stack';
+  }
+  if (lower.includes('runner') || lower.includes('lane') || lower.includes('subway') || lower.includes('dash')) {
+    return 'runner';
+  }
+  if (lower.includes('pipe') || lower.includes('flap') || lower.includes('bird')) {
+    return 'flappy';
+  }
+  if (lower.includes('breakout') || lower.includes('paddle') || lower.includes('brick')) {
+    return 'breakout';
+  }
+  if (lower.includes('orbit') || lower.includes('solar') || lower.includes('gravity')) {
+    return 'orbit';
+  }
+  if (lower.includes('invader') || lower.includes('laser') || lower.includes('shoot')) {
+    return 'shooter';
+  }
+  return undefined;
 }
 
 function sleep(ms: number) {

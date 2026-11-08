@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Share2, Check, RotateCcw, Trophy, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Share2, Check, RotateCcw, Trophy, Sparkles, X, Pencil } from 'lucide-react';
 import { Game } from '@/types/game';
 import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { useWallet } from '@/context/WalletContext';
@@ -304,6 +304,16 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
               </span>
             )}
           </button>
+
+          {/* Edit Game Button */}
+          <Link
+            href={`/create?edit=${game.slug}`}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white transition-all text-xs font-heading font-bold"
+            title="Edit this game in Jumby Studio"
+          >
+            <Pencil className="w-3.5 h-3.5 text-jumby-lime" />
+            <span>Edit</span>
+          </Link>
 
           {/* Share Button */}
           <button

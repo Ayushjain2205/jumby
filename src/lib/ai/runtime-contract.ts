@@ -223,7 +223,20 @@ export function buildSystemPrompt(options?: {
       ? `\n### USER ATTACHED REFERENCE IMAGES/SKETCHES:\nThe user attached visual reference files: [${options.referenceImages.map((img) => img.name).join(', ')}]. Honor the visual style, characters, collectible items, and color themes suggested by these references.\n`
       : '';
 
-  const intentSpecs = options?.intent
+  const isEditing = Boolean(options?.baseCode && options.baseCode.trim().length > 50);
+
+  const intentSpecs = isEditing
+    ? `\n### EDIT DIRECTIVE (CRITICAL: PRESERVE GAME ARCHITECTURE):
+- Title: "${options?.intent?.title || 'Existing Game'}"
+- Core Archetype: ${options?.archetype || options?.intent?.archetype || 'Preserve Existing'} (DO NOT CHANGE THE GENRE OR REWRITE CORE MECHANICS!)
+- If this is a Match-3 / Grid Puzzle, IT MUST REMAIN A MATCH-3 / GRID PUZZLE.
+- If this is a Slingshot game, IT MUST REMAIN A SLINGSHOT GAME.
+- If this is a Survivors Arena game, IT MUST REMAIN A SURVIVORS ARENA GAME.
+- Apply requested theme/styling/mechanic changes: "${options?.intent?.theme || ''}"
+- Updated Theme Colors: Primary "${options?.intent?.themeColor || ''}", Glow/Accent "${options?.intent?.accentColor || ''}", Background "${options?.intent?.bgColor || ''}"
+- Updated Vibe: Typography "${options?.intent?.fontVibe || ''}", Collectible "${options?.intent?.collectibleItem || ''}", Twist "${options?.intent?.mechanicTwist || ''}"
+`
+    : options?.intent
     ? `\n### AI ARCHITECTURAL BLUEPRINT (MANDATORY TO IMPLEMENT):
 - Game Title: "${options.intent.title}"
 - Mechanical Archetype: ${options.intent.archetype}
@@ -371,8 +384,21 @@ ${JUMBY_TYPESCRIPT_CONTRACT}
 \`\`\`
 
 ${options?.archetype ? `Target Archetype: ${options.archetype}` : ''}
-${options?.baseCode ? `### REMIXING EXISTING GAME CODE:
-You are modifying an existing, working game. Keep its underlying structure intact while applying the user's modifications:
+${options?.baseCode ? `### EDITING EXISTING GAME CODE (CRITICAL: PRESERVE GENRE & ARCHITECTURE):
+You are modifying an existing, working game.
+1. PRESERVE THE CORE GENRE AND GAMEPLAY LOOP! If the existing game is a Match-3 / Grid game, DO NOT convert it into a runner, flappy bird, or different genre.
+2. Keep its underlying board / physics loops intact, and surgically update colors, emojis/sprites, fonts, background styling, particle effects, and requested rule modifications.
+3. You can output SURGICAL SEARCH/REPLACE DIFF BLOCKS to change only the relevant lines (saving latency and preventing regressions):
+\`\`\`markdown
+<<<<<<< SEARCH
+[exact lines in existing code to replace]
+=======
+[new replacement lines]
+>>>>>>> REPLACE
+\`\`\`
+Or, if you are performing an extensive thematic re-skinning of the game, output the complete updated <!DOCTYPE html> ... </html> while strictly preserving the existing game's genre and mechanics.
+
+EXISTING BASE CODE:
 \`\`\`html
 ${options.baseCode}
 \`\`\`` : `### CREATING A BRAND NEW GAME FROM SCRATCH:

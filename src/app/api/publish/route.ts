@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { Game } from '@/types/game';
-import { savePublishedGame } from '@/lib/games/game-registry';
+import { savePublishedGame, getGameBySlug } from '@/lib/games/game-registry';
 import { validateAndHealGameHtml } from '@/lib/ai/game-healer';
-
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +15,8 @@ export async function POST(req: NextRequest) {
       prompt = '',
       creatorName = 'Creator',
       creatorUsername = 'creator',
+      editSlug,
+      isEdit,
     } = body;
 
     if (!html || typeof html !== 'string') {
@@ -26,7 +27,59 @@ export async function POST(req: NextRequest) {
     const healingResult = validateAndHealGameHtml(html, { prompt, archetype });
     const finalHtmlToPublish = healingResult.html;
 
-    // Generate safe clean slug
+    // Handle IN-PLACE EDIT MODE
+    if (editSlug && (isEdit || editSlug.trim().length > 0)) {
+      const slug = editSlug.trim();
+      const existingGame = getGameBySlug(slug);
+
+      // Write game bundle to public/games/<slug>/index.html
+      const targetDir = path.join(process.cwd(), 'public', 'games', slug);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+      const targetHtmlPath = path.join(targetDir, 'index.html');
+      fs.writeFileSync(targetHtmlPath, finalHtmlToPublish, 'utf-8');
+
+      // Preserve existing game stats, createdAt, creator, and ID
+      const updatedGame: Game = {
+        id: existingGame?.id || `game_${slug}`,
+        slug,
+        title: title || existingGame?.title || 'Untitled Game',
+        description: prompt || existingGame?.description || `${title} - Created with Jumby AI Studio`,
+        prompt: prompt || existingGame?.prompt || title,
+        creator: existingGame?.creator || {
+          id: 'usr_me',
+          name: creatorName,
+          username: creatorUsername,
+          avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${slug}`,
+        },
+        parentGameId: existingGame?.parentGameId || null,
+        parentGameTitle: existingGame?.parentGameTitle || null,
+        engine: 'canvas2d',
+        bundleUrl: `/games/${slug}/index.html`,
+        stats: existingGame?.stats || {
+          plays: 1,
+          likes: 1,
+          remixes: 0,
+          highScore: 0,
+        },
+        tags: existingGame?.tags || ['AI Generated', archetype],
+        controlsHint: existingGame?.controlsHint || 'Tap or Space to Play',
+        createdAt: existingGame?.createdAt || new Date().toISOString(),
+      };
+
+      savePublishedGame(updatedGame);
+
+      return NextResponse.json({
+        success: true,
+        slug,
+        url: `/g/${slug}`,
+        game: updatedGame,
+        isUpdate: true,
+      });
+    }
+
+    // Handle NEW GAME PUBLISH
     const baseSlug = title
       .toLowerCase()
       .trim()
