@@ -216,8 +216,18 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
     }
   }
 
-  // F. Tap-to-Restart State Safeguard (only if no existing input listener is registered)
-  if (!jsPatched.includes('pointerdown') && !jsPatched.includes('justPressed') && !jsPatched.includes('isDown')) {
+  // F. Tap-to-Restart State Safeguard (only if NO input or event listeners exist at all)
+  const hasInputHandling =
+    jsPatched.includes('pointerdown') ||
+    jsPatched.includes('mousedown') ||
+    jsPatched.includes('touchstart') ||
+    jsPatched.includes('justPressed') ||
+    jsPatched.includes('isDown') ||
+    jsPatched.includes('onDrag') ||
+    jsPatched.includes('onSwipe') ||
+    jsPatched.includes('addEventListener');
+
+  if (!hasInputHandling) {
     const restartSafeguard = `
     window.addEventListener('pointerdown', function () {
       if (typeof state !== 'undefined' && (state === 'gameover' || state === 'waiting')) {
@@ -234,15 +244,16 @@ export function validateAndHealGameHtml(rawHtml: string, options?: ValidationOpt
   }
 
   // G. DOMContentLoaded in srcdoc iframe safety
-  // In srcdoc iframes, DOMContentLoaded may have already fired before the script executes
+  // In srcdoc iframes, DOMContentLoaded may have already fired before the script executes.
+  // Dispatch immediately if document is already interactive or complete.
   if (jsPatched.includes('DOMContentLoaded')) {
-    jsPatched = jsPatched.replace(
-      /(?:window|document)\.addEventListener\s*\(\s*['"]DOMContentLoaded['"]\s*,\s*(?:\(\s*\)\s*=>|function\s*\(\s*\))\s*\{/g,
-      '(function __jumby_run_game() {\n'
-    );
-    // Replace trailing }); with })();
-    jsPatched = jsPatched.replace(/\}\s*\)\s*;\s*$/, '})();');
-    issuesFixed.push('Unwrapped DOMContentLoaded listener so game runs immediately in srcdoc iframe');
+    const readyStateSafety = `
+    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+      window.dispatchEvent(new Event('DOMContentLoaded'));
+    }
+`;
+    jsPatched += readyStateSafety;
+    issuesFixed.push('Ensured DOMContentLoaded fires even if document was already parsed');
   }
 
   // H. Stacker & Physics Boundary Oscillation Healer

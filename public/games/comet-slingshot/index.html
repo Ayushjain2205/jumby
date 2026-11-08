@@ -2,372 +2,451 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Cosmic Slingshot</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body, html {
-      width: 100%; height: 100%;
-      background: #0A0514;
-      font-family: 'Orbitron', sans-serif;
-      overflow: hidden;
-      touch-action: none;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    canvas {
-      display: block;
-      background: #0A0514;
-      box-shadow: 0 0 40px rgba(153, 69, 255, 0.2);
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #070412; font-family: 'Orbitron', -apple-system, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; background: radial-gradient(circle at 50% 40%, #150a2e 0%, #070412 100%); }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
   <script>
-
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // Responsive 9:16 portrait sizing
+    // Virtual resolution
+    const V_WIDTH = 390;
+    const V_HEIGHT = 844;
+    let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+
     function resize() {
       const w = window.innerWidth;
       const h = window.innerHeight;
-      const targetAspect = 9 / 16;
-      let width = w;
-      let height = h;
-      if (width / height > targetAspect) {
-        width = height * targetAspect;
-      } else {
-        height = width / targetAspect;
-      }
-      canvas.width = 390;
-      canvas.height = 844;
-      canvas.style.width = width + 'px';
-      canvas.style.height = height + 'px';
+      canvas.width = w;
+      canvas.height = h;
+
+      const scaleX = w / V_WIDTH;
+      const scaleY = h / V_HEIGHT;
+      scale = Math.min(scaleX, scaleY);
+
+      offsetX = (w - V_WIDTH * scale) / 2;
+      offsetY = (h - V_HEIGHT * scale) / 2;
     }
     window.addEventListener('resize', resize);
     resize();
 
-    Jumby.input.init(canvas);
-
     // Theme Colors
     const COLORS = {
-      bg: '#0A0514',
       primary: '#9945FF',
-      accent: '#00F0FF',
+      cyan: '#00F0FF',
       magenta: '#FF007F',
+      lime: '#D8FF43',
       yellow: '#FACC15',
-      white: '#FFFFFF'
+      white: '#FFFFFF',
     };
 
-    // Game State
-    let state = 'waiting'; // waiting, playing, gameover
+    // Slingshot anchor
+    const SLING_X = 195;
+    const SLING_Y = 680;
+
+    // Game state
+    let state = 'waiting'; // 'waiting', 'aiming', 'flying', 'gameover'
     let score = 0;
     let launchesLeft = 5;
+    let sector = 1;
 
-    // Entities
-    const slingshotPos = { x: 195, y: 700 };
-    let comet = {
-      x: slingshotPos.x,
-      y: slingshotPos.y,
+    // Comet physics object
+    const comet = {
+      x: SLING_X,
+      y: SLING_Y,
       vx: 0,
       vy: 0,
-      radius: 14,
-      active: false
+      radius: 12,
+      trail: [],
     };
 
     let crystals = [];
     let blackHoles = [];
     let stars = [];
 
-    // Init background starfield
-    for (let i = 0; i < 60; i++) {
+    // Background starfield
+    for (let i = 0; i < 70; i++) {
       stars.push({
-        x: Math.random() * 390,
-        y: Math.random() * 844,
+        x: Math.random() * V_WIDTH,
+        y: Math.random() * V_HEIGHT,
         size: Math.random() * 2 + 0.5,
-        alpha: Math.random() * 0.7 + 0.3
+        alpha: Math.random() * 0.7 + 0.3,
+        speed: Math.random() * 0.3 + 0.1,
       });
     }
 
-    function initLevel() {
+    function spawnLevel() {
       crystals = [];
       blackHoles = [];
-      
-      // Spawn 3 to 5 neon crystal cores
-      const count = Math.min(3 + Math.floor(score / 300), 7);
-      for (let i = 0; i < count; i++) {
+
+      const crystalCount = Math.min(3 + sector, 7);
+      for (let i = 0; i < crystalCount; i++) {
+        const angle = (i / crystalCount) * Math.PI + 0.2;
+        const dist = 120 + Math.random() * 110;
+        const cx = V_WIDTH / 2 + Math.cos(angle) * dist;
+        const cy = 180 + Math.sin(angle) * 90 + (i % 2) * 50;
         crystals.push({
-          x: 60 + Math.random() * 270,
-          y: 100 + Math.random() * 320,
-          radius: 20,
+          x: Math.max(40, Math.min(V_WIDTH - 40, cx)),
+          y: Math.max(100, Math.min(420, cy)),
+          radius: 18,
           alive: true,
-          pulse: Math.random() * Math.PI
+          pulse: Math.random() * Math.PI * 2,
+          emoji: ['💎', '💠', '⭐', '🔷'][i % 4],
         });
       }
 
-      // Spawn 1 or 2 black holes in the middle sector
-      const bhCount = score >= 400 ? 2 : 1;
+      // Add 1 or 2 black holes in middle sector
+      const bhCount = sector >= 2 ? 2 : 1;
       for (let i = 0; i < bhCount; i++) {
         blackHoles.push({
-          x: 100 + Math.random() * 190,
-          y: 280 + Math.random() * 180,
-          radius: 28,
-          pull: 0.35
+          x: 100 + i * 190 + (Math.random() * 30 - 15),
+          y: 340 + (Math.random() * 40 - 20),
+          radius: 22,
+          mass: 2800,
+          angle: 0,
         });
       }
-    }
-
-    function resetGame() {
-      score = 0;
-      launchesLeft = 5;
-      Jumby.setScore(0);
-      Jumby.level.reset();
-      resetComet();
-      initLevel();
-      state = 'playing';
-      Jumby.sound.bgm.start('cyber');
     }
 
     function resetComet() {
-      comet.x = slingshotPos.x;
-      comet.y = slingshotPos.y;
+      comet.x = SLING_X;
+      comet.y = SLING_Y;
       comet.vx = 0;
       comet.vy = 0;
-      comet.active = false;
+      comet.trail = [];
     }
 
-    // Slingshot Pull & Launch Handling
-    let isPulling = false;
-    let pullVector = { x: 0, y: 0 };
-
-    Jumby.input.onDrag({
-      onStart: (pos) => {
-        if (state === 'waiting') {
-          resetGame();
-          return;
-        }
-        if (state === 'gameover') {
-          resetGame();
-          return;
-        }
-        if (state === 'playing' && !comet.active && launchesLeft > 0) {
-          const d = Jumby.math.dist(pos.x, pos.y, slingshotPos.x, slingshotPos.y);
-          if (d < 50) {
-            isPulling = true;
-          }
-        }
-      },
-      onDrag: (pos, pullVec, dist, angle) => {
-        if (isPulling && !comet.active) {
-          // Clamp max pull distance to 90px
-          const maxPull = 90;
-          const clampedDist = Math.min(dist, maxPull);
-          const a = angle + Math.PI; // Opposite direction of drag
-          pullVector.x = Math.cos(a) * clampedDist;
-          pullVector.y = Math.sin(a) * clampedDist;
-          
-          comet.x = slingshotPos.x + pullVector.x;
-          comet.y = slingshotPos.y + pullVector.y;
-        }
-      },
-      onRelease: (releaseVec, dist) => {
-        if (isPulling && !comet.active) {
-          isPulling = false;
-          if (dist > 15) {
-            // Launch comet! Speed multiplier 1.2x
-            comet.vx = (slingshotPos.x - comet.x) * 0.18 * 1.2;
-            comet.vy = (slingshotPos.y - comet.y) * 0.18 * 1.2;
-            comet.active = true;
-            launchesLeft--;
-            Jumby.sound.laser();
-          } else {
-            resetComet();
-          }
-        }
-      }
-    });
-
-    // Revive Listener
-    Jumby.on('REVIVE_GRANTED', () => {
-      launchesLeft = 3;
-      state = 'playing';
+    function startGame() {
+      score = 0;
+      launchesLeft = 5;
+      sector = 1;
+      Jumby.setScore(0);
       resetComet();
-      initLevel();
-    });
+      spawnLevel();
+      state = 'aiming';
+      Jumby.sound.bgm.start('arcade');
+    }
 
-    // Main Game Loop
+    // Touch & Pointer Drag handling in virtual coordinates
+    let isDragging = false;
+    let dragPos = { x: SLING_X, y: SLING_Y };
+
+    function toVirtual(clientX, clientY) {
+      return {
+        x: (clientX - offsetX) / scale,
+        y: (clientY - offsetY) / scale,
+      };
+    }
+
+    function onPointerDown(e) {
+      const p = toVirtual(e.clientX, e.clientY);
+
+      if (state === 'waiting' || state === 'gameover') {
+        startGame();
+        return;
+      }
+
+      if (state === 'aiming') {
+        // Allow pulling from anywhere in bottom half or near slingshot
+        const dist = Math.hypot(p.x - SLING_X, p.y - SLING_Y);
+        if (dist < 100 || p.y > 540) {
+          isDragging = true;
+          dragPos = { x: p.x, y: p.y };
+          updateCometPull();
+          Jumby.sound.playTone(320, 0.04, 'sine', 0.15);
+        }
+      }
+    }
+
+    function onPointerMove(e) {
+      if (!isDragging || state !== 'aiming') return;
+      const p = toVirtual(e.clientX, e.clientY);
+      dragPos = { x: p.x, y: p.y };
+      updateCometPull();
+    }
+
+    function updateCometPull() {
+      const dx = dragPos.x - SLING_X;
+      const dy = dragPos.y - SLING_Y;
+      const dist = Math.hypot(dx, dy);
+      const MAX_PULL = 85;
+
+      if (dist > MAX_PULL) {
+        comet.x = SLING_X + (dx / dist) * MAX_PULL;
+        comet.y = SLING_Y + (dy / dist) * MAX_PULL;
+      } else {
+        comet.x = dragPos.x;
+        comet.y = dragPos.y;
+      }
+    }
+
+    function onPointerUp() {
+      if (!isDragging) return;
+      isDragging = false;
+
+      if (state === 'aiming') {
+        const pullX = SLING_X - comet.x;
+        const pullY = SLING_Y - comet.y;
+        const pullDist = Math.hypot(pullX, pullY);
+
+        if (pullDist > 18) {
+          // Launch!
+          const speed = pullDist * 0.28;
+          const angle = Math.atan2(pullY, pullX);
+          comet.vx = Math.cos(angle) * speed;
+          comet.vy = Math.sin(angle) * speed;
+          launchesLeft--;
+          state = 'flying';
+          Jumby.sound.laser();
+          Jumby.fx.shake(5);
+        } else {
+          // Cancel pull
+          resetComet();
+        }
+      }
+    }
+
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+
+    // Update Physics
     function update() {
-      // Background star pulse
-      stars.forEach(s => {
-        s.alpha += (Math.random() - 0.5) * 0.05;
-        s.alpha = Jumby.math.clamp(s.alpha, 0.2, 1);
-      });
+      // Star twinkling
+      for (const s of stars) {
+        s.y += s.speed;
+        if (s.y > V_HEIGHT) s.y = 0;
+      }
 
-      if (state === 'playing') {
-        if (comet.active) {
-          // Apply gravity black holes pull twist
-          blackHoles.forEach(bh => {
-            const dx = bh.x - comet.x;
-            const dy = bh.y - comet.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist > 5 && dist < 200) {
-              const force = (bh.radius * 35) / (dist * dist);
-              comet.vx += (dx / dist) * force;
-              comet.vy += (dy / dist) * force;
-            }
-          });
+      // Black holes rotation
+      for (const bh of blackHoles) {
+        bh.angle += 0.03;
+      }
 
-          // Move comet
-          comet.x += comet.vx;
-          comet.y += comet.vy;
+      if (state === 'flying') {
+        // Gravitational attraction toward black holes
+        for (const bh of blackHoles) {
+          const dx = bh.x - comet.x;
+          const dy = bh.y - comet.y;
+          const distSq = dx * dx + dy * dy;
+          const dist = Math.sqrt(distSq);
 
-          // Trail particles
-          if (Math.random() < 0.5) {
-            Jumby.fx.particles(comet.x, comet.y, 2, COLORS.accent);
+          if (dist > 8 && dist < 220) {
+            const force = bh.mass / (distSq + 400);
+            comet.vx += (dx / dist) * force;
+            comet.vy += (dy / dist) * force;
           }
+        }
 
-          // Wall bounces
-          if (comet.x < comet.radius || comet.x > 390 - comet.radius) {
-            comet.vx *= -0.8;
-            comet.x = Jumby.math.clamp(comet.x, comet.radius, 390 - comet.radius);
+        // Apply velocity
+        comet.x += comet.vx;
+        comet.y += comet.vy;
+
+        // Trail
+        comet.trail.push({ x: comet.x, y: comet.y, life: 1 });
+        if (comet.trail.length > 18) comet.trail.shift();
+
+        // Particle trail
+        if (Math.random() < 0.6) {
+          Jumby.fx.particles(comet.x, comet.y, 2, COLORS.cyan);
+        }
+
+        // Wall collisions
+        const r = comet.radius;
+        if (comet.x - r < 10) {
+          comet.x = 10 + r;
+          comet.vx *= -0.75;
+          Jumby.sound.hit();
+        } else if (comet.x + r > V_WIDTH - 10) {
+          comet.x = V_WIDTH - 10 - r;
+          comet.vx *= -0.75;
+          Jumby.sound.hit();
+        }
+
+        if (comet.y - r < 40) {
+          comet.y = 40 + r;
+          comet.vy *= -0.75;
+          Jumby.sound.hit();
+        }
+
+        // Crystal destruction collision
+        for (const c of crystals) {
+          if (c.alive) {
+            const dist = Math.hypot(comet.x - c.x, comet.y - c.y);
+            if (dist < comet.radius + c.radius) {
+              c.alive = false;
+              score += 100 * sector;
+              Jumby.setScore(score);
+              Jumby.sound.coin();
+              Jumby.fx.shake(12);
+              Jumby.fx.particles(c.x, c.y, 20, COLORS.magenta);
+              Jumby.fx.addFloatingText(`+${100 * sector}`, c.x, c.y - 10, COLORS.yellow);
+              Jumby.awardCoins(1, { item: 'Star Gem', icon: '💎' });
+
+              // Deflect comet
+              comet.vx *= -0.4;
+              comet.vy *= -0.4;
+            }
+          }
+        }
+
+        // Check if sector cleared
+        const remaining = crystals.filter((c) => c.alive).length;
+        if (remaining === 0) {
+          sector++;
+          launchesLeft = Math.min(launchesLeft + 3, 7);
+          Jumby.sound.fanfare();
+          Jumby.level.banner(`SECTOR ${sector}!`, '+3 BONUS LAUNCHES', COLORS.lime);
+          resetComet();
+          spawnLevel();
+          state = 'aiming';
+          return;
+        }
+
+        // Out of bounds or stopped
+        const speed = Math.hypot(comet.vx, comet.vy);
+        const outOfBounds = comet.y > V_HEIGHT + 20 || comet.x < -40 || comet.x > V_WIDTH + 40;
+        const stopped = speed < 0.4 && comet.y < SLING_Y - 40;
+
+        if (outOfBounds || stopped) {
+          resetComet();
+          if (launchesLeft <= 0) {
+            state = 'gameover';
             Jumby.sound.hit();
-          }
-
-          // Check Crystal Collisions
-          crystals.forEach(c => {
-            if (c.alive) {
-              const hitCheck = Jumby.physics.circleCircle(
-                { x: comet.x, y: comet.y, radius: comet.radius },
-                { x: c.x, y: c.y, radius: c.radius }
-              );
-              if (hitCheck.hit) {
-                c.alive = false;
-                score += 100;
-                Jumby.setScore(score);
-                Jumby.sound.coin();
-                Jumby.fx.shake(10);
-                Jumby.fx.particles(c.x, c.y, 18, COLORS.magenta);
-                Jumby.fx.addFloatingText("+100", c.x, c.y, COLORS.yellow);
-                Jumby.awardCoins(1, { item: "Star Gem", icon: "💎" });
-
-                // Bounce comet slightly
-                comet.vx *= -0.5;
-                comet.vy *= -0.5;
-              }
-            }
-          });
-
-          // Check Win/Clear Level condition
-          const remainingCrystals = crystals.filter(c => c.alive).length;
-          if (remainingCrystals === 0) {
-            score += 250 * (launchesLeft + 1);
-            Jumby.setScore(score);
-            Jumby.sound.fanfare();
-            Jumby.level.banner("SECTOR CLEARED!", "+BONUS POINTS", COLORS.accent);
-            initLevel();
-            resetComet();
-            launchesLeft += 2; // bonus launch
-          }
-
-          // Out of bounds / stop check
-          if (comet.y < -20 || comet.y > 860 || comet.x < -20 || comet.x > 410 || 
-              (Math.abs(comet.vx) < 0.3 && Math.abs(comet.vy) < 0.3 && comet.y < slingshotPos.y - 50)) {
-            resetComet();
-            if (launchesLeft <= 0 && remainingCrystals > 0) {
-              state = 'gameover';
-              Jumby.sound.hit();
-              Jumby.fx.shake(16);
-              Jumby.gameOver(score);
-            }
+            Jumby.fx.shake(18);
+            Jumby.gameOver(score);
+          } else {
+            state = 'aiming';
           }
         }
       }
     }
 
+    // Render Scene
     function render() {
-      ctx.fillStyle = COLORS.bg;
-      ctx.fillRect(0, 0, 390, 844);
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Render Starfield
-      stars.forEach(s => {
+      // Apply letterboxing translation & scaling
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(scale, scale);
+
+      // Play area boundary
+      ctx.fillStyle = '#070412';
+      ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
+
+      // Starfield
+      for (const s of stars) {
         ctx.fillStyle = COLORS.white;
         ctx.globalAlpha = s.alpha;
         ctx.fillRect(s.x, s.y, s.size, s.size);
-      });
+      }
       ctx.globalAlpha = 1.0;
 
-      // Render Black Holes
-      blackHoles.forEach(bh => {
+      // Draw Black Holes
+      for (const bh of blackHoles) {
         ctx.save();
-        ctx.beginPath();
-        ctx.arc(bh.x, bh.y, bh.radius + 6, 0, Math.PI * 2);
+        // Gravity event horizon rings
         ctx.strokeStyle = COLORS.magenta;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        ctx.arc(bh.x, bh.y, bh.radius + 14, 0, Math.PI * 2);
         ctx.stroke();
 
+        ctx.strokeStyle = COLORS.cyan;
+        ctx.beginPath();
+        ctx.arc(bh.x, bh.y, bh.radius + 6, bh.angle, bh.angle + Math.PI * 1.5);
+        ctx.stroke();
+
+        // Core singularity
+        ctx.fillStyle = '#000000';
         ctx.beginPath();
         ctx.arc(bh.x, bh.y, bh.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#05020A';
         ctx.fill();
         ctx.strokeStyle = COLORS.primary;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
+
+        Jumby.drawEmoji(ctx, '🕳️', bh.x, bh.y, bh.radius * 1.4);
         ctx.restore();
+      }
 
-        Jumby.drawEmoji(ctx, "🕳️", bh.x, bh.y, bh.radius * 1.5);
-      });
-
-      // Render Crystals
-      crystals.forEach(c => {
+      // Draw Crystals
+      for (const c of crystals) {
         if (c.alive) {
           c.pulse += 0.08;
-          const pSize = c.radius + Math.sin(c.pulse) * 3;
-          
+          const sz = c.radius + Math.sin(c.pulse) * 3;
           ctx.save();
-          ctx.shadowColor = COLORS.accent;
-          ctx.shadowBlur = 15;
-          Jumby.drawEmoji(ctx, "💎", c.x, c.y, pSize * 1.6);
+          ctx.shadowColor = COLORS.cyan;
+          ctx.shadowBlur = 12;
+          Jumby.drawEmoji(ctx, c.emoji, c.x, c.y, sz * 1.8);
           ctx.restore();
         }
-      });
+      }
 
-      // Render Slingshot Base
+      // Draw Slingshot Stand & Bands
       ctx.save();
       ctx.strokeStyle = COLORS.primary;
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(slingshotPos.x - 18, slingshotPos.y + 40);
-      ctx.lineTo(slingshotPos.x, slingshotPos.y);
-      ctx.lineTo(slingshotPos.x + 18, slingshotPos.y + 40);
+      ctx.moveTo(SLING_X - 22, SLING_Y + 45);
+      ctx.lineTo(SLING_X - 16, SLING_Y);
+      ctx.lineTo(SLING_X + 16, SLING_Y);
+      ctx.lineTo(SLING_X + 22, SLING_Y + 45);
       ctx.stroke();
 
-      // Render Pull Rubber Bands if pulling
-      if (isPulling && !comet.active) {
-        ctx.strokeStyle = COLORS.accent;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(slingshotPos.x - 14, slingshotPos.y + 5);
-        ctx.lineTo(comet.x, comet.y);
-        ctx.lineTo(slingshotPos.x + 14, slingshotPos.y + 5);
-        ctx.stroke();
+      // Slingshot rubber bands
+      const isAiming = state === 'aiming' && isDragging;
+      ctx.strokeStyle = isAiming ? COLORS.lime : COLORS.cyan;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(SLING_X - 16, SLING_Y);
+      ctx.lineTo(comet.x, comet.y);
+      ctx.lineTo(SLING_X + 16, SLING_Y);
+      ctx.stroke();
 
-        // Render Dotted Trajectory Prediction Line
-        const simVx = (slingshotPos.x - comet.x) * 0.18 * 1.2;
-        const simVy = (slingshotPos.y - comet.y) * 0.18 * 1.2;
+      // Aim trajectory dotted arc
+      if (isAiming) {
+        const pullX = SLING_X - comet.x;
+        const pullY = SLING_Y - comet.y;
+        const speed = Math.hypot(pullX, pullY) * 0.28;
+        const angle = Math.atan2(pullY, pullX);
         let simX = comet.x;
         let simY = comet.y;
+        let simVx = Math.cos(angle) * speed;
+        let simVy = Math.sin(angle) * speed;
 
-        ctx.fillStyle = COLORS.accent;
-        for (let i = 0; i < 20; i++) {
+        ctx.fillStyle = COLORS.lime;
+        for (let i = 0; i < 22; i++) {
           simX += simVx;
           simY += simVy;
-          ctx.globalAlpha = 1 - (i / 20);
+          // Apply black hole gravity prediction
+          for (const bh of blackHoles) {
+            const dx = bh.x - simX;
+            const dy = bh.y - simY;
+            const distSq = dx * dx + dy * dy;
+            if (distSq > 100 && distSq < 48000) {
+              const f = bh.mass / (distSq + 400);
+              const d = Math.sqrt(distSq);
+              simVx += (dx / d) * f;
+              simVy += (dy / d) * f;
+            }
+          }
+          ctx.globalAlpha = Math.max(0, 1 - i / 22);
           ctx.beginPath();
           ctx.arc(simX, simY, 3, 0, Math.PI * 2);
           ctx.fill();
@@ -376,72 +455,102 @@
       }
       ctx.restore();
 
-      // Render Comet
+      // Draw Comet Trail
+      if (comet.trail.length > 1) {
+        ctx.save();
+        for (let i = 0; i < comet.trail.length - 1; i++) {
+          const pt = comet.trail[i];
+          const next = comet.trail[i + 1];
+          const alpha = (i / comet.trail.length) * 0.7;
+          ctx.strokeStyle = COLORS.cyan;
+          ctx.globalAlpha = alpha;
+          ctx.lineWidth = (i / comet.trail.length) * 8;
+          ctx.beginPath();
+          ctx.moveTo(pt.x, pt.y);
+          ctx.lineTo(next.x, next.y);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // Draw Comet
       ctx.save();
-      ctx.shadowColor = COLORS.primary;
-      ctx.shadowBlur = 20;
-      Jumby.drawEmoji(ctx, "☄️", comet.x, comet.y, comet.radius * 2.2);
+      ctx.shadowColor = COLORS.lime;
+      ctx.shadowBlur = 18;
+      Jumby.drawEmoji(ctx, '☄️', comet.x, comet.y, comet.radius * 2.4);
       ctx.restore();
 
-      // HUD: Launches Left & Score
+      // Top HUD Bar
       ctx.fillStyle = COLORS.white;
-      ctx.font = '700 16px "Orbitron", sans-serif';
+      ctx.font = '900 15px "Orbitron", sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`LAUNCHES: ${launchesLeft}`, 24, 45);
+      ctx.fillText(`SECTOR ${sector}`, 20, 48);
 
+      ctx.fillStyle = COLORS.cyan;
+      ctx.fillText(`LAUNCHES: ${'●'.repeat(Math.max(0, launchesLeft))}`, 20, 72);
+
+      ctx.fillStyle = COLORS.lime;
       ctx.textAlign = 'right';
-      ctx.fillText(`SCORE: ${score}`, 366, 45);
+      ctx.fillText(`SCORE: ${score}`, V_WIDTH - 20, 48);
 
-      // State Overlays
+      // FX Layer
+      Jumby.fx.updateAndRender(ctx, V_WIDTH, V_HEIGHT);
+
+      // Overlays
       if (state === 'waiting') {
-        ctx.fillStyle = 'rgba(10, 5, 20, 0.85)';
-        ctx.fillRect(0, 0, 390, 844);
+        ctx.fillStyle = 'rgba(7, 4, 18, 0.88)';
+        ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
 
         ctx.textAlign = 'center';
-        ctx.fillStyle = COLORS.accent;
-        ctx.font = '900 32px "Orbitron", sans-serif';
-        ctx.fillText('COSMIC', 195, 340);
+        ctx.fillStyle = COLORS.cyan;
+        ctx.font = '900 30px "Orbitron", sans-serif';
+        ctx.fillText('COSMIC', V_WIDTH / 2, 320);
         ctx.fillStyle = COLORS.magenta;
-        ctx.fillText('SLINGSHOT', 195, 385);
+        ctx.fillText('SLINGSHOT', V_WIDTH / 2, 365);
 
         ctx.fillStyle = COLORS.white;
-        ctx.font = '700 14px "Orbitron", sans-serif';
-        ctx.fillText('PULL COMET & SMASH CRYSTALS', 195, 450);
+        ctx.font = '700 13px "Orbitron", sans-serif';
+        ctx.fillText('PULL COMET & BEND AROUND BLACK HOLES', V_WIDTH / 2, 420);
 
-        // Pulsing tap to start
-        const alpha = Math.sin(Date.now() * 0.008) * 0.5 + 0.5;
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = COLORS.yellow;
-        ctx.font = '700 18px "Orbitron", sans-serif';
-        ctx.fillText('TAP TO LAUNCH', 195, 540);
+        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
+        ctx.globalAlpha = 0.5 + pulse * 0.5;
+        ctx.fillStyle = COLORS.lime;
+        ctx.font = '900 18px "Orbitron", sans-serif';
+        ctx.fillText('TAP ANYWHERE TO PLAY', V_WIDTH / 2, 510);
+        ctx.globalAlpha = 1.0;
+      } else if (state === 'gameover') {
+        ctx.fillStyle = 'rgba(7, 4, 18, 0.9)';
+        ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = COLORS.magenta;
+        ctx.font = '900 32px "Orbitron", sans-serif';
+        ctx.fillText('MISSION OVER', V_WIDTH / 2, 330);
+
+        ctx.fillStyle = COLORS.white;
+        ctx.font = '700 15px "Orbitron", sans-serif';
+        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 385);
+        ctx.fillText(`REACHED SECTOR: ${sector}`, V_WIDTH / 2, 415);
+
+        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
+        ctx.globalAlpha = 0.5 + pulse * 0.5;
+        ctx.fillStyle = COLORS.lime;
+        ctx.font = '900 18px "Orbitron", sans-serif';
+        ctx.fillText('TAP TO PLAY AGAIN', V_WIDTH / 2, 510);
         ctx.globalAlpha = 1.0;
       }
 
-      // FX layer update & render
-      Jumby.fx.updateAndRender(ctx, 390, 844);
+      ctx.restore();
     }
 
-    function gameLoop() {
+    function loop() {
       update();
       render();
-      Jumby.input.endFrame();
-      requestAnimationFrame(gameLoop);
+      requestAnimationFrame(loop);
     }
 
     Jumby.ready();
-    requestAnimationFrame(gameLoop);
-  
-    window.addEventListener('pointerdown', function () {
-      if (typeof state !== 'undefined' && (state === 'gameover' || state === 'waiting')) {
-        state = 'playing';
-        if (typeof startGame === 'function') startGame();
-        else if (typeof initGame === 'function') initGame();
-        else if (typeof restartGame === 'function') restartGame();
-        else if (typeof reset === 'function') reset();
-      }
-    });
-
+    requestAnimationFrame(loop);
   </script>
 </body>
-</html>
 </html>

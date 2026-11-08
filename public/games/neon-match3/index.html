@@ -2,377 +2,496 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Neon Grid Spark - Match 3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Neon Grid Spark</title>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
   <script src="/jumby-runtime.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #0A0818;
-      color: #FFFFFF;
-      font-family: 'Orbitron', sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      overflow: hidden;
-      touch-action: none;
-    }
-    canvas {
-      box-shadow: 0 0 30px rgba(0, 255, 255, 0.2);
-      border-radius: 12px;
-      background: #0A0818;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #080614; font-family: 'Orbitron', -apple-system, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; background: radial-gradient(circle at 50% 50%, #150d30 0%, #080614 100%); }
   </style>
 </head>
 <body>
+  <canvas id="gameCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-<canvas id="gameCanvas" width="390" height="844"></canvas>
+    // Virtual portrait resolution (390 x 844)
+    const V_WIDTH = 390;
+    const V_HEIGHT = 844;
+    let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
 
-<script>
+    function resize() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas.width = w;
+      canvas.height = h;
 
-    function __jumby_auto_resize() {
-      const c = document.querySelector('canvas');
-      if (c) {
-        c.width = window.innerWidth;
-        c.height = window.innerHeight;
+      const scaleX = w / V_WIDTH;
+      const scaleY = h / V_HEIGHT;
+      scale = Math.min(scaleX, scaleY);
+
+      offsetX = (w - V_WIDTH * scale) / 2;
+      offsetY = (h - V_HEIGHT * scale) / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Theme Colors
+    const COLORS = {
+      primary: '#9945FF',
+      cyan: '#00F0FF',
+      magenta: '#FF007F',
+      lime: '#D8FF43',
+      yellow: '#FACC15',
+      boardBg: '#100b24',
+      boardBorder: '#2e1e5e',
+      white: '#FFFFFF',
+    };
+
+    const GEM_TYPES = ['💎', '❤️', '🔥', '⭐', '⚡'];
+    const ROWS = 8;
+    const COLS = 8;
+    const CELL_SIZE = 42;
+    const BOARD_WIDTH = COLS * CELL_SIZE; // 336px
+    const BOARD_HEIGHT = ROWS * CELL_SIZE; // 336px
+    const BOARD_X = (V_WIDTH - BOARD_WIDTH) / 2; // 27px
+    const BOARD_Y = 250;
+
+    // Board Matrix
+    let board = [];
+    let selectedCell = null;
+    let isProcessing = false;
+    let score = 0;
+    let timeLeft = 60;
+    let timerInterval = null;
+    let state = 'waiting'; // 'waiting', 'playing', 'gameover'
+    let combo = 0;
+
+    function randomGem() {
+      return GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
+    }
+
+    function initBoard() {
+      board = [];
+      for (let r = 0; r < ROWS; r++) {
+        board[r] = [];
+        for (let c = 0; c < COLS; c++) {
+          board[r][c] = randomGem();
+        }
+      }
+
+      // Clear any initial 3-in-a-row matches
+      while (findMatches().length > 0) {
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            board[r][c] = randomGem();
+          }
+        }
       }
     }
-    window.addEventListener('resize', __jumby_auto_resize);
-    __jumby_auto_resize();
 
-(function __jumby_run_game() {
+    function findMatches() {
+      const matched = new Set();
 
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d');
-  Jumby.input.init(canvas);
+      // Check horizontal matches
+      for (let r = 0; r < ROWS; r++) {
+        let matchLength = 1;
+        for (let c = 0; c < COLS; c++) {
+          const current = board[r][c];
+          const next = c < COLS - 1 ? board[r][c + 1] : null;
 
-  // Palette & Config
-  const COLORS = {
-    bg: '#0A0818',
-    primary: '#FF007F',
-    accent: '#00FFFF',
-    gridBg: '#131026',
-    border: '#2A234A'
-  };
+          if (current && current === next) {
+            matchLength++;
+          } else {
+            if (matchLength >= 3) {
+              for (let i = 0; i < matchLength; i++) {
+                matched.add(`${r},${c - i}`);
+              }
+            }
+            matchLength = 1;
+          }
+        }
+      }
 
-  const GEM_TYPES = ['💎', '❤️', '💚', '💙', '⭐']; // Ruby, Emerald, Sapphire, Gold Coin, Amethyst
-  const COLS = 8;
-  const ROWS = 8;
-  const CELL_SIZE = 42;
-  const ORIGIN_X = (390 - (COLS * CELL_SIZE)) / 2;
-  const ORIGIN_Y = 240;
+      // Check vertical matches
+      for (let c = 0; c < COLS; c++) {
+        let matchLength = 1;
+        for (let r = 0; r < ROWS; r++) {
+          const current = board[r][c];
+          const next = r < ROWS - 1 ? board[r + 1][c] : null;
 
-  // Game state
-  let score = 0;
-  let state = 'waiting'; // 'waiting', 'playing', 'swapping', 'clearing', 'falling', 'gameover'
-  let grid = null;
-  let selectedCell = null;
-  let swapAnim = null;
-  let timeLeft = 60;
-  let timerInterval = null;
+          if (current && current === next) {
+            matchLength++;
+          } else {
+            if (matchLength >= 3) {
+              for (let i = 0; i < matchLength; i++) {
+                matched.add(`${r - i},${c}`);
+              }
+            }
+            matchLength = 1;
+          }
+        }
+      }
 
-  Jumby.level.init({
-    startLevel: 1,
-    pointsPerLevel: 500,
-    autoBanner: true
-  });
-
-  function initBoard() {
-    grid = Jumby.grid.create(ROWS, COLS, () => Jumby.math.randomChoice(GEM_TYPES));
-    // Ensure no initial matches
-    while (grid.findMatches(3).length > 0) {
-      grid.forEach((_, r, c) => {
-        grid.set(r, c, Jumby.math.randomChoice(GEM_TYPES));
+      const result = [];
+      matched.forEach((key) => {
+        const [r, c] = key.split(',').map(Number);
+        result.push({ r, c, val: board[r][c] });
       });
+      return result;
     }
-  }
 
-  function startGame() {
-    score = 0;
-    timeLeft = 60;
-    Jumby.setScore(0);
-    initBoard();
-    state = 'playing';
-    Jumby.sound.bgm.start('cyber');
-    
-    if (timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-      if (state === 'playing' || state === 'falling' || state === 'clearing') {
-        timeLeft--;
-        if (timeLeft <= 0) {
-          endGame();
+    function startGame() {
+      score = 0;
+      timeLeft = 60;
+      combo = 0;
+      selectedCell = null;
+      isProcessing = false;
+      Jumby.setScore(0);
+      initBoard();
+      state = 'playing';
+      Jumby.sound.bgm.start('arcade');
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (state === 'playing') {
+          timeLeft--;
+          if (timeLeft <= 0) {
+            endGame();
+          }
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      state = 'gameover';
+      clearInterval(timerInterval);
+      Jumby.sound.hit();
+      Jumby.fx.shake(18);
+      Jumby.gameOver(score);
+    }
+
+    // Attempt swapping two adjacent cells
+    function swapCells(r1, c1, r2, c2) {
+      if (isProcessing || state !== 'playing') return;
+      isProcessing = true;
+
+      // Perform swap
+      const temp = board[r1][c1];
+      board[r1][c1] = board[r2][c2];
+      board[r2][c2] = temp;
+
+      const matches = findMatches();
+      if (matches.length > 0) {
+        combo = 1;
+        Jumby.sound.score();
+        processMatches(matches);
+      } else {
+        // Revert swap with reject sound
+        Jumby.sound.playTone(160, 0.1, 'sawtooth', 0.2);
+        setTimeout(() => {
+          const revert = board[r1][c1];
+          board[r1][c1] = board[r2][c2];
+          board[r2][c2] = revert;
+          isProcessing = false;
+        }, 180);
+      }
+    }
+
+    function processMatches(matches) {
+      const matchPoints = matches.length * 40 * combo;
+      score += matchPoints;
+      Jumby.setScore(score);
+
+      // Bursts & Particles
+      matches.forEach((m) => {
+        const cx = BOARD_X + m.c * CELL_SIZE + CELL_SIZE / 2;
+        const cy = BOARD_Y + m.r * CELL_SIZE + CELL_SIZE / 2;
+        Jumby.fx.particles(cx, cy, 14, COLORS.cyan);
+        board[m.r][m.c] = null;
+      });
+
+      Jumby.sound.coin();
+      Jumby.fx.shake(6 + Math.min(combo * 2, 10));
+
+      if (combo > 1) {
+        Jumby.fx.addFloatingText(`${combo}x COMBO!`, V_WIDTH / 2, BOARD_Y - 20, COLORS.lime);
+      } else {
+        Jumby.fx.addFloatingText(`+${matchPoints}`, V_WIDTH / 2, BOARD_Y - 20, COLORS.yellow);
+      }
+
+      Jumby.awardCoins(1, { item: 'Cyber Gem', icon: '💎' });
+
+      // Apply gravity drop & fill after delay
+      setTimeout(() => {
+        dropGems();
+      }, 220);
+    }
+
+    function dropGems() {
+      // Shift gems down
+      for (let c = 0; c < COLS; c++) {
+        let emptyR = ROWS - 1;
+        for (let r = ROWS - 1; r >= 0; r--) {
+          if (board[r][c] !== null) {
+            if (r !== emptyR) {
+              board[emptyR][c] = board[r][c];
+              board[r][c] = null;
+            }
+            emptyR--;
+          }
+        }
+        // Spawn fresh gems at top
+        for (let r = emptyR; r >= 0; r--) {
+          board[r][c] = randomGem();
         }
       }
-    }, 1000);
-  }
 
-  function endGame() {
-    state = 'gameover';
-    clearInterval(timerInterval);
-    Jumby.sound.bgm.stop();
-    Jumby.sound.hit();
-    Jumby.fx.shake(16);
-    Jumby.gameOver(score);
-  }
-
-  // Input Handling for Tap/Drag Swap
-  let dragStartPos = null;
-  Jumby.input.onDrag({
-    onStart: (pos) => {
-      if (state === 'waiting') {
-        startGame();
-        return;
-      }
-      if (state === 'gameover') {
-        startGame();
-        return;
-      }
-      if (state !== 'playing') return;
-
-      const gPos = grid.screenToGrid(pos.x, pos.y, CELL_SIZE, ORIGIN_X, ORIGIN_Y);
-      if (gPos.valid) {
-        selectedCell = { r: gPos.r, c: gPos.c };
-        dragStartPos = { x: pos.x, y: pos.y };
-      }
-    },
-    onDrag: (pos, pullVec, dist) => {
-      if (state !== 'playing' || !selectedCell) return;
-      if (dist > CELL_SIZE * 0.6) {
-        // Determine swipe direction
-        let dr = 0, dc = 0;
-        if (Math.abs(pullVec.x) > Math.abs(pullVec.y)) {
-          dc = pullVec.x > 0 ? 1 : -1;
+      // Check cascade combo matches
+      setTimeout(() => {
+        const cascadeMatches = findMatches();
+        if (cascadeMatches.length > 0) {
+          combo++;
+          processMatches(cascadeMatches);
         } else {
-          dr = pullVec.y > 0 ? 1 : -1;
+          isProcessing = false;
         }
+      }, 200);
+    }
 
-        const targetR = selectedCell.r + dr;
-        const targetC = selectedCell.c + dc;
+    // Touch & Pointer Coordinates
+    function toVirtual(clientX, clientY) {
+      return {
+        x: (clientX - offsetX) / scale,
+        y: (clientY - offsetY) / scale,
+      };
+    }
+
+    function gridFromVirtual(vx, vy) {
+      if (vx < BOARD_X || vx > BOARD_X + BOARD_WIDTH || vy < BOARD_Y || vy > BOARD_Y + BOARD_HEIGHT) {
+        return null;
+      }
+      const c = Math.floor((vx - BOARD_X) / CELL_SIZE);
+      const r = Math.floor((vy - BOARD_Y) / CELL_SIZE);
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+        return { r, c };
+      }
+      return null;
+    }
+
+    let dragStart = null;
+
+    function onPointerDown(e) {
+      const p = toVirtual(e.clientX, e.clientY);
+
+      if (state === 'waiting' || state === 'gameover') {
+        startGame();
+        return;
+      }
+
+      if (state !== 'playing' || isProcessing) return;
+
+      const cell = gridFromVirtual(p.x, p.y);
+      if (!cell) return;
+
+      dragStart = { ...cell, startX: p.x, startY: p.y };
+
+      if (!selectedCell) {
+        selectedCell = cell;
+        Jumby.sound.playTone(480, 0.05, 'sine', 0.15);
+      } else {
+        const dr = Math.abs(selectedCell.r - cell.r);
+        const dc = Math.abs(selectedCell.c - cell.c);
+        if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
+          // Adjacent click swap!
+          swapCells(selectedCell.r, selectedCell.c, cell.r, cell.c);
+          selectedCell = null;
+        } else {
+          // Pick new selection
+          selectedCell = cell;
+          Jumby.sound.playTone(480, 0.05, 'sine', 0.15);
+        }
+      }
+    }
+
+    function onPointerMove(e) {
+      if (!dragStart || !selectedCell || isProcessing || state !== 'playing') return;
+      const p = toVirtual(e.clientX, e.clientY);
+      const dx = p.x - dragStart.startX;
+      const dy = p.y - dragStart.startY;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > CELL_SIZE * 0.45) {
+        // Trigger swipe in dominant direction
+        let targetR = dragStart.r;
+        let targetC = dragStart.c;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+          targetC += dx > 0 ? 1 : -1;
+        } else {
+          targetR += dy > 0 ? 1 : -1;
+        }
 
         if (targetR >= 0 && targetR < ROWS && targetC >= 0 && targetC < COLS) {
-          attemptSwap(selectedCell.r, selectedCell.c, targetR, targetC);
+          swapCells(dragStart.r, dragStart.c, targetR, targetC);
           selectedCell = null;
+          dragStart = null;
         }
       }
-    },
-    onRelease: () => {
-      // Tap selection fallback if not dragged far enough
-      if (state === 'playing' && selectedCell) {
-        // Keep selection or tap second gem
-      }
-    }
-  });
-
-  // Tap support for quick adjacent clicks
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (state === 'waiting' || state === 'gameover') {
-      startGame();
-      return;
     }
 
-    if (state !== 'playing') return;
-
-    const gPos = grid.screenToGrid(x, y, CELL_SIZE, ORIGIN_X, ORIGIN_Y);
-    if (!gPos.valid) return;
-
-    if (!selectedCell) {
-      selectedCell = { r: gPos.r, c: gPos.c };
-      Jumby.sound.playTone(400, 0.05, 'sine', 0.1);
-    } else {
-      // Check if adjacent
-      const dr = Math.abs(selectedCell.r - gPos.r);
-      const dc = Math.abs(selectedCell.c - gPos.c);
-      if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
-        attemptSwap(selectedCell.r, selectedCell.c, gPos.r, gPos.c);
-      }
-      selectedCell = null;
-    }
-  });
-
-  function attemptSwap(r1, c1, r2, c2) {
-    state = 'swapping';
-    grid.swap(r1, c1, r2, c2);
-
-    // Check matches
-    const matches = grid.findMatches(3);
-    if (matches.length > 0) {
-      processMatches();
-    } else {
-      // Revert swap
-      grid.swap(r1, c1, r2, c2);
-      state = 'playing';
-      Jumby.sound.hit();
-    }
-  }
-
-  function processMatches() {
-    state = 'clearing';
-    const matches = grid.findMatches(3);
-
-    if (matches.length === 0) {
-      state = 'playing';
-      return;
+    function onPointerUp() {
+      dragStart = null;
     }
 
-    // Reward coins & score
-    let pointsEarned = matches.length * 50;
-    score += pointsEarned;
-    Jumby.setScore(score);
-    Jumby.sound.score();
-    Jumby.sound.powerup();
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
 
-    matches.forEach(m => {
-      const screenPos = grid.gridToScreen(m.r, m.c, CELL_SIZE, ORIGIN_X, ORIGIN_Y);
-      Jumby.fx.particles(screenPos.x + CELL_SIZE/2, screenPos.y + CELL_SIZE/2, 12, COLORS.accent);
-      if (m.val === '⭐' || m.val === '💎') {
-        Jumby.awardCoins(1, { item: "Cyber Gem", icon: m.val });
-      }
-      grid.set(m.r, m.c, null);
-    });
+    // Render Loop
+    function render() {
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    Jumby.fx.addFloatingText(`+${pointsEarned}`, ORIGIN_X + (COLS*CELL_SIZE)/2, ORIGIN_Y + (ROWS*CELL_SIZE)/2, COLORS.accent);
-    Jumby.fx.shake(8);
+      ctx.translate(offsetX, offsetY);
+      ctx.scale(scale, scale);
 
-    setTimeout(() => {
-      applyGravityAndRefill();
-    }, 250);
-  }
+      // Play area background
+      ctx.fillStyle = '#080614';
+      ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
 
-  function applyGravityAndRefill() {
-    state = 'falling';
-    let moved = false;
-
-    // Drop existing gems down
-    for (let c = 0; c < COLS; c++) {
-      let emptyRow = ROWS - 1;
-      for (let r = ROWS - 1; r >= 0; r--) {
-        if (grid.get(r, c) !== null) {
-          if (r !== emptyRow) {
-            grid.set(emptyRow, c, grid.get(r, c));
-            grid.set(r, c, null);
-            moved = true;
-          }
-          emptyRow--;
-        }
-      }
-      // Fill remaining top slots
-      for (let r = emptyRow; r >= 0; r--) {
-        grid.set(r, c, Jumby.math.randomChoice(GEM_TYPES));
-        moved = true;
-      }
-    }
-
-    setTimeout(() => {
-      const newMatches = grid.findMatches(3);
-      if (newMatches.length > 0) {
-        processMatches();
-      } else {
-        state = 'playing';
-      }
-    }, 300);
-  }
-
-  // Main Game Loop
-  function loop() {
-    ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Render Cyber Grid Background Frame
-    ctx.strokeStyle = COLORS.border;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(ORIGIN_X - 6, ORIGIN_Y - 6, (COLS * CELL_SIZE) + 12, (ROWS * CELL_SIZE) + 12);
-
-    ctx.fillStyle = COLORS.gridBg;
-    ctx.fillRect(ORIGIN_X, ORIGIN_Y, COLS * CELL_SIZE, ROWS * CELL_SIZE);
-
-    // Draw Grid Cells & Gems
-    if (grid) {
-      grid.forEach((val, r, c) => {
-        const screenPos = grid.gridToScreen(r, c, CELL_SIZE, ORIGIN_X, ORIGIN_Y);
-
-        // Cell background glow if selected
-        if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
-          ctx.fillStyle = 'rgba(0, 255, 255, 0.25);';
-          ctx.fillRect(screenPos.x, screenPos.y, CELL_SIZE, CELL_SIZE);
-          ctx.strokeStyle = COLORS.accent;
-          ctx.strokeRect(screenPos.x, screenPos.y, CELL_SIZE, CELL_SIZE);
-        }
-
-        if (val) {
-          Jumby.drawEmoji(ctx, val, screenPos.x + CELL_SIZE / 2, screenPos.y + CELL_SIZE / 2, 26, {
-            shadowColor: COLORS.primary,
-            shadowBlur: 8
-          });
-        }
-      });
-    }
-
-    // HUD Header
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 24px Orbitron';
-    ctx.textAlign = 'center';
-    ctx.fillText('NEON GRID SPARK', canvas.width / 2, 50);
-
-    // Stats Bar
-    ctx.font = '700 14px Orbitron';
-    ctx.fillStyle = COLORS.accent;
-    ctx.textAlign = 'left';
-    ctx.fillText(`SCORE: ${score}`, 30, 95);
-
-    ctx.fillStyle = COLORS.primary;
-    ctx.textAlign = 'right';
-    ctx.fillText(`TIME: ${timeLeft}s`, canvas.width - 30, 95);
-
-    // Level banner & Juice FX
-    Jumby.fx.updateAndRender(ctx, canvas.width, canvas.height);
-
-    // States Overlay
-    if (state === 'waiting') {
-      ctx.fillStyle = 'rgba(10, 8, 24, 0.85)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = COLORS.accent;
-      ctx.font = '900 28px Orbitron';
+      // Header Title
       ctx.textAlign = 'center';
-      ctx.fillText('MATCH 3 GEMS', canvas.width / 2, canvas.height / 2 - 40);
+      ctx.fillStyle = COLORS.cyan;
+      ctx.font = '900 24px "Orbitron", sans-serif';
+      ctx.fillText('NEON GRID SPARK', V_WIDTH / 2, 55);
 
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '700 14px Orbitron';
-      ctx.fillText('TAP OR DRAG TO SWAP CYBER GEMS', canvas.width / 2, canvas.height / 2 + 10);
+      // HUD: Time & Score Bar
+      ctx.fillStyle = '#140f2b';
+      ctx.strokeStyle = COLORS.boardBorder;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(24, 75, V_WIDTH - 48, 55, 16);
+      ctx.fill();
+      ctx.stroke();
 
-      ctx.fillStyle = COLORS.primary;
-      ctx.font = '900 18px Orbitron';
-      const pulse = Math.floor(Date.now() / 300) % 2 === 0;
-      if (pulse) {
-        ctx.fillText('⚡ TAP TO START ⚡', canvas.width / 2, canvas.height / 2 + 70);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = COLORS.magenta;
+      ctx.font = '900 13px "Orbitron", sans-serif';
+      ctx.fillText('TIME LEFT', 40, 97);
+      ctx.fillStyle = timeLeft <= 10 ? COLORS.magenta : COLORS.white;
+      ctx.font = '900 20px "Orbitron", sans-serif';
+      ctx.fillText(`${timeLeft}s`, 40, 120);
+
+      ctx.textAlign = 'right';
+      ctx.fillStyle = COLORS.lime;
+      ctx.font = '900 13px "Orbitron", sans-serif';
+      ctx.fillText('SCORE', V_WIDTH - 40, 97);
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '900 20px "Orbitron", sans-serif';
+      ctx.fillText(`${score}`, V_WIDTH - 40, 120);
+
+      // Instructions Hint
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.font = '700 11px "Orbitron", sans-serif';
+      ctx.fillText('TAP OR SWIPE ADJACENT GEMS TO MATCH 3', V_WIDTH / 2, 215);
+
+      // Draw Grid Frame
+      ctx.save();
+      ctx.fillStyle = COLORS.boardBg;
+      ctx.strokeStyle = COLORS.boardBorder;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(BOARD_X - 6, BOARD_Y - 6, BOARD_WIDTH + 12, BOARD_HEIGHT + 12, 14);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw Grid Cells & Gems
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cx = BOARD_X + c * CELL_SIZE;
+          const cy = BOARD_Y + r * CELL_SIZE;
+
+          // Cell slot background
+          ctx.fillStyle = (r + c) % 2 === 0 ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.15)';
+          ctx.fillRect(cx + 2, cy + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+
+          // Highlight selected cell
+          if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
+            ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+            ctx.fillRect(cx + 2, cy + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+            ctx.strokeStyle = COLORS.cyan;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx + 2, cy + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+          }
+
+          // Draw Gem Emoji
+          const val = board[r]?.[c];
+          if (val) {
+            Jumby.drawEmoji(ctx, val, cx + CELL_SIZE / 2, cy + CELL_SIZE / 2, 26);
+          }
+        }
       }
+
+      // FX Layer
+      Jumby.fx.updateAndRender(ctx, V_WIDTH, V_HEIGHT);
+
+      // Overlays
+      if (state === 'waiting') {
+        ctx.fillStyle = 'rgba(8, 6, 20, 0.88)';
+        ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = COLORS.cyan;
+        ctx.font = '900 28px "Orbitron", sans-serif';
+        ctx.fillText('NEON GRID SPARK', V_WIDTH / 2, 360);
+
+        ctx.fillStyle = COLORS.magenta;
+        ctx.font = '700 13px "Orbitron", sans-serif';
+        ctx.fillText('60-SECOND MATCH-3 BLITZ', V_WIDTH / 2, 400);
+
+        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
+        ctx.globalAlpha = 0.5 + pulse * 0.5;
+        ctx.fillStyle = COLORS.lime;
+        ctx.font = '900 18px "Orbitron", sans-serif';
+        ctx.fillText('TAP ANYWHERE TO START', V_WIDTH / 2, 490);
+        ctx.globalAlpha = 1.0;
+      } else if (state === 'gameover') {
+        ctx.fillStyle = 'rgba(8, 6, 20, 0.9)';
+        ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = COLORS.magenta;
+        ctx.font = '900 32px "Orbitron", sans-serif';
+        ctx.fillText('TIME UP!', V_WIDTH / 2, 350);
+
+        ctx.fillStyle = COLORS.white;
+        ctx.font = '700 16px "Orbitron", sans-serif';
+        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 405);
+
+        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
+        ctx.globalAlpha = 0.5 + pulse * 0.5;
+        ctx.fillStyle = COLORS.lime;
+        ctx.font = '900 18px "Orbitron", sans-serif';
+        ctx.fillText('TAP TO PLAY AGAIN', V_WIDTH / 2, 490);
+        ctx.globalAlpha = 1.0;
+      }
+
+      ctx.restore();
+      requestAnimationFrame(render);
     }
 
-    Jumby.input.endFrame();
-    requestAnimationFrame(loop);
-  }
-
-  Jumby.ready();
-  requestAnimationFrame(loop);
-});
-
-    window.addEventListener('pointerdown', function () {
-      if (typeof state !== 'undefined' && (state === 'gameover' || state === 'waiting')) {
-        state = 'playing';
-        if (typeof startGame === 'function') startGame();
-        else if (typeof initGame === 'function') initGame();
-        else if (typeof restartGame === 'function') restartGame();
-        else if (typeof reset === 'function') reset();
-      }
-    })();
+    initBoard();
+    Jumby.ready();
+    requestAnimationFrame(render);
   </script>
-
 </body>
 </html>
