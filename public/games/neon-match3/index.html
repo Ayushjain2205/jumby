@@ -8,8 +8,16 @@
   <script src="/jumby-runtime.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-user-select: none; user-select: none; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #080614; font-family: 'Orbitron', -apple-system, sans-serif; }
-    canvas { display: block; width: 100%; height: 100%; background: radial-gradient(circle at 50% 50%, #150d30 0%, #080614 100%); }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #090717;
+      font-family: 'Orbitron', -apple-system, sans-serif;
+      display: flex; justify-content: center; align-items: center;
+    }
+    canvas {
+      display: block; width: 100%; height: 100%;
+      background: radial-gradient(circle at 50% 30%, #1c1038 0%, #090717 100%);
+    }
   </style>
 </head>
 <body>
@@ -18,7 +26,7 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // Virtual portrait resolution (390 x 844)
+    // Virtual Portrait Resolution
     const V_WIDTH = 390;
     const V_HEIGHT = 844;
     let scale = 1;
@@ -41,39 +49,52 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // Theme Colors
-    const COLORS = {
-      primary: '#9945FF',
-      cyan: '#00F0FF',
-      magenta: '#FF007F',
-      lime: '#D8FF43',
-      yellow: '#FACC15',
-      boardBg: '#100b24',
-      boardBorder: '#2e1e5e',
-      white: '#FFFFFF',
-    };
+    // 5 Distinct Vector Gem Types
+    const GEM_TYPES = [
+      { id: 0, name: 'Cyan Diamond', color: '#00F0FF', shadow: '#00F0FF', shape: 'diamond' },
+      { id: 1, name: 'Ruby Core', color: '#FF1744', shadow: '#FF1744', shape: 'heart' },
+      { id: 2, name: 'Gold Star', color: '#FFD700', shadow: '#FFD700', shape: 'star' },
+      { id: 3, name: 'Emerald Gem', color: '#00E676', shadow: '#00E676', shape: 'hex' },
+      { id: 4, name: 'Amethyst', color: '#D500F9', shadow: '#D500F9', shape: 'octagon' },
+    ];
 
-    const GEM_TYPES = ['💎', '❤️', '🔥', '⭐', '⚡'];
     const ROWS = 8;
     const COLS = 8;
-    const CELL_SIZE = 42;
-    const BOARD_WIDTH = COLS * CELL_SIZE; // 336px
-    const BOARD_HEIGHT = ROWS * CELL_SIZE; // 336px
-    const BOARD_X = (V_WIDTH - BOARD_WIDTH) / 2; // 27px
-    const BOARD_Y = 250;
+    const CELL_SIZE = 43;
+    const BOARD_WIDTH = COLS * CELL_SIZE; // 344px
+    const BOARD_HEIGHT = ROWS * CELL_SIZE; // 344px
+    const BOARD_X = (V_WIDTH - BOARD_WIDTH) / 2; // 23px
+    const BOARD_Y = 220; // Room for top HUD
 
-    // Board Matrix
+    // Board matrix containing gem objects
+    // Each gem: { type: number, x: number, y: number, targetX: number, targetY: number, scale: number, alpha: number }
     let board = [];
     let selectedCell = null;
     let isProcessing = false;
     let score = 0;
     let timeLeft = 60;
+    let maxTime = 60;
     let timerInterval = null;
-    let state = 'waiting'; // 'waiting', 'playing', 'gameover'
+    let state = 'playing'; // Starts directly in PLAYING state — ZERO dim scrim!
     let combo = 0;
+    let animQueue = []; // active sliding/falling animations
 
-    function randomGem() {
-      return GEM_TYPES[Math.floor(Math.random() * GEM_TYPES.length)];
+    function randomType() {
+      return Math.floor(Math.random() * GEM_TYPES.length);
+    }
+
+    function createGem(type, r, c, startFromTop = false) {
+      const targetX = BOARD_X + c * CELL_SIZE + CELL_SIZE / 2;
+      const targetY = BOARD_Y + r * CELL_SIZE + CELL_SIZE / 2;
+      return {
+        type,
+        x: targetX,
+        y: startFromTop ? BOARD_Y - (ROWS - r) * CELL_SIZE : targetY,
+        targetX,
+        targetY,
+        scale: 1,
+        alpha: 1,
+      };
     }
 
     function initBoard() {
@@ -81,15 +102,15 @@
       for (let r = 0; r < ROWS; r++) {
         board[r] = [];
         for (let c = 0; c < COLS; c++) {
-          board[r][c] = randomGem();
+          board[r][c] = createGem(randomType(), r, c, false);
         }
       }
 
-      // Clear any initial 3-in-a-row matches
+      // Ensure no initial 3-in-a-row
       while (findMatches().length > 0) {
         for (let r = 0; r < ROWS; r++) {
           for (let c = 0; c < COLS; c++) {
-            board[r][c] = randomGem();
+            board[r][c].type = randomType();
           }
         }
       }
@@ -100,53 +121,53 @@
 
       // Check horizontal matches
       for (let r = 0; r < ROWS; r++) {
-        let matchLength = 1;
+        let matchLen = 1;
         for (let c = 0; c < COLS; c++) {
-          const current = board[r][c];
-          const next = c < COLS - 1 ? board[r][c + 1] : null;
+          const current = board[r][c]?.type;
+          const next = c < COLS - 1 ? board[r][c + 1]?.type : null;
 
-          if (current && current === next) {
-            matchLength++;
+          if (current !== undefined && current !== null && current === next) {
+            matchLen++;
           } else {
-            if (matchLength >= 3) {
-              for (let i = 0; i < matchLength; i++) {
+            if (matchLen >= 3) {
+              for (let i = 0; i < matchLen; i++) {
                 matched.add(`${r},${c - i}`);
               }
             }
-            matchLength = 1;
+            matchLen = 1;
           }
         }
       }
 
       // Check vertical matches
       for (let c = 0; c < COLS; c++) {
-        let matchLength = 1;
+        let matchLen = 1;
         for (let r = 0; r < ROWS; r++) {
-          const current = board[r][c];
-          const next = r < ROWS - 1 ? board[r + 1][c] : null;
+          const current = board[r][c]?.type;
+          const next = r < ROWS - 1 ? board[r + 1][c]?.type : null;
 
-          if (current && current === next) {
-            matchLength++;
+          if (current !== undefined && current !== null && current === next) {
+            matchLen++;
           } else {
-            if (matchLength >= 3) {
-              for (let i = 0; i < matchLength; i++) {
+            if (matchLen >= 3) {
+              for (let i = 0; i < matchLen; i++) {
                 matched.add(`${r - i},${c}`);
               }
             }
-            matchLength = 1;
+            matchLen = 1;
           }
         }
       }
 
-      const result = [];
+      const res = [];
       matched.forEach((key) => {
         const [r, c] = key.split(',').map(Number);
-        result.push({ r, c, val: board[r][c] });
+        res.push({ r, c, gem: board[r][c] });
       });
-      return result;
+      return res;
     }
 
-    function startGame() {
+    function restartGame() {
       score = 0;
       timeLeft = 60;
       combo = 0;
@@ -172,99 +193,130 @@
       state = 'gameover';
       clearInterval(timerInterval);
       Jumby.sound.hit();
-      Jumby.fx.shake(18);
+      Jumby.fx.shake(16);
       Jumby.gameOver(score);
     }
 
-    // Attempt swapping two adjacent cells
-    function swapCells(r1, c1, r2, c2) {
+    // Gem Swapping
+    function swapGems(r1, c1, r2, c2) {
       if (isProcessing || state !== 'playing') return;
       isProcessing = true;
 
-      // Perform swap
-      const temp = board[r1][c1];
-      board[r1][c1] = board[r2][c2];
-      board[r2][c2] = temp;
+      const gem1 = board[r1][c1];
+      const gem2 = board[r2][c2];
 
-      const matches = findMatches();
-      if (matches.length > 0) {
-        combo = 1;
-        Jumby.sound.score();
-        processMatches(matches);
-      } else {
-        // Revert swap with reject sound
-        Jumby.sound.playTone(160, 0.1, 'sawtooth', 0.2);
-        setTimeout(() => {
-          const revert = board[r1][c1];
-          board[r1][c1] = board[r2][c2];
-          board[r2][c2] = revert;
-          isProcessing = false;
-        }, 180);
-      }
+      // Swap in matrix
+      board[r1][c1] = gem2;
+      board[r2][c2] = gem1;
+
+      // Update target positions for smooth slide
+      gem1.targetX = BOARD_X + c2 * CELL_SIZE + CELL_SIZE / 2;
+      gem1.targetY = BOARD_Y + r2 * CELL_SIZE + CELL_SIZE / 2;
+
+      gem2.targetX = BOARD_X + c1 * CELL_SIZE + CELL_SIZE / 2;
+      gem2.targetY = BOARD_Y + r1 * CELL_SIZE + CELL_SIZE / 2;
+
+      Jumby.sound.playTone(420, 0.06, 'sine', 0.2);
+
+      // Check matches after slide
+      setTimeout(() => {
+        const matches = findMatches();
+        if (matches.length > 0) {
+          combo = 1;
+          processMatches(matches);
+        } else {
+          // Revert swap
+          board[r1][c1] = gem1;
+          board[r2][c2] = gem2;
+          gem1.targetX = BOARD_X + c1 * CELL_SIZE + CELL_SIZE / 2;
+          gem1.targetY = BOARD_Y + r1 * CELL_SIZE + CELL_SIZE / 2;
+          gem2.targetX = BOARD_X + c2 * CELL_SIZE + CELL_SIZE / 2;
+          gem2.targetY = BOARD_Y + r2 * CELL_SIZE + CELL_SIZE / 2;
+          Jumby.sound.playTone(180, 0.12, 'sawtooth', 0.25);
+          setTimeout(() => {
+            isProcessing = false;
+          }, 180);
+        }
+      }, 180);
     }
 
     function processMatches(matches) {
-      const matchPoints = matches.length * 40 * combo;
-      score += matchPoints;
+      const matchScore = matches.length * 60 * combo;
+      score += matchScore;
       Jumby.setScore(score);
 
-      // Bursts & Particles
+      Jumby.sound.score();
+      Jumby.fx.shake(5 + Math.min(combo * 3, 12));
+
+      // Burst particles on matched gems
       matches.forEach((m) => {
-        const cx = BOARD_X + m.c * CELL_SIZE + CELL_SIZE / 2;
-        const cy = BOARD_Y + m.r * CELL_SIZE + CELL_SIZE / 2;
-        Jumby.fx.particles(cx, cy, 14, COLORS.cyan);
+        const gem = m.gem;
+        if (gem) {
+          const cfg = GEM_TYPES[gem.type] || GEM_TYPES[0];
+          Jumby.fx.particles(gem.x, gem.y, 14, cfg.color);
+        }
         board[m.r][m.c] = null;
       });
 
-      Jumby.sound.coin();
-      Jumby.fx.shake(6 + Math.min(combo * 2, 10));
+      // Floating text
+      const mid = matches[Math.floor(matches.length / 2)];
+      const textX = BOARD_X + (mid ? mid.c : 4) * CELL_SIZE + CELL_SIZE / 2;
+      const textY = BOARD_Y + (mid ? mid.r : 4) * CELL_SIZE;
 
       if (combo > 1) {
-        Jumby.fx.addFloatingText(`${combo}x COMBO!`, V_WIDTH / 2, BOARD_Y - 20, COLORS.lime);
+        Jumby.fx.addFloatingText(`${combo}X COMBO! +${matchScore}`, textX, textY, '#D8FF43');
+        Jumby.sound.powerup();
       } else {
-        Jumby.fx.addFloatingText(`+${matchPoints}`, V_WIDTH / 2, BOARD_Y - 20, COLORS.yellow);
+        Jumby.fx.addFloatingText(`+${matchScore}`, textX, textY, '#00F0FF');
       }
 
-      Jumby.awardCoins(1, { item: 'Cyber Gem', icon: '💎' });
+      Jumby.awardCoins(1, { item: 'Neon Jewel', icon: '💎' });
 
-      // Apply gravity drop & fill after delay
+      // Gravity fall after delay
       setTimeout(() => {
-        dropGems();
-      }, 220);
+        applyGravityAndRefill();
+      }, 200);
     }
 
-    function dropGems() {
-      // Shift gems down
+    function applyGravityAndRefill() {
+      // 1. Shift downward
       for (let c = 0; c < COLS; c++) {
         let emptyR = ROWS - 1;
         for (let r = ROWS - 1; r >= 0; r--) {
           if (board[r][c] !== null) {
             if (r !== emptyR) {
               board[emptyR][c] = board[r][c];
+              board[emptyR][c].targetY = BOARD_Y + emptyR * CELL_SIZE + CELL_SIZE / 2;
               board[r][c] = null;
             }
             emptyR--;
           }
         }
-        // Spawn fresh gems at top
+
+        // 2. Spawn fresh gems from top
+        let spawnOffset = 1;
         for (let r = emptyR; r >= 0; r--) {
-          board[r][c] = randomGem();
+          const newGem = createGem(randomType(), r, c, false);
+          newGem.y = BOARD_Y - spawnOffset * CELL_SIZE;
+          newGem.targetY = BOARD_Y + r * CELL_SIZE + CELL_SIZE / 2;
+          board[r][c] = newGem;
+          spawnOffset++;
         }
       }
 
-      // Check cascade combo matches
+      // 3. Check for chain cascade matches
       setTimeout(() => {
-        const cascadeMatches = findMatches();
-        if (cascadeMatches.length > 0) {
+        const cascades = findMatches();
+        if (cascades.length > 0) {
           combo++;
-          processMatches(cascadeMatches);
+          processMatches(cascades);
         } else {
           isProcessing = false;
         }
-      }, 200);
+      }, 220);
     }
 
-    // Touch & Pointer Coordinates
+    // Coordinate Conversion
     function toVirtual(clientX, clientY) {
       return {
         x: (clientX - offsetX) / scale,
@@ -272,7 +324,7 @@
       };
     }
 
-    function gridFromVirtual(vx, vy) {
+    function cellFromVirtual(vx, vy) {
       if (vx < BOARD_X || vx > BOARD_X + BOARD_WIDTH || vy < BOARD_Y || vy > BOARD_Y + BOARD_HEIGHT) {
         return null;
       }
@@ -287,34 +339,33 @@
     let dragStart = null;
 
     function onPointerDown(e) {
-      const p = toVirtual(e.clientX, e.clientY);
-
-      if (state === 'waiting' || state === 'gameover') {
-        startGame();
+      if (state === 'gameover') {
+        restartGame();
         return;
       }
-
       if (state !== 'playing' || isProcessing) return;
 
-      const cell = gridFromVirtual(p.x, p.y);
+      const p = toVirtual(e.clientX, e.clientY);
+      const cell = cellFromVirtual(p.x, p.y);
       if (!cell) return;
 
       dragStart = { ...cell, startX: p.x, startY: p.y };
 
       if (!selectedCell) {
         selectedCell = cell;
-        Jumby.sound.playTone(480, 0.05, 'sine', 0.15);
+        Jumby.sound.playTone(520, 0.04, 'sine', 0.15);
       } else {
         const dr = Math.abs(selectedCell.r - cell.r);
         const dc = Math.abs(selectedCell.c - cell.c);
+
         if ((dr === 1 && dc === 0) || (dr === 0 && dc === 1)) {
-          // Adjacent click swap!
-          swapCells(selectedCell.r, selectedCell.c, cell.r, cell.c);
+          // Swap adjacent
+          swapGems(selectedCell.r, selectedCell.c, cell.r, cell.c);
           selectedCell = null;
         } else {
-          // Pick new selection
+          // Select clicked gem
           selectedCell = cell;
-          Jumby.sound.playTone(480, 0.05, 'sine', 0.15);
+          Jumby.sound.playTone(520, 0.04, 'sine', 0.15);
         }
       }
     }
@@ -326,19 +377,18 @@
       const dy = p.y - dragStart.startY;
       const dist = Math.hypot(dx, dy);
 
-      if (dist > CELL_SIZE * 0.45) {
-        // Trigger swipe in dominant direction
-        let targetR = dragStart.r;
-        let targetC = dragStart.c;
+      if (dist > CELL_SIZE * 0.4) {
+        let tr = dragStart.r;
+        let tc = dragStart.c;
 
         if (Math.abs(dx) > Math.abs(dy)) {
-          targetC += dx > 0 ? 1 : -1;
+          tc += dx > 0 ? 1 : -1;
         } else {
-          targetR += dy > 0 ? 1 : -1;
+          tr += dy > 0 ? 1 : -1;
         }
 
-        if (targetR >= 0 && targetR < ROWS && targetC >= 0 && targetC < COLS) {
-          swapCells(dragStart.r, dragStart.c, targetR, targetC);
+        if (tr >= 0 && tr < ROWS && tc >= 0 && tc < COLS) {
+          swapGems(dragStart.r, dragStart.c, tr, tc);
           selectedCell = null;
           dragStart = null;
         }
@@ -354,142 +404,354 @@
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
 
-    // Render Loop
+    // ==========================================
+    // VECTOR GEM RENDERING (Crisp, Lush, Glowing)
+    // ==========================================
+    function drawVectorGem(ctx, typeId, x, y, size, isSelected) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      const r = size * 0.44;
+      const pulse = isSelected ? Math.sin(Date.now() * 0.01) * 3 : 0;
+      const activeRadius = r + pulse;
+
+      switch (typeId) {
+        // 0: Cyan Prism Diamond
+        case 0: {
+          ctx.shadowColor = '#00F0FF';
+          ctx.shadowBlur = isSelected ? 22 : 12;
+
+          // Main diamond path
+          ctx.beginPath();
+          ctx.moveTo(0, -activeRadius);
+          ctx.lineTo(activeRadius * 0.9, 0);
+          ctx.lineTo(0, activeRadius);
+          ctx.lineTo(-activeRadius * 0.9, 0);
+          ctx.closePath();
+
+          const grad = ctx.createLinearGradient(0, -activeRadius, 0, activeRadius);
+          grad.addColorStop(0, '#E0FFFF');
+          grad.addColorStop(0.4, '#00F0FF');
+          grad.addColorStop(1, '#00838F');
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          // Facet specular highlights
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(0, -activeRadius);
+          ctx.lineTo(0, activeRadius);
+          ctx.moveTo(-activeRadius * 0.9, 0);
+          ctx.lineTo(activeRadius * 0.9, 0);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          break;
+        }
+
+        // 1: Crimson Ruby
+        case 1: {
+          ctx.shadowColor = '#FF1744';
+          ctx.shadowBlur = isSelected ? 22 : 12;
+
+          ctx.beginPath();
+          ctx.moveTo(0, -activeRadius * 0.7);
+          ctx.lineTo(activeRadius * 0.8, -activeRadius * 0.3);
+          ctx.lineTo(activeRadius * 0.6, activeRadius * 0.8);
+          ctx.lineTo(0, activeRadius);
+          ctx.lineTo(-activeRadius * 0.6, activeRadius * 0.8);
+          ctx.lineTo(-activeRadius * 0.8, -activeRadius * 0.3);
+          ctx.closePath();
+
+          const grad = ctx.createRadialGradient(0, -activeRadius * 0.3, 2, 0, 0, activeRadius);
+          grad.addColorStop(0, '#FF8A80');
+          grad.addColorStop(0.5, '#FF1744');
+          grad.addColorStop(1, '#B71C1C');
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Inner facet
+          ctx.beginPath();
+          ctx.arc(-activeRadius * 0.25, -activeRadius * 0.25, activeRadius * 0.2, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fill();
+          break;
+        }
+
+        // 2: Golden Star
+        case 2: {
+          ctx.shadowColor = '#FFD700';
+          ctx.shadowBlur = isSelected ? 22 : 12;
+
+          ctx.beginPath();
+          for (let i = 0; i < 5; i++) {
+            const outerAngle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+            const innerAngle = outerAngle + (2 * Math.PI) / 10;
+            const ox = Math.cos(outerAngle) * activeRadius;
+            const oy = Math.sin(outerAngle) * activeRadius;
+            const ix = Math.cos(innerAngle) * (activeRadius * 0.45);
+            const iy = Math.sin(innerAngle) * (activeRadius * 0.45);
+
+            if (i === 0) ctx.moveTo(ox, oy);
+            else ctx.lineTo(ox, oy);
+            ctx.lineTo(ix, iy);
+          }
+          ctx.closePath();
+
+          const grad = ctx.createLinearGradient(0, -activeRadius, 0, activeRadius);
+          grad.addColorStop(0, '#FFFDE7');
+          grad.addColorStop(0.4, '#FFD700');
+          grad.addColorStop(1, '#FF8F00');
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          break;
+        }
+
+        // 3: Emerald Hexagon
+        case 3: {
+          ctx.shadowColor = '#00E676';
+          ctx.shadowBlur = isSelected ? 22 : 12;
+
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const angle = (i * Math.PI) / 3;
+            const hx = Math.cos(angle) * activeRadius;
+            const hy = Math.sin(angle) * activeRadius;
+            if (i === 0) ctx.moveTo(hx, hy);
+            else ctx.lineTo(hx, hy);
+          }
+          ctx.closePath();
+
+          const grad = ctx.createRadialGradient(0, -activeRadius * 0.2, 2, 0, 0, activeRadius);
+          grad.addColorStop(0, '#B9F6CA');
+          grad.addColorStop(0.5, '#00E676');
+          grad.addColorStop(1, '#1B5E20');
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          break;
+        }
+
+        // 4: Amethyst Octagon
+        case 4:
+        default: {
+          ctx.shadowColor = '#D500F9';
+          ctx.shadowBlur = isSelected ? 22 : 12;
+
+          ctx.beginPath();
+          for (let i = 0; i < 8; i++) {
+            const angle = (i * Math.PI) / 4 + Math.PI / 8;
+            const ox = Math.cos(angle) * activeRadius;
+            const oy = Math.sin(angle) * activeRadius;
+            if (i === 0) ctx.moveTo(ox, oy);
+            else ctx.lineTo(ox, oy);
+          }
+          ctx.closePath();
+
+          const grad = ctx.createRadialGradient(0, -activeRadius * 0.3, 2, 0, 0, activeRadius);
+          grad.addColorStop(0, '#F8BBD0');
+          grad.addColorStop(0.5, '#D500F9');
+          grad.addColorStop(1, '#4A148C');
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          break;
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // ==========================================
+    // MAIN UPDATE & RENDER LOOP
+    // ==========================================
+    function updatePhysics() {
+      // Smooth interpolation for sliding/falling gems
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const gem = board[r]?.[c];
+          if (gem) {
+            gem.x += (gem.targetX - gem.x) * 0.32;
+            gem.y += (gem.targetY - gem.y) * 0.32;
+          }
+        }
+      }
+    }
+
     function render() {
+      updatePhysics();
+
       ctx.save();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       ctx.translate(offsetX, offsetY);
       ctx.scale(scale, scale);
 
-      // Play area background
-      ctx.fillStyle = '#080614';
+      // Play Area Background
+      ctx.fillStyle = '#090717';
       ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
 
-      // Header Title
+      // 1. TOP HEADER & HUD
       ctx.textAlign = 'center';
-      ctx.fillStyle = COLORS.cyan;
-      ctx.font = '900 24px "Orbitron", sans-serif';
-      ctx.fillText('NEON GRID SPARK', V_WIDTH / 2, 55);
+      ctx.fillStyle = '#00F0FF';
+      ctx.font = '900 22px "Orbitron", sans-serif';
+      ctx.shadowColor = '#00F0FF';
+      ctx.shadowBlur = 10;
+      ctx.fillText('NEON GRID SPARK', V_WIDTH / 2, 45);
+      ctx.shadowBlur = 0;
 
-      // HUD: Time & Score Bar
-      ctx.fillStyle = '#140f2b';
-      ctx.strokeStyle = COLORS.boardBorder;
-      ctx.lineWidth = 1.5;
+      // Stats Card
+      ctx.fillStyle = '#140E29';
+      ctx.strokeStyle = '#32235C';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(24, 75, V_WIDTH - 48, 55, 16);
+      ctx.roundRect(20, 65, V_WIDTH - 40, 75, 18);
       ctx.fill();
       ctx.stroke();
 
+      // Time & Score Text
       ctx.textAlign = 'left';
-      ctx.fillStyle = COLORS.magenta;
-      ctx.font = '900 13px "Orbitron", sans-serif';
-      ctx.fillText('TIME LEFT', 40, 97);
-      ctx.fillStyle = timeLeft <= 10 ? COLORS.magenta : COLORS.white;
-      ctx.font = '900 20px "Orbitron", sans-serif';
-      ctx.fillText(`${timeLeft}s`, 40, 120);
+      ctx.fillStyle = '#A78BFA';
+      ctx.font = '700 11px "Orbitron", sans-serif';
+      ctx.fillText('TIME REMAINING', 38, 88);
+
+      const isUrgent = timeLeft <= 10;
+      ctx.fillStyle = isUrgent ? '#FF1744' : '#FFFFFF';
+      ctx.font = '900 22px "Orbitron", sans-serif';
+      ctx.fillText(`${timeLeft}s`, 38, 114);
 
       ctx.textAlign = 'right';
-      ctx.fillStyle = COLORS.lime;
-      ctx.font = '900 13px "Orbitron", sans-serif';
-      ctx.fillText('SCORE', V_WIDTH - 40, 97);
-      ctx.fillStyle = COLORS.white;
-      ctx.font = '900 20px "Orbitron", sans-serif';
-      ctx.fillText(`${score}`, V_WIDTH - 40, 120);
-
-      // Instructions Hint
-      ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fillStyle = '#A78BFA';
       ctx.font = '700 11px "Orbitron", sans-serif';
-      ctx.fillText('TAP OR SWIPE ADJACENT GEMS TO MATCH 3', V_WIDTH / 2, 215);
+      ctx.fillText('TOTAL SCORE', V_WIDTH - 38, 88);
 
-      // Draw Grid Frame
+      ctx.fillStyle = '#D8FF43';
+      ctx.font = '900 22px "Orbitron", sans-serif';
+      ctx.fillText(`${score}`, V_WIDTH - 38, 114);
+
+      // Time Progress Bar
+      const timePercent = Math.max(0, timeLeft / maxTime);
+      const barX = 38;
+      const barY = 124;
+      const barW = V_WIDTH - 76;
+      const barH = 5;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.fillRect(barX, barY, barW, barH);
+
+      ctx.fillStyle = isUrgent ? '#FF1744' : '#00F0FF';
+      ctx.shadowColor = isUrgent ? '#FF1744' : '#00F0FF';
+      ctx.shadowBlur = 6;
+      ctx.fillRect(barX, barY, barW * timePercent, barH);
+      ctx.shadowBlur = 0;
+
+      // Instructions Banner
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.font = '700 12px "Orbitron", sans-serif';
+      ctx.fillText('TAP OR SWIPE ADJACENT GEMS TO MATCH 3', V_WIDTH / 2, 185);
+
+      // 2. BRIGHT ARCADE BOARD
       ctx.save();
-      ctx.fillStyle = COLORS.boardBg;
-      ctx.strokeStyle = COLORS.boardBorder;
+      ctx.fillStyle = '#110B24';
+      ctx.strokeStyle = '#432C7A';
       ctx.lineWidth = 3;
+      ctx.shadowColor = '#9945FF';
+      ctx.shadowBlur = 20;
       ctx.beginPath();
-      ctx.roundRect(BOARD_X - 6, BOARD_Y - 6, BOARD_WIDTH + 12, BOARD_HEIGHT + 12, 14);
+      ctx.roundRect(BOARD_X - 6, BOARD_Y - 6, BOARD_WIDTH + 12, BOARD_HEIGHT + 12, 16);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
 
-      // Draw Grid Cells & Gems
+      // Checkered grid cells
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           const cx = BOARD_X + c * CELL_SIZE;
           const cy = BOARD_Y + r * CELL_SIZE;
 
-          // Cell slot background
-          ctx.fillStyle = (r + c) % 2 === 0 ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.15)';
-          ctx.fillRect(cx + 2, cy + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+          ctx.fillStyle = (r + c) % 2 === 0 ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.25)';
+          ctx.fillRect(cx + 1, cy + 1, CELL_SIZE - 2, CELL_SIZE - 2);
 
-          // Highlight selected cell
+          // Selection Glow Bracket
           if (selectedCell && selectedCell.r === r && selectedCell.c === c) {
-            ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 240, 255, 0.28)';
             ctx.fillRect(cx + 2, cy + 2, CELL_SIZE - 4, CELL_SIZE - 4);
-            ctx.strokeStyle = COLORS.cyan;
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#00F0FF';
+            ctx.lineWidth = 2.5;
+            ctx.shadowColor = '#00F0FF';
+            ctx.shadowBlur = 12;
             ctx.strokeRect(cx + 2, cy + 2, CELL_SIZE - 4, CELL_SIZE - 4);
-          }
-
-          // Draw Gem Emoji
-          const val = board[r]?.[c];
-          if (val) {
-            Jumby.drawEmoji(ctx, val, cx + CELL_SIZE / 2, cy + CELL_SIZE / 2, 26);
+            ctx.restore();
           }
         }
       }
 
-      // FX Layer
+      // 3. RENDER ALL GEMS (Lush Vector Graphics)
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const gem = board[r]?.[c];
+          if (gem) {
+            const isSel = selectedCell && selectedCell.r === r && selectedCell.c === c;
+            drawVectorGem(ctx, gem.type, gem.x, gem.y, CELL_SIZE, isSel);
+          }
+        }
+      }
+
+      // 4. JUICE FX LAYER (Particle bursts, floating scores, screenshake)
       Jumby.fx.updateAndRender(ctx, V_WIDTH, V_HEIGHT);
 
-      // Overlays
-      if (state === 'waiting') {
-        ctx.fillStyle = 'rgba(8, 6, 20, 0.88)';
+      // 5. GAME OVER MODAL (Only when time expires!)
+      if (state === 'gameover') {
+        ctx.fillStyle = 'rgba(9, 7, 23, 0.92)';
         ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
 
         ctx.textAlign = 'center';
-        ctx.fillStyle = COLORS.cyan;
-        ctx.font = '900 28px "Orbitron", sans-serif';
-        ctx.fillText('NEON GRID SPARK', V_WIDTH / 2, 360);
+        ctx.fillStyle = '#FF1744';
+        ctx.font = '900 34px "Orbitron", sans-serif';
+        ctx.shadowColor = '#FF1744';
+        ctx.shadowBlur = 18;
+        ctx.fillText('TIME UP!', V_WIDTH / 2, 340);
+        ctx.shadowBlur = 0;
 
-        ctx.fillStyle = COLORS.magenta;
-        ctx.font = '700 13px "Orbitron", sans-serif';
-        ctx.fillText('60-SECOND MATCH-3 BLITZ', V_WIDTH / 2, 400);
-
-        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
-        ctx.globalAlpha = 0.5 + pulse * 0.5;
-        ctx.fillStyle = COLORS.lime;
-        ctx.font = '900 18px "Orbitron", sans-serif';
-        ctx.fillText('TAP ANYWHERE TO START', V_WIDTH / 2, 490);
-        ctx.globalAlpha = 1.0;
-      } else if (state === 'gameover') {
-        ctx.fillStyle = 'rgba(8, 6, 20, 0.9)';
-        ctx.fillRect(0, 0, V_WIDTH, V_HEIGHT);
-
-        ctx.textAlign = 'center';
-        ctx.fillStyle = COLORS.magenta;
-        ctx.font = '900 32px "Orbitron", sans-serif';
-        ctx.fillText('TIME UP!', V_WIDTH / 2, 350);
-
-        ctx.fillStyle = COLORS.white;
+        ctx.fillStyle = '#FFFFFF';
         ctx.font = '700 16px "Orbitron", sans-serif';
-        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 405);
+        ctx.fillText(`FINAL SCORE: ${score}`, V_WIDTH / 2, 395);
 
-        const pulse = Math.sin(Date.now() * 0.007) * 0.5 + 0.5;
-        ctx.globalAlpha = 0.5 + pulse * 0.5;
-        ctx.fillStyle = COLORS.lime;
-        ctx.font = '900 18px "Orbitron", sans-serif';
-        ctx.fillText('TAP TO PLAY AGAIN', V_WIDTH / 2, 490);
-        ctx.globalAlpha = 1.0;
+        // Play Again Button Card
+        ctx.fillStyle = '#D8FF43';
+        ctx.beginPath();
+        ctx.roundRect(V_WIDTH / 2 - 110, 460, 220, 52, 26);
+        ctx.fill();
+
+        ctx.fillStyle = '#090717';
+        ctx.font = '900 16px "Orbitron", sans-serif';
+        ctx.fillText('PLAY AGAIN', V_WIDTH / 2, 492);
       }
 
       ctx.restore();
       requestAnimationFrame(render);
     }
 
-    initBoard();
+    restartGame();
     Jumby.ready();
     requestAnimationFrame(render);
   </script>
