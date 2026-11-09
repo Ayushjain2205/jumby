@@ -29,8 +29,8 @@ app.route('/api/auth', authRouter);
 
 // Games & Publishing endpoints
 app.route('/api/games', gamesRouter);
-app.get('/api/game', (c) => gamesRouter.fetch(new Request(new URL(`/api/games/single?${c.req.query('slug') ? 'slug=' + c.req.query('slug') : ''}`, c.req.url), c.req.raw, c.env)));
-app.post('/api/publish', (c) => gamesRouter.fetch(new Request(new URL('/api/games/publish', c.req.url), c.req.raw, c.env)));
+app.get('/api/game', (c) => gamesRouter.fetch(new Request(new URL(`/api/games/single?${c.req.query('slug') ? 'slug=' + c.req.query('slug') : ''}`, c.req.url)), c.env));
+app.post('/api/publish', (c) => gamesRouter.fetch(new Request(new URL('/api/games/publish', c.req.url), { method: 'POST', body: c.req.raw.body, headers: c.req.raw.headers }), c.env));
 
 // AI Engine endpoints
 app.route('/api/generate', generateRouter);

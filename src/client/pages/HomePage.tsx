@@ -10,7 +10,7 @@ export default function HomePage() {
     // Re-sync published games from server
     fetch('/api/games')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+      .then((data: any) => {
         if (data?.games && Array.isArray(data.games)) {
           setGames(data.games);
         }

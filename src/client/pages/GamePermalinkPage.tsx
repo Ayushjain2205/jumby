@@ -13,7 +13,6 @@ export default function GamePermalinkPage() {
 
   useEffect(() => {
     if (!slug) return;
-    // Check if we already have it locally
     const local = getGameBySlug(slug);
     if (local) {
       setGame(local);
@@ -21,11 +20,10 @@ export default function GamePermalinkPage() {
       return;
     }
 
-    // Otherwise fetch from server /api/game?slug=...
     setLoading(true);
     fetch(`/api/game?slug=${encodeURIComponent(slug)}`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+      .then((data: any) => {
         if (data?.game) {
           setGame(data.game);
         }

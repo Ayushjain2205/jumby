@@ -100,7 +100,7 @@ Update the visual theme, colors, font vibe, and item to reflect the user's reque
     clearTimeout(timeout);
 
     if (res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as any;
       const content = data.choices?.[0]?.message?.content?.trim();
       if (content) {
         const parsed = parseIntentJson(content, isEdit, currentTitle, requestedArchetype);
@@ -137,7 +137,7 @@ Update the visual theme, colors, font vibe, and item to reflect the user's reque
       clearTimeout(timeout);
 
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as any;
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
           const parsed = parseIntentJson(text, isEdit, currentTitle, requestedArchetype);

@@ -25,8 +25,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await fetch('/api/auth/me');
       if (res.ok) {
-        const data = await res.json();
-        if (data.user) {
+        const data = (await res.json()) as any;
+        if (data?.user) {
           setUser(data.user);
         }
       }
@@ -48,12 +48,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier, password: pass }),
       });
-      const data = await res.json();
-      if (res.ok && data.user) {
+      const data = (await res.json()) as any;
+      if (res.ok && data?.user) {
         setUser(data.user);
         return { success: true };
       }
-      return { success: false, error: data.error || 'Login failed' };
+      return { success: false, error: data?.error || 'Login failed' };
     } catch (err: any) {
       return { success: false, error: err.message || 'Login failed' };
     }
@@ -76,12 +76,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           displayName: displayName || undefined,
         }),
       });
-      const data = await res.json();
-      if (res.ok && data.user) {
+      const data = (await res.json()) as any;
+      if (res.ok && data?.user) {
         setUser(data.user);
         return { success: true };
       }
-      return { success: false, error: data.error || 'Registration failed' };
+      return { success: false, error: data?.error || 'Registration failed' };
     } catch (err: any) {
       return { success: false, error: err.message || 'Registration failed' };
     }
