@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ExploreGrid } from '@/components/explore/ExploreGrid';
-import { WalletProvider } from '@/context/WalletContext';
 import { getAllGames } from '@/lib/games/game-registry';
 import { Game } from '@/types/game';
 
@@ -8,7 +7,7 @@ export default function HomePage() {
   const [games, setGames] = useState<Game[]>(() => getAllGames());
 
   useEffect(() => {
-    // Optionally re-sync published games from server
+    // Re-sync published games from server
     fetch('/api/games')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -21,9 +20,5 @@ export default function HomePage() {
       });
   }, []);
 
-  return (
-    <WalletProvider>
-      <ExploreGrid games={games} />
-    </WalletProvider>
-  );
+  return <ExploreGrid games={games} />;
 }
