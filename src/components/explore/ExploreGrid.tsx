@@ -7,7 +7,9 @@ import { GameTile } from './GameTile';
 import { JumbyLogo } from '@/components/brand/JumbyLogo';
 import { JumbyCoin } from '@/components/brand/JumbyCoin';
 import { useWallet } from '@/context/WalletContext';
+import { useAuth } from '@/context/AuthContext';
 import { CoinShopModal } from '@/components/modals/CoinShopModal';
+import { AuthModal } from '@/components/modals/AuthModal';
 import {
   Search,
   Plus,
@@ -35,10 +37,12 @@ const CATEGORIES = [
 
 export function ExploreGrid({ games }: ExploreGridProps) {
   const { coins, openShop } = useWallet();
+  const { user } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Filtered games based on search and category
   const filteredGames = useMemo(() => {
@@ -148,17 +152,36 @@ export function ExploreGrid({ games }: ExploreGridProps) {
               <Plus className="w-3 h-3 text-zinc-400 stroke-[3]" />
             </button>
 
-            {/* User Avatar */}
-            <div className="flex items-center gap-1 pl-1 cursor-pointer group">
+            {/* Claim Profile Pill for Guests */}
+            {user?.isGuest && (
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-jumby-lime/20 to-jumby-purple/20 hover:from-jumby-lime/30 hover:to-jumby-purple/30 border border-jumby-lime/40 text-jumby-lime text-xs font-heading font-black cursor-pointer transition active:scale-95 shadow-sm"
+              >
+                <Sparkles className="w-3 h-3 text-jumby-lime" />
+                <span>Claim Handle</span>
+              </button>
+            )}
+
+            {/* User Profile Pill */}
+            <div
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex items-center gap-1.5 pl-1 cursor-pointer group"
+              title={user ? `@${user.username}` : 'Profile'}
+            >
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-jumby-purple to-jumby-lime p-0.5 shadow-md">
                 <div className="w-full h-full rounded-full bg-zinc-950 flex items-center justify-center overflow-hidden">
                   <img
-                    src="/images/agent-avatar.jpg"
-                    alt="User Profile"
+                    src={user?.avatarUrl || '/images/agent-avatar.jpg'}
+                    alt={user?.displayName || 'User Profile'}
                     className="w-full h-full object-cover"
                   />
                 </div>
               </div>
+              <span className="hidden md:inline-block text-xs font-bold text-zinc-300 group-hover:text-white transition-colors max-w-[100px] truncate">
+                @{user?.username || 'player'}
+              </span>
               <ChevronDown className="w-3.5 h-3.5 text-zinc-400 group-hover:text-white transition-colors" />
             </div>
           </div>
@@ -252,6 +275,9 @@ export function ExploreGrid({ games }: ExploreGridProps) {
 
       {/* Wallet Shop Modal */}
       <CoinShopModal />
+
+      {/* Creator Profile / Auth Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>
   );
 }

@@ -50,6 +50,8 @@ import {
   DifficultyConfig,
 } from '@/components/create/GenerativeChatWidgets';
 import { WalletProvider } from '@/context/WalletContext';
+import { useAuth } from '@/context/AuthContext';
+import { AuthModal } from '@/components/modals/AuthModal';
 import {
   GAME_FONTS,
   detectFontVibe,
@@ -173,6 +175,8 @@ function AnimatedGeniusTitle() {
 }
 
 function CreateStudioContent() {
+  const { user } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const searchParams = useSearchParams();
   const remixId = searchParams.get('remix');
   const editSlug = searchParams.get('edit');
@@ -939,6 +943,21 @@ function CreateStudioContent() {
             </button>
           )}
 
+          {/* User Profile / Claim Handle Pill */}
+          <button
+            type="button"
+            onClick={() => setIsAuthModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold transition-all cursor-pointer"
+            title={user ? `@${user.username}` : 'Profile'}
+          >
+            <div className="w-4 h-4 rounded-full overflow-hidden bg-zinc-900">
+              <img src={user?.avatarUrl || '/images/agent-avatar.jpg'} alt="" className="w-full h-full object-cover" />
+            </div>
+            <span className="hidden sm:inline text-zinc-300">
+              {user?.isGuest ? 'Claim Profile' : `@${user?.username}`}
+            </span>
+          </button>
+
           {/* Primary Publish Button: Jumby Lime (#D8FF43) */}
           <button
             onClick={handlePublish}
@@ -1503,6 +1522,16 @@ function CreateStudioContent() {
             </div>
 
             <div className="flex flex-col gap-2">
+              {user?.isGuest && (
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="w-full py-2.5 px-3 rounded-full bg-purple-950/70 hover:bg-purple-900/60 border border-purple-500/30 text-purple-200 text-xs font-heading font-black flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-jumby-lime" />
+                  <span>Claim Handle to Own This Game</span>
+                </button>
+              )}
               <Link
                 href={`/g/${publishedSlug}`}
                 className="w-full py-3.5 rounded-full bg-jumby-lime font-heading font-black text-xs text-jumby-ink shadow-lg shadow-jumby-lime/20 hover:brightness-105 transition-all flex items-center justify-center gap-1.5"
@@ -1521,6 +1550,9 @@ function CreateStudioContent() {
           </div>
         </div>
       )}
+
+      {/* Profile & Auth Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </div>
   );
 }
