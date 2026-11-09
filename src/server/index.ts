@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth';
 import { gamesRouter } from './routes/games';
 import { generateRouter } from './routes/generate';
 import { healRouter } from './routes/heal';
+import { scoresRouter } from './routes/scores';
 import { SEED_GAMES } from '@/data/seed-games';
 
 const app = new Hono<{ Bindings: CloudflareEnv; Variables: AppVariables }>();
@@ -31,6 +32,9 @@ app.route('/api/auth', authRouter);
 app.route('/api/games', gamesRouter);
 app.get('/api/game', (c) => gamesRouter.fetch(new Request(new URL(`/api/games/single?${c.req.query('slug') ? 'slug=' + c.req.query('slug') : ''}`, c.req.url)), c.env));
 app.post('/api/publish', (c) => gamesRouter.fetch(new Request(new URL('/api/games/publish', c.req.url), { method: 'POST', body: c.req.raw.body, headers: c.req.raw.headers }), c.env));
+
+// High Scores & Leaderboard endpoints (Technique 1: Client-Side PB Gate)
+app.route('/api/scores', scoresRouter);
 
 // AI Engine endpoints
 app.route('/api/generate', generateRouter);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useWallet } from '@/context/WalletContext';
 import { JumbyLogo } from '@/components/brand/JumbyLogo';
@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Loader2,
   ShieldCheck,
+  Trophy,
+  Play,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -34,6 +36,22 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'claim' }: AuthModalP
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [userScores, setUserScores] = useState<
+    { gameId: string; title: string; slug: string; score: number; thumbnailUrl: string | null }[]
+  >([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/scores/user')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: any) => {
+          if (data?.scores && Array.isArray(data.scores)) {
+            setUserScores(data.scores);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen, user?.id]);
 
   if (!isOpen) return null;
 
@@ -114,6 +132,51 @@ export function AuthModal({ isOpen, onClose, defaultMode = 'claim' }: AuthModalP
                 {coins.toLocaleString()} Coins
               </span>
               <span className="text-xs text-zinc-500">• Permanent Account</span>
+            </div>
+
+            {/* My High Scores / Trophies Showcase */}
+            <div className="w-full text-left mb-6">
+              <div className="flex items-center gap-1.5 text-xs font-heading font-black text-zinc-300 mb-2.5">
+                <Trophy className="w-3.5 h-3.5 text-yellow-400" />
+                <span>My High Scores ({userScores.length})</span>
+              </div>
+
+              {userScores.length === 0 ? (
+                <div className="p-4 rounded-2xl bg-black/20 border border-white/5 text-center text-xs text-zinc-500 font-sans">
+                  No personal bests recorded yet. Play games to earn trophies!
+                </div>
+              ) : (
+                <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1 no-scrollbar">
+                  {userScores.map((scoreItem) => (
+                    <div
+                      key={scoreItem.gameId}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-jumby-purple/20 flex items-center justify-center text-xs shrink-0">
+                          🎮
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">{scoreItem.title}</div>
+                          <div className="text-[10px] text-zinc-400 font-mono">Personal Best</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-heading font-black text-xs text-jumby-lime">
+                          {scoreItem.score.toLocaleString()}
+                        </span>
+                        <a
+                          href={`/g/${scoreItem.slug}`}
+                          className="w-6 h-6 rounded-full bg-white/10 hover:bg-jumby-purple flex items-center justify-center text-white transition"
+                          title="Play again"
+                        >
+                          <Play className="w-3 h-3 fill-current ml-0.5" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="w-full space-y-3">

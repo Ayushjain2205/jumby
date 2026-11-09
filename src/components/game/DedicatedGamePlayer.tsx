@@ -79,6 +79,24 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
     );
   };
 
+  // Sync latest cloud personal best from D1 if available
+  useEffect(() => {
+    fetch('/api/scores/user')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: any) => {
+        if (data?.scores && Array.isArray(data.scores)) {
+          const match = data.scores.find((s: any) => s.gameId === game.id || s.slug === game.slug);
+          if (match && typeof match.score === 'number' && match.score > highScore) {
+            setHighScore(match.score);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`jumby_hs_${game.id}`, String(match.score));
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }, [game.id, game.slug]);
+
   // Play audio chime on coin reward
   const playRewardSound = (isBest: boolean) => {
     try {
@@ -164,6 +182,12 @@ export function DedicatedGamePlayer({ game }: DedicatedGamePlayerProps) {
           if (typeof window !== 'undefined') {
             localStorage.setItem(`jumby_hs_${game.id}`, String(score));
           }
+          // Technique 1: Client-Side PB Gate (only 5% of runs write to D1)
+          fetch('/api/scores/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameId: game.id, score }),
+          }).catch((err) => console.warn('[Scores] Background submit failed:', err));
         } else if (score >= Math.round(highScore * 0.5) && score > 0) {
           milestone = 5; // +5 Coins for a solid run (>50% of best)
         }
